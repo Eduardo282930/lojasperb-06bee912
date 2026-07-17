@@ -1,8 +1,9 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useSuspenseQuery, queryOptions } from "@tanstack/react-query";
-import { Plus, Minus, ShoppingBag, ImageOff, RefreshCw } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Plus, ShoppingBag, ImageOff, RefreshCw, Search, X } from "lucide-react";
 import { fetchProducts, type CatalogProduct } from "@/lib/loyverse.functions";
-import { addToCart, updateQty, useCart, formatPrice, type CartItem } from "@/lib/cart";
+import { addToCart, useCart, formatPrice } from "@/lib/cart";
 
 const productsQuery = queryOptions({
   queryKey: ["products"],
@@ -47,24 +48,58 @@ function ErrorView({ error }: { error: Error }) {
   );
 }
 
+function normalize(s: string) {
+  return s.toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "");
+}
+
 function Home() {
   const { data: products } = useSuspenseQuery(productsQuery);
   const cart = useCart();
   const totalQty = cart.reduce((s, c) => s + c.qty, 0);
-  const cartById = new Map(cart.map((c) => [c.id, c]));
+  const [query, setQuery] = useState("");
+
+  const filtered = useMemo(() => {
+    const q = normalize(query.trim());
+    if (!q) return products;
+    return products.filter((p) => normalize(p.name).includes(q));
+  }, [products, query]);
 
   return (
     <div className="min-h-screen bg-background pb-8">
       <TopBar totalQty={totalQty} />
-      <main className="mx-auto max-w-3xl px-4 pt-4">
-        {products.length === 0 ? (
-          <p className="mt-10 text-center text-2xl text-muted-foreground">
-            Nenhum produto disponível.
+      <div className="sticky top-[72px] z-10 border-b border-border bg-background/95 backdrop-blur">
+        <div className="mx-auto max-w-3xl px-4 py-3">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-4 top-1/2 h-6 w-6 -translate-y-1/2 text-muted-foreground" />
+            <input
+              type="search"
+              inputMode="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Buscar produto..."
+              className="w-full rounded-2xl border-2 border-border bg-card py-4 pl-14 pr-12 text-xl font-semibold text-foreground placeholder:text-muted-foreground focus:border-[oklch(0.55_0.22_255)] focus:outline-none"
+            />
+            {query && (
+              <button
+                aria-label="Limpar busca"
+                onClick={() => setQuery("")}
+                className="absolute right-3 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full bg-muted text-foreground"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+      <main className="mx-auto max-w-3xl px-4 pt-3">
+        {filtered.length === 0 ? (
+          <p className="mt-10 text-center text-xl text-muted-foreground">
+            Nenhum produto encontrado.
           </p>
         ) : (
-          <ul className="flex flex-col gap-4">
-            {products.map((p) => (
-              <ProductRow key={p.id} product={p} inCart={cartById.get(p.id)} />
+          <ul className="flex flex-col gap-2">
+            {filtered.map((p) => (
+              <ProductRow key={p.id} product={p} />
             ))}
           </ul>
         )}
@@ -75,17 +110,17 @@ function Home() {
 
 function TopBar({ totalQty }: { totalQty: number }) {
   return (
-    <header className="sticky top-0 z-10 border-b-2 border-border bg-background/95 backdrop-blur">
-      <div className="mx-auto flex max-w-3xl items-center justify-between gap-3 px-4 py-3">
-        <h1 className="text-4xl font-black tracking-tight text-foreground">SPERB</h1>
+    <header className="sticky top-0 z-20 border-b-2 border-border bg-background/95 backdrop-blur">
+      <div className="mx-auto grid max-w-3xl grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-4 py-3">
+        <h1 className="truncate text-3xl font-black tracking-tight text-foreground">SPERB</h1>
         <Link
           to="/sacola"
-          className="inline-flex items-center gap-3 rounded-2xl bg-[oklch(0.62_0.19_145)] px-6 py-4 text-2xl font-bold text-white shadow-lg active:scale-95"
+          className="inline-flex shrink-0 items-center gap-2 rounded-2xl bg-[oklch(0.62_0.19_145)] px-4 py-3 text-xl font-bold text-white shadow-lg active:scale-95"
         >
-          <ShoppingBag className="h-8 w-8" />
+          <ShoppingBag className="h-6 w-6" />
           Ver Sacola
           {totalQty > 0 && (
-            <span className="ml-1 min-w-9 rounded-full bg-white px-3 py-1 text-center text-xl font-black text-[oklch(0.45_0.19_145)]">
+            <span className="ml-1 min-w-8 rounded-full bg-white px-2 py-0.5 text-center text-lg font-black text-[oklch(0.45_0.19_145)]">
               {totalQty}
             </span>
           )}
@@ -95,75 +130,42 @@ function TopBar({ totalQty }: { totalQty: number }) {
   );
 }
 
-function ProductRow({ product, inCart }: { product: CatalogProduct; inCart?: CartItem }) {
+function ProductRow({ product }: { product: CatalogProduct }) {
   const outOfStock = product.stock <= 0;
-  const stockLabel = Number.isFinite(product.stock)
-    ? `Estoque: ${product.stock}`
-    : null;
-  const qty = inCart?.qty ?? 0;
-  const canAddMore = !Number.isFinite(product.stock) || qty < product.stock;
 
   return (
-    <li className="flex items-center gap-4 rounded-3xl border-2 border-border bg-card p-4 shadow-sm">
-      <div className="grid h-24 w-24 shrink-0 place-items-center overflow-hidden rounded-2xl bg-muted">
+    <li className="flex items-center gap-3 rounded-2xl border border-border bg-card p-2 shadow-sm">
+      <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-xl bg-muted">
         {product.image ? (
           <img src={product.image} alt={product.name} className="h-full w-full object-cover" loading="lazy" />
         ) : (
-          <ImageOff className="h-10 w-10 text-muted-foreground" />
+          <ImageOff className="h-7 w-7 text-muted-foreground" />
         )}
       </div>
       <div className="flex min-w-0 flex-1 flex-col">
-        <p className="text-2xl font-bold leading-tight text-foreground break-words">
+        <p className="text-base font-bold leading-snug text-foreground break-words">
           {product.name}
         </p>
-        {stockLabel && (
-          <p className={`mt-1 text-sm font-semibold ${outOfStock ? "text-red-600" : "text-muted-foreground"}`}>
-            {stockLabel}
-          </p>
-        )}
-        <p className="mt-1 text-3xl font-black text-foreground">{formatPrice(product.price)}</p>
+        <p className="mt-0.5 text-lg font-black text-foreground">{formatPrice(product.price)}</p>
       </div>
 
       {outOfStock ? (
         <button
           disabled
-          className="grid h-20 min-w-24 shrink-0 place-items-center rounded-2xl bg-muted px-3 text-base font-bold text-muted-foreground"
+          className="grid h-14 shrink-0 place-items-center rounded-xl bg-muted px-3 text-sm font-bold text-muted-foreground"
         >
           Indisponível
         </button>
-      ) : qty === 0 ? (
+      ) : (
         <button
           aria-label={`Adicionar ${product.name}`}
           onClick={() =>
             addToCart({ id: product.id, name: product.name, price: product.price })
           }
-          className="grid h-20 w-20 shrink-0 place-items-center rounded-2xl bg-[oklch(0.55_0.22_255)] text-white shadow-lg active:scale-95"
+          className="grid h-14 w-14 shrink-0 place-items-center rounded-xl bg-[oklch(0.55_0.22_255)] text-white shadow-md active:scale-95"
         >
-          <Plus className="h-12 w-12" strokeWidth={3} />
+          <Plus className="h-8 w-8" strokeWidth={3} />
         </button>
-      ) : (
-        <div className="flex shrink-0 items-center gap-2">
-          <button
-            aria-label={`Diminuir ${product.name}`}
-            onClick={() => updateQty(product.id, qty - 1)}
-            className="grid h-16 w-16 place-items-center rounded-2xl bg-red-600 text-white shadow-lg active:scale-95"
-          >
-            <Minus className="h-9 w-9" strokeWidth={3} />
-          </button>
-          <span className="w-10 text-center text-3xl font-black text-foreground">
-            {qty}
-          </span>
-          <button
-            aria-label={`Aumentar ${product.name}`}
-            disabled={!canAddMore}
-            onClick={() =>
-              addToCart({ id: product.id, name: product.name, price: product.price })
-            }
-            className="grid h-16 w-16 place-items-center rounded-2xl bg-[oklch(0.55_0.22_255)] text-white shadow-lg active:scale-95 disabled:opacity-40"
-          >
-            <Plus className="h-9 w-9" strokeWidth={3} />
-          </button>
-        </div>
       )}
     </li>
   );
