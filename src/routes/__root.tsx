@@ -83,6 +83,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:description", content: "Catálogo SPERB. Escolha seus produtos e envie o pedido pelo WhatsApp." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "SPERB — Catálogo" },
+      { name: "twitter:description", content: "Catálogo SPERB. Escolha seus produtos e envie o pedido pelo WhatsApp." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/e110b080-dcdf-4710-ac8d-dfb63680bcde/id-preview-2b496283--50628d9d-ee67-4887-b808-5e0452dad905.lovable.app-1784287422036.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/e110b080-dcdf-4710-ac8d-dfb63680bcde/id-preview-2b496283--50628d9d-ee67-4887-b808-5e0452dad905.lovable.app-1784287422036.png" },
     ],
     links: [
       {
