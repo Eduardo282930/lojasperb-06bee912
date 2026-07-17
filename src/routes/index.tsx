@@ -1,13 +1,13 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useSuspenseQuery, queryOptions } from "@tanstack/react-query";
-import { Plus, ShoppingBag, ImageOff, RefreshCw } from "lucide-react";
+import { Plus, Minus, ShoppingBag, ImageOff, RefreshCw } from "lucide-react";
 import { fetchProducts, type CatalogProduct } from "@/lib/loyverse.functions";
-import { addToCart, useCart, formatPrice } from "@/lib/cart";
+import { addToCart, updateQty, useCart, formatPrice, type CartItem } from "@/lib/cart";
 
 const productsQuery = queryOptions({
   queryKey: ["products"],
   queryFn: () => fetchProducts(),
-  staleTime: 5 * 60 * 1000,
+  staleTime: 60 * 1000,
 });
 
 export const Route = createFileRoute("/")({
@@ -51,6 +51,7 @@ function Home() {
   const { data: products } = useSuspenseQuery(productsQuery);
   const cart = useCart();
   const totalQty = cart.reduce((s, c) => s + c.qty, 0);
+  const cartById = new Map(cart.map((c) => [c.id, c]));
 
   return (
     <div className="min-h-screen bg-background pb-8">
@@ -63,7 +64,7 @@ function Home() {
         ) : (
           <ul className="flex flex-col gap-4">
             {products.map((p) => (
-              <ProductRow key={p.id} product={p} />
+              <ProductRow key={p.id} product={p} inCart={cartById.get(p.id)} />
             ))}
           </ul>
         )}
@@ -94,30 +95,76 @@ function TopBar({ totalQty }: { totalQty: number }) {
   );
 }
 
-function ProductRow({ product }: { product: CatalogProduct }) {
+function ProductRow({ product, inCart }: { product: CatalogProduct; inCart?: CartItem }) {
+  const outOfStock = product.stock <= 0;
+  const stockLabel = Number.isFinite(product.stock)
+    ? `Estoque: ${product.stock}`
+    : null;
+  const qty = inCart?.qty ?? 0;
+  const canAddMore = !Number.isFinite(product.stock) || qty < product.stock;
+
   return (
     <li className="flex items-center gap-4 rounded-3xl border-2 border-border bg-card p-4 shadow-sm">
       <div className="grid h-24 w-24 shrink-0 place-items-center overflow-hidden rounded-2xl bg-muted">
         {product.image ? (
-          // eslint-disable-next-line @next/next/no-img-element
           <img src={product.image} alt={product.name} className="h-full w-full object-cover" loading="lazy" />
         ) : (
           <ImageOff className="h-10 w-10 text-muted-foreground" />
         )}
       </div>
       <div className="flex min-w-0 flex-1 flex-col">
-        <p className="truncate text-2xl font-bold leading-tight text-foreground">{product.name}</p>
+        <p className="text-2xl font-bold leading-tight text-foreground break-words">
+          {product.name}
+        </p>
+        {stockLabel && (
+          <p className={`mt-1 text-sm font-semibold ${outOfStock ? "text-red-600" : "text-muted-foreground"}`}>
+            {stockLabel}
+          </p>
+        )}
         <p className="mt-1 text-3xl font-black text-foreground">{formatPrice(product.price)}</p>
       </div>
-      <button
-        aria-label={`Adicionar ${product.name}`}
-        onClick={() =>
-          addToCart({ id: product.id, name: product.name, price: product.price })
-        }
-        className="grid h-20 w-20 shrink-0 place-items-center rounded-2xl bg-[oklch(0.55_0.22_255)] text-white shadow-lg active:scale-95"
-      >
-        <Plus className="h-12 w-12" strokeWidth={3} />
-      </button>
+
+      {outOfStock ? (
+        <button
+          disabled
+          className="grid h-20 min-w-24 shrink-0 place-items-center rounded-2xl bg-muted px-3 text-base font-bold text-muted-foreground"
+        >
+          Indisponível
+        </button>
+      ) : qty === 0 ? (
+        <button
+          aria-label={`Adicionar ${product.name}`}
+          onClick={() =>
+            addToCart({ id: product.id, name: product.name, price: product.price })
+          }
+          className="grid h-20 w-20 shrink-0 place-items-center rounded-2xl bg-[oklch(0.55_0.22_255)] text-white shadow-lg active:scale-95"
+        >
+          <Plus className="h-12 w-12" strokeWidth={3} />
+        </button>
+      ) : (
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            aria-label={`Diminuir ${product.name}`}
+            onClick={() => updateQty(product.id, qty - 1)}
+            className="grid h-16 w-16 place-items-center rounded-2xl bg-red-600 text-white shadow-lg active:scale-95"
+          >
+            <Minus className="h-9 w-9" strokeWidth={3} />
+          </button>
+          <span className="w-10 text-center text-3xl font-black text-foreground">
+            {qty}
+          </span>
+          <button
+            aria-label={`Aumentar ${product.name}`}
+            disabled={!canAddMore}
+            onClick={() =>
+              addToCart({ id: product.id, name: product.name, price: product.price })
+            }
+            className="grid h-16 w-16 place-items-center rounded-2xl bg-[oklch(0.55_0.22_255)] text-white shadow-lg active:scale-95 disabled:opacity-40"
+          >
+            <Plus className="h-9 w-9" strokeWidth={3} />
+          </button>
+        </div>
+      )}
     </li>
   );
 }
