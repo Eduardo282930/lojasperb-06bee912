@@ -78,11 +78,10 @@ export function useCart(): CartItem[] {
 }
 
 export function formatPrice(price: number): string {
-  // Sempre mostrar com final ",90"
-  const reais = Math.max(0, Math.floor(price));
-  return `R$ ${reais},90`;
+  const value = Number.isFinite(price) ? price : 0;
+  return `R$ ${value.toFixed(2).replace(".", ",")}`;
 }
 
 export function priceValue(price: number): number {
-  return Math.max(0, Math.floor(price)) + 0.9;
+  return Number.isFinite(price) ? price : 0;
 }

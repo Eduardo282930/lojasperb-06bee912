@@ -21,13 +21,13 @@ function SacolaPage() {
   function enviarWhatsApp() {
     if (cart.length === 0) return;
     const linhas = cart.map(
-      (c) => `• ${c.qty}x ${c.name} — ${formatPrice(c.price)}`,
+      (c) => `- ${c.name} | Qtd: ${c.qty} | ${formatPrice(c.price)}`,
     );
-    const totalStr = `R$ ${total.toFixed(2).replace(".", ",")}`;
+    const totalStr = formatPrice(total);
     const texto =
-      `*Pedido SPERB*\n\n${linhas.join("\n")}\n\n*Total: ${totalStr}*`;
-    const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(texto)}`;
-    window.location.href = url;
+      `Pedido SPERB\n\n${linhas.join("\n")}\n\nTotal: ${totalStr}`;
+    const url = `https://api.whatsapp.com/send?phone=${WHATSAPP_NUMBER}&text=${encodeURIComponent(texto)}`;
+    window.open(url, "_blank");
   }
 
   return (
