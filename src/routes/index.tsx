@@ -256,7 +256,7 @@ function ProductCard({ product, ratingInfo }: { product: CatalogProduct; ratingI
   const outOfStock = product.stock <= 0;
   const [added, setAdded] = useState(false);
   const lowStock = product.stock > 0 && product.stock <= 5;
-
+    
   // Função para compartilhar o produto direto no WhatsApp
   const handleShare = (e: React.MouseEvent) => {
     e.preventDefault();
