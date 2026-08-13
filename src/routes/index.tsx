@@ -225,49 +225,51 @@ function ProductCard({ product }: { product: CatalogProduct }) {
             </div>
           )}
           {outOfStock && (
-            <div className="absolute inset-0 grid place-items-center bg-background/80 backdrop-blur-sm">
-              <span className="rounded-xl bg-destructive px-3 py-1.5 text-sm font-bold text-destructive-foreground">
+            <div className="absolute inset-0 grid place-items-center bg-background/70">
+              <span className="rounded-lg bg-muted px-3 py-1 text-base font-bold text-muted-foreground">
                 Indisponível
               </span>
             </div>
           )}
-          {low && !outOfStock && (
-            <div className="absolute bottom-2 left-2 rounded-lg bg-orange-500/90 px-2 py-1 text-xs font-bold text-white">
-              Restam apenas {product.stock}
-            </div>
+          {low && (
+            <span className="absolute left-2 top-2 rounded-md bg-[oklch(0.62_0.2_45)] px-2 py-0.5 text-sm font-bold text-white">
+              Últimas {product.stock}
+            </span>
           )}
         </div>
-
-        <div className="flex flex-1 flex-col p-4">
-          <h2 className="line-clamp-2 text-xl font-bold text-foreground">
+        <div className="flex flex-1 flex-col p-3 pb-14">
+          <p className="line-clamp-2 text-base font-semibold leading-snug text-foreground break-words">
             {product.name}
-          </h2>
-          <div className="mt-auto pt-4 flex items-center justify-between">
-            <span className="text-2xl font-black text-foreground">
-              {formatPrice(product.price)}
-            </span>
-            <button
-              disabled={outOfStock}
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                addToCart(product);
-                setAdded(true);
-                setTimeout(() => setAdded(false), 1000);
-              }}
-              className={`grid h-12 w-12 place-items-center rounded-xl border-2 transition-all active:scale-90 ${
-                outOfStock
-                  ? "border-muted bg-muted text-muted-foreground cursor-not-allowed"
-                  : added
-                  ? "border-green-500 bg-green-500 text-white"
-                  : "border-primary bg-primary text-primary-foreground hover:bg-primary/90"
-              }`}
-            >
-              {added ? <Check className="h-6 w-6 stroke-" /> : <Plus className="h-6 w-6 stroke-" />}
-            </button>
-          </div>
+          </p>
+          <p className="mt-auto pt-2 text-xl font-black text-[oklch(0.55_0.22_255)]">
+            {formatPrice(product.price)}
+          </p>
         </div>
       </Link>
+
+      {outOfStock ? (
+        <span className="absolute bottom-3 right-3 grid h-12 w-12 place-items-center rounded-xl bg-muted text-muted-foreground">
+          <X className="h-6 w-6" strokeWidth={3} />
+        </span>
+      ) : (
+        <button
+          aria-label={`Adicionar ${product.name}`}
+          onClick={() => {
+            addToCart({ id: product.id, name: product.name, price: product.price });
+            setAdded(true);
+            setTimeout(() => setAdded(false), 900);
+          }}
+          className={`absolute bottom-3 right-3 grid h-12 w-12 place-items-center rounded-xl text-white shadow-md transition-transform active:scale-90 ${
+            added ? "bg-[oklch(0.62_0.19_145)]" : "bg-[oklch(0.55_0.22_255)]"
+          }`}
+        >
+          {added ? (
+            <Check className="h-7 w-7" strokeWidth={3} />
+          ) : (
+            <Plus className="h-7 w-7" strokeWidth={3} />
+          )}
+        </button>
+      )}
     </li>
   );
 }
