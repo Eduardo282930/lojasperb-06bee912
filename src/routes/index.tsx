@@ -27,7 +27,7 @@ export const Route = createFileRoute("/")({
       {
         property: "og:description",
         content:
-          "Catálogo SPERB em tempo real: produtos por categoria, estoque updated e pedido direto pelo WhatsApp.",
+          "Catálogo SPERB em tempo real: produtos por categoria, estoque atualizado e pedido direto pelo WhatsApp.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -263,7 +263,7 @@ function ProductCard({ product }: { product: CatalogProduct }) {
                   : "border-primary bg-primary text-primary-foreground hover:bg-primary/90"
               }`}
             >
-              {added ? <Check className="h-6 w-6 stroke-[3]" /> : <Plus className="h-6 w-6 stroke-[3]" />}
+              {added ? <Check className="h-6 w-6 stroke-" /> : <Plus className="h-6 w-6 stroke-" />}
             </button>
           </div>
         </div>
