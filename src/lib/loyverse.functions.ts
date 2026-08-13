@@ -6,6 +6,9 @@ export type CatalogProduct = {
   price: number;
   image: string | null;
   stock: number;
+  description: string | null;
+  sku: string | null;
+  trackStock: boolean;
 };
 
 type LoyverseVariant = {
