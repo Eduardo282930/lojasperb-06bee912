@@ -6,14 +6,10 @@ export type CatalogProduct = {
   price: number;
   image: string | null;
   stock: number;
-  description: string | null;
-  sku: string | null;
-  trackStock: boolean;
 };
 
 type LoyverseVariant = {
   variant_id: string;
-  sku?: string | null;
   default_price?: number | null;
   stores?: Array<{ price?: number | null }>;
 };
@@ -21,7 +17,6 @@ type LoyverseVariant = {
 type LoyverseItem = {
   id: string;
   item_name: string;
-  description?: string | null;
   image_url?: string | null;
   track_stock?: boolean;
   variants?: LoyverseVariant[];
@@ -93,9 +88,6 @@ export const fetchProducts = createServerFn({ method: "GET" }).handler(
         price: Number(rawPrice) || 0,
         image: it.image_url ?? null,
         stock,
-        description: it.description?.trim() ? it.description.trim() : null,
-        sku: variant.sku ?? null,
-        trackStock: tracked,
       });
     }
 
