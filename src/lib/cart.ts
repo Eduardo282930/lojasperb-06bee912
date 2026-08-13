@@ -63,6 +63,8 @@ export function clearCart() {
   write([]);
 }
 
+const EMPTY: CartItem[] = [];
+
 export function useCart(): CartItem[] {
   return useSyncExternalStore(
     (cb) => {
@@ -73,7 +75,7 @@ export function useCart(): CartItem[] {
       ensureInit();
       return cache;
     },
-    () => [],
+    () => EMPTY,
   );
 }
 
