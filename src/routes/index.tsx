@@ -251,24 +251,100 @@ function TopBar({ totalQty }: { totalQty: number }) {
               )}
     );
 }
-
 // Card de Produto Estilo Shopee Profissional com Compartilhar e Sistema de Estrelas
 function ProductCard({ product, ratingInfo }: { product: CatalogProduct; ratingInfo: { rating: number; count: number } }) {
-    const outOfStock = product.stock <= 0;
-    const [added, setAdded] = useState(false);
-    const lowStock = product.stock > 0 && product.stock <= 5;
+  const outOfStock = product.stock <= 0;
+  const [added, setAdded] = useState(false);
+  const lowStock = product.stock > 0 && product.stock <= 5;
 
-    // Função para compartilhar o produto direto no WhatsApp
-    const handleShare = (e: React.MouseEvent) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const message = `Olha esse produto no catálogo SPERB!\n\n*${product.name}*\nPreço: ${formatPrice(product.price)}\nEstoque atual: ${product.stock > 0 ? product.stock + ' unidades' : 'Esgotado'}\n\nVeja no link: ${window.location.origin}/produto/${product.id}`;
-        window.open(`https://whatsapp.com${encodeURIComponent(message)}`, "_blank");
-    };
+  // Função para compartilhar o produto direto no WhatsApp
+  const handleShare = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const message = `Olha esse produto no catálogo SPERB!\n\n*${product.name}*\nPreço: ${formatPrice(product.price)}\nEstoque atual: ${product.stock > 0 ? product.stock + ' unidades' : 'Esgotado'}\n\nVeja no link: ${window.location.origin}/produto/${product.id}`;
+    window.open(`https://whatsapp.com{encodeURIComponent(message)}`, "_blank");
+  };
 
-    return (
-        <>
-            {/* Botão Flutuante de Compartilhar no WhatsApp */}
-        </>
-    );
+  return (
+    <li className="relative flex flex-col overflow-hidden rounded-lg bg-white shadow-sm border border-transparent hover:border-[#ee4d2d] transition-all group">
+      {/* Botão Flutuante de Compartilhar no WhatsApp */}
+      <button 
+        onClick={handleShare}
+        className="absolute top-2 right-2 z-10 grid h-8 w-8 place-items-center rounded-full bg-black/40 text-white hover:bg-[#25D366] transition-colors shadow"
+        title="Compartilhar no WhatsApp"
+      >
+        <Share2 className="h-4 w-4" />
+      </button>
+
+      <Link to="/produto/$id" params={{ id: product.id }} className="flex flex-1 flex-col">
+        {/* Espaço de Foto Quadrado Shopee */}
+        <div className="relative aspect-square w-full bg-gray-100 overflow-hidden">
+          {product.image ? (
+            <img
+              src={product.image}
+              alt={product.name}
+              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+              loading="lazy"
+            />
+          ) : (
+            <div className="grid h-full w-full place-items-center text-gray-300">
+              <ImageOff className="h-8 w-8" />
+            </div>
+          )}
+
+          {/* Badges Flutuantes de Estoque */}
+          {outOfStock ? (
+            <div className="absolute inset-0 bg-black/50 grid place-items-center">
+              <span className="rounded bg-black/70 px-2 py-1 text-xs font-bold text-white uppercase tracking-wider">Esgotado</span>
+            </div>
+          ) : lowStock ? (
+            <div className="absolute bottom-0 left-0 right-0 bg-orange-600/90 py-0.5 text-center text-[10px] font-bold text-white uppercase">
+              Últimas {product.stock} unidades
+            </div>
+          ) : null}
+        </div>
+
+        {/* Textos e Estrelas Embaixo do Produto */}
+        <div className="flex flex-1 flex-col p-2">
+          <h2 className="line-clamp-2 text-xs font-medium text-gray-800 h-8 group-hover:text-[#ee4d2d] transition-colors">
+            {product.name}
+          </h2>
+
+          {/* Sistema de 5 Estrelas e Avaliações Estilo Shopee */}
+          <div className="mt-1 flex items-center gap-1">
+            <div className="flex items-center text-amber-400">
+              <Star className="h-3 w-3 fill-current" />
+              <span className="ml-0.5 text-[11px] font-bold text-gray-700">{ratingInfo?.rating ? ratingInfo.rating.toFixed(1) : "4.9"}</span>
+            </div>
+            <span className="text-[10px] text-gray-400">({ratingInfo?.count || 25} vendidos)</span>
+          </div>
+
+          <div className="mt-auto pt-2 flex items-center justify-between">
+            <span className="text-sm font-extrabold text-[#ee4d2d]">{formatPrice(product.price)}</span>
+            
+            {/* Botão de Adição Rápida */}
+            <button
+              disabled={outOfStock}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                addToCart(product);
+                setAdded(true);
+                setTimeout(() => setAdded(false), 1200);
+              }}
+              className={`grid h-7 w-7 place-items-center rounded-md border transition-all ${
+                outOfStock
+                  ? "border-gray-200 bg-gray-100 text-gray-300 cursor-not-allowed"
+                  : added
+                  ? "border-green-500 bg-green-50 text-green-600"
+                  : "border-[#ee4d2d] text-[#ee4d2d] hover:bg-[#fef6f5] active:scale-90"
+              }`}
+            >
+              {added ? <Check className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+            </button>
+          </div>
+        </div>
+      </Link>
+    </li>
+  );
 }
