@@ -174,37 +174,91 @@ function EuPage() {
         </section>
 
         {ownerOpen && !isOwner && (
-          <section className="mt-6 rounded-3xl border-2 border-border bg-card p-4">
-            <h2 className="text-lg font-black text-foreground">Área do proprietário</h2>
-            <input
-              type="password"
-              inputMode="numeric"
-              value={pass}
-              onChange={(e) => {
-                setPass(e.target.value);
-                setPassError(false);
-              }}
-              placeholder="Senha"
-              className="mt-3 w-full rounded-2xl border-2 border-border bg-background px-4 py-3 text-lg font-semibold text-foreground outline-none focus:border-[oklch(0.55_0.22_255)]"
-            />
-            {passError && (
-              <p className="mt-2 text-base font-bold text-[oklch(0.58_0.22_25)]">
-                Senha incorreta.
-              </p>
-            )}
-            <button
-              onClick={() => {
-                if (pass === OWNER_PASSWORD) {
-                  setIsOwner(true);
-                  setPass("");
-                } else setPassError(true);
-              }}
-              className="mt-3 w-full rounded-2xl bg-foreground py-3 text-lg font-black text-background active:scale-[0.98]"
-            >
-              Entrar
-            </button>
-          </section>
-        )}
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+    <section
+      className="w-full max-w-md rounded-3xl border-2 border-border bg-card p-5 shadow-2xl"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="owner-title"
+    >
+      <div className="flex items-center justify-between">
+        <h2
+          id="owner-title"
+          className="text-xl font-black text-foreground"
+        >
+          Área do proprietário
+        </h2>
+
+        <button
+          type="button"
+          onClick={() => {
+            setOwnerOpen(false);
+            setPass("");
+            setPassError(false);
+          }}
+          className="grid h-10 w-10 place-items-center rounded-xl bg-muted text-xl font-black text-foreground active:scale-95"
+          aria-label="Fechar"
+        >
+          ×
+        </button>
+      </div>
+
+      <p className="mt-2 text-sm text-muted-foreground">
+        Digite a senha para acessar o gerenciamento de cupons.
+      </p>
+
+      <input
+        type="password"
+        inputMode="numeric"
+        value={pass}
+        onChange={(e) => {
+          setPass(e.target.value);
+          setPassError(false);
+        }}
+        placeholder="Senha"
+        autoFocus
+        className="mt-4 w-full rounded-2xl border-2 border-border bg-background px-4 py-4 text-lg font-semibold text-foreground outline-none focus:border-[oklch(0.55_0.22_255)]"
+      />
+
+      {passError && (
+        <p className="mt-2 text-base font-bold text-[oklch(0.58_0.22_25)]">
+          Senha incorreta.
+        </p>
+      )}
+
+      <div className="mt-4 flex gap-2">
+        <button
+          type="button"
+          onClick={() => {
+            setOwnerOpen(false);
+            setPass("");
+            setPassError(false);
+          }}
+          className="flex-1 rounded-2xl bg-muted py-4 text-lg font-black text-foreground active:scale-[0.98]"
+        >
+          Cancelar
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            if (pass === OWNER_PASSWORD) {
+              setIsOwner(true);
+              setOwnerOpen(false);
+              setPass("");
+              setPassError(false);
+            } else {
+              setPassError(true);
+            }
+          }}
+          className="flex-1 rounded-2xl bg-[oklch(0.55_0.22_255)] py-4 text-lg font-black text-white active:scale-[0.98]"
+        >
+          Entrar
+        </button>
+      </div>
+    </section>
+  </div>
+)}
 
         {isOwner && <OwnerPanel />}
       </main>
