@@ -14,7 +14,7 @@ import {
   User,
 } from "lucide-react";
 import { fetchCatalog, type CatalogProduct } from "@/lib/loyverse.functions";
-import { addToCart, useCart, formatPrice, cartQtyOf } from "@/lib/cart";
+import { addToCart, useCart, formatPrice } from "@/lib/cart";
 import { fuzzyScore, STRONG_MATCH } from "@/lib/search";
 import { flyToCart } from "@/lib/fly";
 import { shareProduct } from "@/lib/share";
@@ -275,6 +275,8 @@ function ProductCard({ product }: { product: CatalogProduct }) {
   const [added, setAdded] = useState(false);
   const [limitHit, setLimitHit] = useState(false);
   const btnRef = useRef<HTMLButtonElement>(null);
+  const cart = useCart();
+  const inCart = cart.find((c) => c.id === product.id)?.qty ?? 0;
   const low = Number.isFinite(product.stock) && product.stock > 0 && product.stock <= 5;
 
   function handleAdd() {
@@ -296,8 +298,6 @@ function ProductCard({ product }: { product: CatalogProduct }) {
     setAdded(true);
     setTimeout(() => setAdded(false), 800);
   }
-
-  const inCart = cartQtyOf(product.id);
 
   return (
     <li className="relative flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-shadow hover:shadow-md">
