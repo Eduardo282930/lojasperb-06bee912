@@ -66,12 +66,16 @@ function EuPage() {
           </Link>
           <h1 className="text-2xl font-black text-foreground">Eu</h1>
           <button
-            onClick={() => setOwnerOpen((v) => !v)}
-            aria-label="Área do proprietário"
-            className="ml-auto grid h-11 w-11 place-items-center rounded-2xl border-2 border-border bg-card text-muted-foreground active:scale-95"
-          >
-            <Lock className="h-5 w-5" />
-          </button>
+  type="button"
+  onClick={() => {
+    alert("CLIQUE FUNCIONOU");
+    setOwnerOpen(true);
+  }}
+  aria-label="Área do proprietário"
+  className="ml-auto grid h-11 w-11 place-items-center rounded-2xl border-2 border-border bg-card text-muted-foreground"
+>
+  <Lock className="h-5 w-5" />
+</button>
         </div>
       </header>
 
