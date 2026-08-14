@@ -7,11 +7,13 @@ import {
   Minus,
   Plus,
   RefreshCw,
-  ShoppingBag,
+  ShoppingCart,
   Check,
+  Share2,
 } from "lucide-react";
 import { fetchProduct } from "@/lib/loyverse.functions";
-import { addToCart, useCart, formatPrice } from "@/lib/cart";
+import { addToCart, useCart, formatPrice, cartQtyOf } from "@/lib/cart";
+import { shareProduct } from "@/lib/share";
 
 const productQuery = (id: string) =>
   queryOptions({
@@ -90,7 +92,10 @@ function ProdutoPage() {
   }
 
   const outOfStock = product.stock <= 0;
-  const maxQty = Number.isFinite(product.stock) ? product.stock : 99;
+  const inCart = cartQtyOf(product.id);
+  const maxQty = Number.isFinite(product.stock)
+    ? Math.max(1, product.stock - inCart)
+    : 99;
   const stockLabel = !Number.isFinite(product.stock)
     ? "Disponível"
     : product.stock > 0
@@ -111,12 +116,20 @@ function ProdutoPage() {
           <h1 className="min-w-0 flex-1 truncate text-2xl font-black text-foreground">
             {product.name}
           </h1>
+          <button
+            aria-label="Compartilhar produto"
+            onClick={() => shareProduct(product.id, product.name, product.price)}
+            className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl border-2 border-border bg-card text-foreground active:scale-95"
+          >
+            <Share2 className="h-6 w-6" />
+          </button>
           <Link
+            id="cart-anchor"
             to="/sacola"
             className="relative grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-[oklch(0.62_0.19_145)] text-white active:scale-95"
-            aria-label="Ver sacola"
+            aria-label="Ver carrinho"
           >
-            <ShoppingBag className="h-7 w-7" />
+            <ShoppingCart className="h-7 w-7" />
             {totalQty > 0 && (
               <span className="absolute -right-1 -top-1 min-w-6 rounded-full bg-white px-1 text-center text-sm font-black text-[oklch(0.45_0.19_145)]">
                 {totalQty}
@@ -214,9 +227,15 @@ function ProdutoPage() {
           <button
             disabled={outOfStock}
             onClick={() => {
-              for (let i = 0; i < qty; i++) {
-                addToCart({ id: product.id, name: product.name, price: product.price });
-              }
+              addToCart(
+                {
+                  id: product.id,
+                  name: product.name,
+                  price: product.price,
+                  stock: product.stock,
+                },
+                qty,
+              );
               setAdded(true);
               setTimeout(() => setAdded(false), 1200);
             }}
