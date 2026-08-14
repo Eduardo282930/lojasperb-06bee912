@@ -1,13 +1,21 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeft, Minus, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Minus, Plus, Trash2, Ticket } from "lucide-react";
 import { useCart, updateQty, formatPrice, priceValue, clearCart } from "@/lib/cart";
+import {
+  useCoupons,
+  useRedeemed,
+  useProfile,
+  activeCouponFor,
+  consumeCoupon,
+  unredeemCoupon,
+} from "@/lib/coupons";
 
 const WHATSAPP_NUMBER = "5551996109657";
 
 export const Route = createFileRoute("/sacola")({
   head: () => ({
     meta: [
-      { title: "Sacola — SPERB" },
+      { title: "Carrinho — SPERB" },
       { name: "description", content: "Revise seu pedido e envie pelo WhatsApp." },
     ],
   }),
@@ -16,16 +24,32 @@ export const Route = createFileRoute("/sacola")({
 
 function SacolaPage() {
   const cart = useCart();
-  const total = cart.reduce((s, c) => s + priceValue(c.price) * c.qty, 0);
+  const coupons = useCoupons();
+  const redeemed = useRedeemed();
+  const profile = useProfile();
+  const subtotal = cart.reduce((s, c) => s + priceValue(c.price) * c.qty, 0);
+  const applied = activeCouponFor(coupons, redeemed, subtotal);
+  const total = Math.max(0, subtotal - (applied?.discount ?? 0));
 
   function enviarWhatsApp() {
     if (cart.length === 0) return;
     const linhas = cart.map(
       (c) => `- ${c.name} | Qtd: ${c.qty} | ${formatPrice(c.price)}`,
     );
-    const totalStr = formatPrice(total);
-    const texto =
-      `Pedido SPERB\n\n${linhas.join("\n")}\n\nTotal: ${totalStr}`;
+    let texto = `Pedido SPERB\n\n${linhas.join("\n")}`;
+    if (profile.name) texto = `Pedido SPERB\nCliente: ${profile.name}\n\n${linhas.join("\n")}`;
+    if (applied) {
+      texto += `\n\nSubtotal: ${formatPrice(subtotal)}`;
+      texto += `\nCUPOM SPERB ${applied.coupon.code}: -${formatPrice(applied.discount)}`;
+      texto += `\n(O resgate não garante o uso, sujeito a confirmação)`;
+    }
+    texto += `\n\nTotal: ${formatPrice(total)}`;
+
+    if (applied) {
+      consumeCoupon(applied.coupon.id);
+      unredeemCoupon(applied.coupon.id);
+    }
+
     const url = `https://api.whatsapp.com/send?phone=${WHATSAPP_NUMBER}&text=${encodeURIComponent(texto)}`;
     window.open(url, "_blank");
   }
@@ -37,18 +61,20 @@ function SacolaPage() {
           <Link
             to="/"
             aria-label="Voltar"
-            className="grid h-16 w-16 place-items-center rounded-2xl bg-muted text-foreground active:scale-95"
+            className="grid h-14 w-14 place-items-center rounded-2xl bg-muted text-foreground active:scale-95"
           >
-            <ArrowLeft className="h-9 w-9" strokeWidth={2.5} />
+            <ArrowLeft className="h-8 w-8" strokeWidth={2.5} />
           </Link>
-          <h1 className="text-3xl font-black text-foreground">Sua Sacola</h1>
+          <h1 className="text-3xl font-black text-foreground">Meu Carrinho</h1>
         </div>
       </header>
 
       <main className="mx-auto max-w-3xl px-4 pt-4">
         {cart.length === 0 ? (
           <div className="mt-16 text-center">
-            <p className="text-2xl font-semibold text-foreground">Sua sacola está vazia.</p>
+            <p className="text-2xl font-semibold text-foreground">
+              Seu carrinho está vazio.
+            </p>
             <Link
               to="/"
               className="mt-6 inline-block rounded-2xl bg-primary px-8 py-5 text-2xl font-bold text-primary-foreground"
@@ -59,54 +85,95 @@ function SacolaPage() {
         ) : (
           <>
             <ul className="flex flex-col gap-3">
-              {cart.map((c) => (
-                <li
-                  key={c.id}
-                  className="flex items-center gap-3 rounded-3xl border-2 border-border bg-card p-4"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-2xl font-bold text-foreground">{c.name}</p>
-                    <p className="mt-1 text-2xl font-black text-foreground">
-                      {formatPrice(c.price)}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      aria-label="Diminuir"
-                      onClick={() => updateQty(c.id, c.qty - 1)}
-                      className="grid h-16 w-16 place-items-center rounded-2xl bg-muted text-foreground active:scale-95"
-                    >
-                      {c.qty === 1 ? <Trash2 className="h-8 w-8" /> : <Minus className="h-8 w-8" strokeWidth={3} />}
-                    </button>
-                    <span className="w-12 text-center text-3xl font-black text-foreground">
-                      {c.qty}
-                    </span>
-                    <button
-                      aria-label="Aumentar"
-                      onClick={() => updateQty(c.id, c.qty + 1)}
-                      className="grid h-16 w-16 place-items-center rounded-2xl bg-[oklch(0.55_0.22_255)] text-white active:scale-95"
-                    >
-                      <Plus className="h-8 w-8" strokeWidth={3} />
-                    </button>
-                  </div>
-                </li>
-              ))}
+              {cart.map((c) => {
+                const max =
+                  typeof c.stock === "number" && Number.isFinite(c.stock)
+                    ? Math.floor(c.stock)
+                    : 999;
+                const atMax = c.qty >= max;
+                return (
+                  <li
+                    key={c.id}
+                    className="flex items-center gap-3 rounded-3xl border-2 border-border bg-card p-4"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xl font-bold text-foreground break-words">
+                        {c.name}
+                      </p>
+                      <p className="mt-1 text-2xl font-black text-foreground">
+                        {formatPrice(c.price)}
+                      </p>
+                      {atMax && (
+                        <p className="text-sm font-bold text-[oklch(0.62_0.2_45)]">
+                          Máximo em estoque: {max}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        aria-label="Diminuir"
+                        onClick={() => updateQty(c.id, c.qty - 1)}
+                        className="grid h-14 w-14 place-items-center rounded-2xl bg-muted text-foreground active:scale-95"
+                      >
+                        {c.qty === 1 ? (
+                          <Trash2 className="h-7 w-7" />
+                        ) : (
+                          <Minus className="h-7 w-7" strokeWidth={3} />
+                        )}
+                      </button>
+                      <span className="w-10 text-center text-3xl font-black text-foreground">
+                        {c.qty}
+                      </span>
+                      <button
+                        aria-label="Aumentar"
+                        disabled={atMax}
+                        onClick={() => updateQty(c.id, c.qty + 1)}
+                        className="grid h-14 w-14 place-items-center rounded-2xl bg-[oklch(0.55_0.22_255)] text-white disabled:opacity-40 active:scale-95"
+                      >
+                        <Plus className="h-7 w-7" strokeWidth={3} />
+                      </button>
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
 
-            <div className="mt-6 flex items-center justify-between rounded-3xl border-2 border-border bg-card p-5">
-              <span className="text-2xl font-bold text-foreground">Total</span>
-              <span className="text-4xl font-black text-foreground">
-                R$ {total.toFixed(2).replace(".", ",")}
-              </span>
+            <div className="mt-6 rounded-3xl border-2 border-border bg-card p-5">
+              <div className="flex items-center justify-between text-xl font-bold text-muted-foreground">
+                <span>Subtotal</span>
+                <span>{formatPrice(subtotal)}</span>
+              </div>
+              {applied && (
+                <div className="mt-2 flex items-center justify-between text-xl font-black text-[oklch(0.45_0.19_145)]">
+                  <span className="inline-flex items-center gap-2">
+                    <Ticket className="h-6 w-6" /> CUPOM SPERB {applied.coupon.code}
+                  </span>
+                  <span>-{formatPrice(applied.discount)}</span>
+                </div>
+              )}
+              <div className="mt-3 flex items-center justify-between border-t-2 border-border pt-3">
+                <span className="text-2xl font-bold text-foreground">Total</span>
+                <span className="text-4xl font-black text-foreground">
+                  {formatPrice(total)}
+                </span>
+              </div>
+              {!applied && (
+                <Link
+                  to="/eu"
+                  className="mt-3 inline-flex items-center gap-2 text-lg font-bold text-[oklch(0.55_0.22_255)]"
+                >
+                  <Ticket className="h-5 w-5" /> Resgatar um CUPOM SPERB
+                </Link>
+              )}
             </div>
 
             <button
               onClick={() => {
-                if (confirm("Esvaziar a sacola?")) clearCart();
+                if (confirm("Esvaziar o carrinho?")) clearCart();
               }}
               className="mt-4 w-full rounded-2xl border-2 border-border bg-background py-4 text-xl font-bold text-muted-foreground active:scale-95"
             >
-              Esvaziar sacola
+              Esvaziar carrinho
             </button>
           </>
         )}
