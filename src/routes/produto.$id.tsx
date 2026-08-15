@@ -98,6 +98,8 @@ function ProdutoPage() {
   }
 
   const hasVariants = product.variants.length > 1;
+  const productImages = product.images && product.images.length > 0 ? product.images : product.image ? [product.image] : [];
+  const selectedImage = selected.image ?? productImages[0] ?? product.image;
   const fullName = selected.label
     ? `${product.name} ${selected.label}`
     : product.name;
@@ -145,9 +147,9 @@ function ProdutoPage() {
       <main className="mx-auto max-w-3xl px-4 pt-4">
         <div className="overflow-hidden rounded-3xl border border-border bg-muted">
           <div className="aspect-square w-full">
-            {product.image ? (
+            {selectedImage ? (
               <img
-                src={product.image}
+                src={selectedImage}
                 alt={fullName}
                 className="h-full w-full object-cover"
               />
@@ -157,6 +159,23 @@ function ProdutoPage() {
               </div>
             )}
           </div>
+
+          {productImages.length > 1 && (
+            <div className="flex gap-2 overflow-x-auto border-t border-border bg-background p-3">
+              {productImages.map((img, index) => (
+                <button
+                  key={`${img}-${index}`}
+                  type="button"
+                  onClick={() => setSelectedId(product.variants[index]?.id ?? selected.id)}
+                  className={`h-16 w-16 shrink-0 overflow-hidden rounded-xl border-2 bg-muted ${
+                    selectedImage === img ? "border-[oklch(0.55_0.22_255)]" : "border-border"
+                  }`}
+                >
+                  <img src={img} alt={`${product.name} imagem ${index + 1}`} className="h-full w-full object-cover" />
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="mt-5">
