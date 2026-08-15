@@ -370,8 +370,13 @@ function OwnerPanel() {
       setLimited(false);
       setCapped(false);
       await refresh();
-    } catch {
-      setError("Não foi possível salvar o cupom. Verifique se o código já existe.");
+    } catch (err) {
+      console.error("[OwnerPanel] saveCoupon failed", err);
+      const message =
+        err instanceof Error && err.message
+          ? err.message
+          : "Não foi possível salvar o cupom.";
+      setError(message);
     }
   }
 

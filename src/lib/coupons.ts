@@ -90,13 +90,21 @@ export async function saveCoupon(coupon: Coupon): Promise<void> {
     max_uses: coupon.maxUses,
     active: coupon.active,
   };
+
   if (coupon.id) {
     const { error } = await supabase.from("coupons").update(payload).eq("id", coupon.id);
-    if (error) throw error;
+    if (error) {
+      console.error("[Supabase] saveCoupon update failed", error);
+      throw error;
+    }
     return;
   }
+
   const { error } = await supabase.from("coupons").insert(payload);
-  if (error) throw error;
+  if (error) {
+    console.error("[Supabase] saveCoupon insert failed", error);
+    throw error;
+  }
 }
 
 export async function deleteCoupon(id: string): Promise<void> {
