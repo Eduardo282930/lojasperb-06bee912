@@ -24,20 +24,39 @@ export const STORE_LOGO_KEY = ["store_logo"] as const;
  */
 export const fetchStoreLogo = createServerFn({ method: "GET" }).handler(
   async (): Promise<SystemProduct | null> => {
-    const { data, error } = await supabase
-      .from("system_products")
-      .select("*")
-      .eq("product_type", "store_logo")
-      .single();
+    try {
+      const { data, error } = await supabase
+        .from("system_products")
+        .select("*")
+        .eq("product_type", "store_logo")
+        .single();
 
-    if (error) {
-      // It's ok if it doesn't exist yet
-      if (error.code === "PGRST116") return null;
-      console.error("[Store Logo] Failed to fetch:", error);
+      if (error) {
+        // PGRST116: No rows found (table exists but no store_logo record)
+        if (error.code === "PGRST116") {
+          return null;
+        }
+        
+        // 42P01: Relation (table) does not exist (migration not applied)
+        if (error.code === "42P01") {
+          console.warn("[Store Logo] Table does not exist (migration not applied). This is safe to ignore.");
+          return null;
+        }
+        
+        // Other database errors - log but don't break
+        console.error("[Store Logo] Database error:", {
+          code: error.code,
+          message: error.message,
+        });
+        return null;
+      }
+
+      return data as SystemProduct;
+    } catch (err) {
+      // Network or other runtime errors - fail gracefully
+      console.error("[Store Logo] Unexpected error:", err);
       return null;
     }
-
-    return data as SystemProduct;
   },
 );
 

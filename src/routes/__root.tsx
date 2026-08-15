@@ -117,16 +117,22 @@ function RootShell({ children }: { children: ReactNode }) {
   );
 }
 
+/**
+ * Inner component that uses favicon sync hook
+ * Must be placed INSIDE QueryClientProvider to avoid context errors
+ */
+function FaviconSyncWrapper() {
+  useFaviconSync();
+  return <Outlet />;
+}
+
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
-
-  // Sync favicon with store logo
-  useFaviconSync();
 
   return (
     <QueryClientProvider client={queryClient}>
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-      <Outlet />
+      <FaviconSyncWrapper />
     </QueryClientProvider>
   );
 }
