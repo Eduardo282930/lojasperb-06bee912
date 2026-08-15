@@ -1,10 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { ArrowLeft, Ticket, Lock, Trash2, Check, Plus } from "lucide-react";
+import { ArrowLeft, Ticket, Lock, Trash2, Check, Plus, LogOut } from "lucide-react";
 import {
   useCoupons,
   useProfile,
   useRedeemed,
+  useCouponsRefresh,
   saveProfile,
   saveCoupon,
   deleteCoupon,
@@ -12,9 +13,9 @@ import {
   unredeemCoupon,
   isAvailable,
   isExhausted,
-  OWNER_PASSWORD,
   type Coupon,
 } from "@/lib/coupons";
+import { useAdmin, adminSignIn, adminSignUp, adminSignOut } from "@/lib/admin";
 import { formatPrice } from "@/lib/cart";
 
 export const Route = createFileRoute("/eu")({
@@ -45,13 +46,14 @@ function EuPage() {
   const profile = useProfile();
   const coupons = useCoupons();
   const redeemed = useRedeemed();
+  const { isAdmin } = useAdmin();
   const [name, setName] = useState(profile.name);
   const [phone, setPhone] = useState(profile.phone);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState("");
   const [ownerOpen, setOwnerOpen] = useState(false);
-  const [pass, setPass] = useState("");
-  const [isOwner, setIsOwner] = useState(false);
-  const [passError, setPassError] = useState(false);
+
+  const visible = coupons.filter(isAvailable);
 
   return (
     <div className="min-h-screen bg-background pb-16">
@@ -66,16 +68,13 @@ function EuPage() {
           </Link>
           <h1 className="text-2xl font-black text-foreground">Eu</h1>
           <button
-  type="button"
-  onClick={() => {
-    alert("CLIQUE FUNCIONOU");
-    setOwnerOpen(true);
-  }}
-  aria-label="Área do proprietário"
-  className="ml-auto grid h-11 w-11 place-items-center rounded-2xl border-2 border-border bg-card text-muted-foreground"
->
-  <Lock className="h-5 w-5" />
-</button>
+            type="button"
+            onClick={() => setOwnerOpen(true)}
+            aria-label="Área do proprietário"
+            className="ml-auto grid h-11 w-11 place-items-center rounded-2xl border-2 border-border bg-card text-muted-foreground"
+          >
+            <Lock className="h-5 w-5" />
+          </button>
         </div>
       </header>
 
@@ -104,17 +103,27 @@ function EuPage() {
             />
           </label>
           <button
-            onClick={() => {
-              saveProfile({ name: name.trim(), phone: phone.trim() });
-              setSaved(true);
-              setTimeout(() => setSaved(false), 1500);
+            onClick={async () => {
+              setSaveError("");
+              try {
+                await saveProfile({ name: name.trim(), phone: phone.trim() });
+                setSaved(true);
+                setTimeout(() => setSaved(false), 1500);
+              } catch {
+                setSaveError("Não foi possível salvar agora. Tente de novo.");
+              }
             }}
             className="mt-4 w-full rounded-2xl bg-[oklch(0.55_0.22_255)] py-4 text-xl font-black text-white active:scale-[0.98]"
           >
             {saved ? "Salvo!" : "Salvar cadastro"}
           </button>
+          {saveError && (
+            <p className="mt-2 text-base font-bold text-[oklch(0.58_0.22_25)]">
+              {saveError}
+            </p>
+          )}
           <p className="mt-2 text-sm text-muted-foreground">
-            Cadastro completo em breve. Seus dados ficam salvos neste aparelho.
+            Seus dados ficam guardados na sua conta da loja.
           </p>
         </section>
 
@@ -122,13 +131,13 @@ function EuPage() {
           <h2 className="flex items-center gap-2 text-xl font-black text-foreground">
             <Ticket className="h-6 w-6" /> Cupons de desconto
           </h2>
-          {coupons.filter(isAvailable).length === 0 ? (
+          {visible.length === 0 ? (
             <p className="mt-3 rounded-2xl border-2 border-dashed border-border p-5 text-center text-lg text-muted-foreground">
               Nenhum cupom disponível no momento.
             </p>
           ) : (
             <ul className="mt-3 flex flex-col gap-3">
-              {coupons.filter(isAvailable).map((c) => {
+              {visible.map((c) => {
                 const isRedeemed = redeemed.includes(c.id);
                 return (
                   <li
@@ -147,7 +156,11 @@ function EuPage() {
                       )}
                       <p className="text-sm text-muted-foreground">
                         Pedido mínimo: {formatPrice(c.minOrder)}
-                        {c.maxUses !== null && ` · restam ${Math.max(0, c.maxUses - c.uses)} usos`}
+                        {c.type === "percent" &&
+                          c.maxDiscount !== null &&
+                          ` · desconto máximo ${formatPrice(c.maxDiscount)}`}
+                        {c.maxUses !== null &&
+                          ` · restam ${Math.max(0, c.maxUses - c.uses)} usos`}
                       </p>
                     </div>
                     <button
@@ -173,95 +186,142 @@ function EuPage() {
           </p>
         </section>
 
-        {ownerOpen && !isOwner && (
-  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-    <section
-      className="w-full max-w-md rounded-3xl border-2 border-border bg-card p-5 shadow-2xl"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="owner-title"
-    >
-      <div className="flex items-center justify-between">
-        <h2
-          id="owner-title"
-          className="text-xl font-black text-foreground"
-        >
-          Área do proprietário
-        </h2>
+        {ownerOpen && !isAdmin && <OwnerLogin onClose={() => setOwnerOpen(false)} />}
 
-        <button
-          type="button"
-          onClick={() => {
-            setOwnerOpen(false);
-            setPass("");
-            setPassError(false);
-          }}
-          className="grid h-10 w-10 place-items-center rounded-xl bg-muted text-xl font-black text-foreground active:scale-95"
-          aria-label="Fechar"
-        >
-          ×
-        </button>
-      </div>
-
-      <p className="mt-2 text-sm text-muted-foreground">
-        Digite a senha para acessar o gerenciamento de cupons.
-      </p>
-
-      <input
-        type="password"
-        inputMode="numeric"
-        value={pass}
-        onChange={(e) => {
-          setPass(e.target.value);
-          setPassError(false);
-        }}
-        placeholder="Senha"
-        autoFocus
-        className="mt-4 w-full rounded-2xl border-2 border-border bg-background px-4 py-4 text-lg font-semibold text-foreground outline-none focus:border-[oklch(0.55_0.22_255)]"
-      />
-
-      {passError && (
-        <p className="mt-2 text-base font-bold text-[oklch(0.58_0.22_25)]">
-          Senha incorreta.
-        </p>
-      )}
-
-      <div className="mt-4 flex gap-2">
-        <button
-          type="button"
-          onClick={() => {
-            setOwnerOpen(false);
-            setPass("");
-            setPassError(false);
-          }}
-          className="flex-1 rounded-2xl bg-muted py-4 text-lg font-black text-foreground active:scale-[0.98]"
-        >
-          Cancelar
-        </button>
-
-        <button
-          type="button"
-          onClick={() => {
-            if (pass === OWNER_PASSWORD) {
-              setIsOwner(true);
-              setOwnerOpen(false);
-              setPass("");
-              setPassError(false);
-            } else {
-              setPassError(true);
-            }
-          }}
-          className="flex-1 rounded-2xl bg-[oklch(0.55_0.22_255)] py-4 text-lg font-black text-white active:scale-[0.98]"
-        >
-          Entrar
-        </button>
-      </div>
-    </section>
-  </div>
-)}
-
-        {isOwner && <OwnerPanel />}
+        {isAdmin && <OwnerPanel />}
       </main>
+    </div>
+  );
+}
+
+function OwnerLogin({ onClose }: { onClose: () => void }) {
+  const { recheck } = useAdmin();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [mode, setMode] = useState<"in" | "up">("in");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [info, setInfo] = useState("");
+
+  async function submit() {
+    setError("");
+    setInfo("");
+    setBusy(true);
+    try {
+      if (mode === "up") {
+        const { error } = await adminSignUp(email, password);
+        if (error) {
+          setError(error.message);
+          return;
+        }
+        setInfo("Conta criada. Se pedir confirmação, verifique seu e-mail e entre.");
+        setMode("in");
+        return;
+      }
+      const { error } = await adminSignIn(email, password);
+      if (error) {
+        setError("E-mail ou senha incorretos.");
+        return;
+      }
+      const ok = await recheck();
+      if (!ok) {
+        setError("Esta conta não tem permissão de proprietário.");
+        return;
+      }
+      onClose();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+      <section
+        className="w-full max-w-md rounded-3xl border-2 border-border bg-card p-5 shadow-2xl"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="owner-title"
+      >
+        <div className="flex items-center justify-between">
+          <h2 id="owner-title" className="text-xl font-black text-foreground">
+            Área do proprietário
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="grid h-10 w-10 place-items-center rounded-xl bg-muted text-xl font-black text-foreground active:scale-95"
+            aria-label="Fechar"
+          >
+            ×
+          </button>
+        </div>
+
+        <p className="mt-2 text-sm text-muted-foreground">
+          {mode === "in"
+            ? "Entre com sua conta para gerenciar os cupons."
+            : "Crie a conta do proprietário da loja."}
+        </p>
+
+        <input
+          type="email"
+          inputMode="email"
+          autoComplete="email"
+          value={email}
+          onChange={(e) => {
+            setEmail(e.target.value);
+            setError("");
+          }}
+          placeholder="E-mail"
+          className="mt-4 w-full rounded-2xl border-2 border-border bg-background px-4 py-4 text-lg font-semibold text-foreground outline-none focus:border-[oklch(0.55_0.22_255)]"
+        />
+        <input
+          type="password"
+          autoComplete={mode === "in" ? "current-password" : "new-password"}
+          value={password}
+          onChange={(e) => {
+            setPassword(e.target.value);
+            setError("");
+          }}
+          placeholder="Senha"
+          className="mt-3 w-full rounded-2xl border-2 border-border bg-background px-4 py-4 text-lg font-semibold text-foreground outline-none focus:border-[oklch(0.55_0.22_255)]"
+        />
+
+        {error && (
+          <p className="mt-2 text-base font-bold text-[oklch(0.58_0.22_25)]">{error}</p>
+        )}
+        {info && (
+          <p className="mt-2 text-base font-bold text-[oklch(0.45_0.19_145)]">{info}</p>
+        )}
+
+        <div className="mt-4 flex gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 rounded-2xl bg-muted py-4 text-lg font-black text-foreground active:scale-[0.98]"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            disabled={busy || !email || !password}
+            onClick={submit}
+            className="flex-1 rounded-2xl bg-[oklch(0.55_0.22_255)] py-4 text-lg font-black text-white disabled:opacity-50 active:scale-[0.98]"
+          >
+            {busy ? "..." : mode === "in" ? "Entrar" : "Criar conta"}
+          </button>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => {
+            setMode((m) => (m === "in" ? "up" : "in"));
+            setError("");
+          }}
+          className="mt-3 w-full text-base font-bold text-[oklch(0.55_0.22_255)]"
+        >
+          {mode === "in" ? "Criar conta do proprietário" : "Já tenho conta — entrar"}
+        </button>
+      </section>
     </div>
   );
 }
@@ -273,6 +333,7 @@ function emptyDraft(): Coupon {
     description: "",
     type: "percent",
     value: 10,
+    maxDiscount: null,
     minOrder: 0,
     maxUses: null,
     uses: 0,
@@ -282,28 +343,49 @@ function emptyDraft(): Coupon {
 
 function OwnerPanel() {
   const coupons = useCoupons();
+  const refresh = useCouponsRefresh();
   const [draft, setDraft] = useState<Coupon>(emptyDraft());
   const [limited, setLimited] = useState(false);
+  const [capped, setCapped] = useState(false);
+  const [error, setError] = useState("");
 
-  function submit() {
+  async function submit() {
     const code = draft.code.trim().toUpperCase();
     if (!code) return;
-    saveCoupon({
-      ...draft,
-      code,
-      description: draft.description.trim(),
-      value: Math.max(0, Number(draft.value) || 0),
-      minOrder: Math.max(0, Number(draft.minOrder) || 0),
-      maxUses: limited ? Math.max(1, Number(draft.maxUses) || 1) : null,
-      id: draft.id || `cp_${Date.now()}`,
-    });
-    setDraft(emptyDraft());
-    setLimited(false);
+    setError("");
+    try {
+      await saveCoupon({
+        ...draft,
+        code,
+        description: draft.description.trim(),
+        value: Math.max(0, Number(draft.value) || 0),
+        minOrder: Math.max(0, Number(draft.minOrder) || 0),
+        maxDiscount:
+          draft.type === "percent" && capped
+            ? Math.max(0, Number(draft.maxDiscount) || 0)
+            : null,
+        maxUses: limited ? Math.max(1, Number(draft.maxUses) || 1) : null,
+      });
+      setDraft(emptyDraft());
+      setLimited(false);
+      setCapped(false);
+      await refresh();
+    } catch {
+      setError("Não foi possível salvar o cupom. Verifique se o código já existe.");
+    }
   }
 
   return (
     <section className="mt-6 rounded-3xl border-2 border-[oklch(0.55_0.22_255)] bg-card p-4">
-      <h2 className="text-xl font-black text-foreground">Gerenciar cupons</h2>
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-xl font-black text-foreground">Gerenciar cupons</h2>
+        <button
+          onClick={() => adminSignOut()}
+          className="inline-flex items-center gap-1 rounded-xl bg-muted px-3 py-2 text-sm font-black text-foreground"
+        >
+          <LogOut className="h-4 w-4" /> Sair
+        </button>
+      </div>
 
       <div className="mt-3 flex flex-col gap-3">
         <input
@@ -340,6 +422,33 @@ function OwnerPanel() {
             placeholder="Valor"
           />
         </div>
+
+        {draft.type === "percent" && (
+          <>
+            <label className="flex items-center gap-3 text-lg font-bold text-foreground">
+              <input
+                type="checkbox"
+                checked={capped}
+                onChange={(e) => setCapped(e.target.checked)}
+                className="h-6 w-6"
+              />
+              Limitar desconto máximo (R$)
+            </label>
+            {capped && (
+              <input
+                type="number"
+                min={0}
+                value={draft.maxDiscount ?? 0}
+                onChange={(e) =>
+                  setDraft({ ...draft, maxDiscount: Number(e.target.value) })
+                }
+                placeholder="Ex: 20 (desconto de no máximo R$ 20)"
+                className="w-full rounded-2xl border-2 border-border bg-background px-4 py-3 text-lg font-semibold text-foreground outline-none"
+              />
+            )}
+          </>
+        )}
+
         <input
           type="number"
           min={0}
@@ -373,6 +482,9 @@ function OwnerPanel() {
         >
           <Plus className="h-6 w-6" strokeWidth={3} /> Salvar cupom
         </button>
+        {error && (
+          <p className="text-base font-bold text-[oklch(0.58_0.22_25)]">{error}</p>
+        )}
       </div>
 
       <h3 className="mt-6 text-lg font-black text-foreground">Cupons cadastrados</h3>
@@ -390,7 +502,11 @@ function OwnerPanel() {
                   {c.code} · {couponLabel(c)}
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  Mín. {formatPrice(c.minOrder)} ·{" "}
+                  Mín. {formatPrice(c.minOrder)}
+                  {c.type === "percent" &&
+                    c.maxDiscount !== null &&
+                    ` · máx. ${formatPrice(c.maxDiscount)}`}{" "}
+                  ·{" "}
                   {c.maxUses === null
                     ? "usos ilimitados"
                     : `${c.uses}/${c.maxUses} usos`}
@@ -398,7 +514,10 @@ function OwnerPanel() {
                 </p>
               </div>
               <button
-                onClick={() => saveCoupon({ ...c, active: !c.active })}
+                onClick={async () => {
+                  await saveCoupon({ ...c, active: !c.active });
+                  await refresh();
+                }}
                 className={`rounded-xl px-3 py-2 text-sm font-black ${
                   c.active
                     ? "bg-[oklch(0.62_0.19_145)] text-white"
@@ -409,7 +528,10 @@ function OwnerPanel() {
               </button>
               <button
                 aria-label={`Excluir ${c.code}`}
-                onClick={() => deleteCoupon(c.id)}
+                onClick={async () => {
+                  await deleteCoupon(c.id);
+                  await refresh();
+                }}
                 className="rounded-xl bg-muted p-2 text-[oklch(0.58_0.22_25)]"
               >
                 <Trash2 className="h-5 w-5" />
