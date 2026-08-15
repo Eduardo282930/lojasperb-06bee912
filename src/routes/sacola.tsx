@@ -5,10 +5,12 @@ import {
   useCoupons,
   useRedeemed,
   useProfile,
+  useCouponsRefresh,
   activeCouponFor,
   consumeCoupon,
   unredeemCoupon,
 } from "@/lib/coupons";
+
 
 const WHATSAPP_NUMBER = "5551996109657";
 
@@ -27,11 +29,13 @@ function SacolaPage() {
   const coupons = useCoupons();
   const redeemed = useRedeemed();
   const profile = useProfile();
+  const refreshCoupons = useCouponsRefresh();
+
   const subtotal = cart.reduce((s, c) => s + priceValue(c.price) * c.qty, 0);
   const applied = activeCouponFor(coupons, redeemed, subtotal);
   const total = Math.max(0, subtotal - (applied?.discount ?? 0));
 
-  function enviarWhatsApp() {
+  async function enviarWhatsApp() {
     if (cart.length === 0) return;
     const linhas = cart.map(
       (c) => `- ${c.name} | Qtd: ${c.qty} | ${formatPrice(c.price)}`,
@@ -45,14 +49,16 @@ function SacolaPage() {
     }
     texto += `\n\nTotal: ${formatPrice(total)}`;
 
-    if (applied) {
-      consumeCoupon(applied.coupon.id);
-      unredeemCoupon(applied.coupon.id);
-    }
-
     const url = `https://api.whatsapp.com/send?phone=${WHATSAPP_NUMBER}&text=${encodeURIComponent(texto)}`;
     window.open(url, "_blank");
+
+    if (applied) {
+      await consumeCoupon(applied.coupon.id);
+      unredeemCoupon(applied.coupon.id);
+      await refreshCoupons();
+    }
   }
+
 
   return (
     <div className="min-h-screen bg-background pb-40">

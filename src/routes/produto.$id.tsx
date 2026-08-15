@@ -1,16 +1,7 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { queryOptions, useQuery } from "@tanstack/react-query";
-import { useState } from "react";
-import {
-  ArrowLeft,
-  ImageOff,
-  Minus,
-  Plus,
-  RefreshCw,
-  ShoppingCart,
-  Check,
-  Share2,
-} from "lucide-react";
+import { useMemo, useState } from "react";
+import { ArrowLeft, ImageOff, Minus, Plus, ShoppingCart, Check, Share2 } from "lucide-react";
 import { fetchProduct } from "@/lib/loyverse.functions";
 import { addToCart, useCart, formatPrice, cartQtyOf } from "@/lib/cart";
 import { shareProduct } from "@/lib/share";
@@ -47,7 +38,10 @@ export const Route = createFileRoute("/produto/$id")({
       <div>
         <p className="text-2xl font-bold text-foreground">Erro ao carregar produto</p>
         <p className="mt-2 text-muted-foreground">{error.message}</p>
-        <Link to="/" className="mt-6 inline-block rounded-2xl bg-primary px-6 py-4 text-xl font-bold text-primary-foreground">
+        <Link
+          to="/"
+          className="mt-6 inline-block rounded-2xl bg-primary px-6 py-4 text-xl font-bold text-primary-foreground"
+        >
           Voltar ao catálogo
         </Link>
       </div>
@@ -63,11 +57,23 @@ export const Route = createFileRoute("/produto/$id")({
 function ProdutoPage() {
   const { id } = Route.useParams();
   const router = useRouter();
-  const { data: product, isLoading, isFetching, refetch } = useQuery(productQuery(id));
+  const { data: product, isLoading } = useQuery(productQuery(id));
   const cart = useCart();
   const totalQty = cart.reduce((s, c) => s + c.qty, 0);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
+
+  const selected = useMemo(() => {
+    if (!product) return null;
+    const wanted = selectedId ?? id;
+    return (
+      product.variants.find((v) => v.id === wanted) ??
+      product.variants.find((v) => v.stock > 0) ??
+      product.variants[0] ??
+      null
+    );
+  }, [product, selectedId, id]);
 
   if (isLoading) {
     return (
@@ -77,7 +83,7 @@ function ProdutoPage() {
     );
   }
 
-  if (!product) {
+  if (!product || !selected) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-background px-6 text-center">
         <p className="text-2xl font-bold text-foreground">Produto não encontrado.</p>
@@ -91,19 +97,23 @@ function ProdutoPage() {
     );
   }
 
-  const outOfStock = product.stock <= 0;
-  const inCart = cartQtyOf(product.id);
-  const maxQty = Number.isFinite(product.stock)
-    ? Math.max(1, product.stock - inCart)
+  const hasVariants = product.variants.length > 1;
+  const fullName = selected.label
+    ? `${product.name} ${selected.label}`
+    : product.name;
+  const outOfStock = selected.stock <= 0;
+  const inCart = cartQtyOf(selected.id);
+  const maxQty = Number.isFinite(selected.stock)
+    ? Math.max(1, selected.stock - inCart)
     : 99;
-  const stockLabel = !Number.isFinite(product.stock)
+  const stockLabel = !Number.isFinite(selected.stock)
     ? "Disponível"
-    : product.stock > 0
-      ? `${product.stock} em estoque`
+    : selected.stock > 0
+      ? `${selected.stock} em estoque`
       : "Sem estoque";
 
   return (
-    <div className="min-h-screen bg-background pb-36">
+    <div className="min-h-screen bg-background pb-10">
       <header className="sticky top-0 z-20 border-b-2 border-border bg-background/95 backdrop-blur">
         <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-3">
           <button
@@ -116,13 +126,6 @@ function ProdutoPage() {
           <h1 className="min-w-0 flex-1 truncate text-2xl font-black text-foreground">
             {product.name}
           </h1>
-          <button
-            aria-label="Compartilhar produto"
-            onClick={() => shareProduct(product.id, product.name, product.price)}
-            className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl border-2 border-border bg-card text-foreground active:scale-95"
-          >
-            <Share2 className="h-6 w-6" />
-          </button>
           <Link
             id="cart-anchor"
             to="/sacola"
@@ -145,7 +148,7 @@ function ProdutoPage() {
             {product.image ? (
               <img
                 src={product.image}
-                alt={product.name}
+                alt={fullName}
                 className="h-full w-full object-cover"
               />
             ) : (
@@ -161,106 +164,143 @@ function ProdutoPage() {
             {product.categoryName}
           </span>
           <h2 className="mt-3 text-2xl font-black leading-snug text-foreground break-words">
-            {product.name}
+            {fullName}
           </h2>
-          <p className="mt-2 text-4xl font-black text-[oklch(0.55_0.22_255)]">
-            {formatPrice(product.price)}
-          </p>
 
-          <div className="mt-4 flex items-center gap-3">
-            <span
-              className={`rounded-xl px-4 py-2 text-lg font-bold ${
-                outOfStock
-                  ? "bg-muted text-muted-foreground"
-                  : "bg-[oklch(0.62_0.19_145)]/15 text-[oklch(0.45_0.19_145)]"
-              }`}
-            >
-              {stockLabel}
-            </span>
+          <div className="mt-2 flex items-center gap-3">
+            <p className="text-4xl font-black text-[oklch(0.55_0.22_255)]">
+              {formatPrice(selected.price)}
+            </p>
             <button
-              onClick={() => refetch()}
-              className="inline-flex items-center gap-2 rounded-xl border-2 border-border px-4 py-2 text-base font-bold text-muted-foreground active:scale-95"
+              aria-label="Compartilhar produto"
+              onClick={() => shareProduct(selected.id, fullName, selected.price)}
+              className="inline-flex items-center gap-2 rounded-2xl border-2 border-border bg-card px-4 py-2 text-base font-bold text-foreground active:scale-95"
             >
-              <RefreshCw className={`h-5 w-5 ${isFetching ? "animate-spin" : ""}`} />
-              Atualizar
+              <Share2 className="h-5 w-5" /> Compartilhar
             </button>
           </div>
 
-          <div className="mt-6 rounded-2xl border border-border bg-card p-4">
+          <span
+            className={`mt-3 inline-block rounded-xl px-4 py-2 text-lg font-bold ${
+              outOfStock
+                ? "bg-muted text-muted-foreground"
+                : "bg-[oklch(0.62_0.19_145)]/15 text-[oklch(0.45_0.19_145)]"
+            }`}
+          >
+            {stockLabel}
+          </span>
+
+          {hasVariants && (
+            <div className="mt-5 rounded-2xl border-2 border-border bg-card p-4">
+              <h3 className="text-lg font-black text-foreground">
+                {product.variantAxis || "Variação"}
+              </h3>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {product.variants.map((v) => {
+                  const active = v.id === selected.id;
+                  const empty = v.stock <= 0;
+                  return (
+                    <button
+                      key={v.id}
+                      disabled={empty}
+                      onClick={() => {
+                        setSelectedId(v.id);
+                        setQty(1);
+                      }}
+                      className={`rounded-2xl border-2 px-4 py-3 text-lg font-black transition-colors active:scale-95 ${
+                        active
+                          ? "border-[oklch(0.55_0.22_255)] bg-[oklch(0.55_0.22_255)] text-white"
+                          : empty
+                            ? "border-border bg-muted text-muted-foreground line-through"
+                            : "border-border bg-background text-foreground"
+                      }`}
+                    >
+                      {v.label || "Padrão"}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Quantidade + adicionar, logo abaixo das variações */}
+          <div className="mt-4 rounded-2xl border-2 border-border bg-card p-4">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-lg font-black text-foreground">Quantidade</span>
+              <div className="flex items-center gap-2">
+                <button
+                  aria-label="Diminuir"
+                  disabled={qty <= 1 || outOfStock}
+                  onClick={() => setQty((q) => Math.max(1, q - 1))}
+                  className="grid h-14 w-14 place-items-center rounded-2xl bg-muted text-foreground disabled:opacity-40 active:scale-95"
+                >
+                  <Minus className="h-7 w-7" strokeWidth={3} />
+                </button>
+                <span className="w-12 text-center text-2xl font-black text-foreground">
+                  {qty}
+                </span>
+                <button
+                  aria-label="Aumentar"
+                  disabled={outOfStock || qty >= maxQty}
+                  onClick={() => setQty((q) => Math.min(maxQty, q + 1))}
+                  className="grid h-14 w-14 place-items-center rounded-2xl bg-muted text-foreground disabled:opacity-40 active:scale-95"
+                >
+                  <Plus className="h-7 w-7" strokeWidth={3} />
+                </button>
+              </div>
+            </div>
+
+            <button
+              disabled={outOfStock}
+              onClick={() => {
+                addToCart(
+                  {
+                    id: selected.id,
+                    name: fullName,
+                    price: selected.price,
+                    stock: selected.stock,
+                  },
+                  qty,
+                );
+                setAdded(true);
+                setTimeout(() => setAdded(false), 1200);
+              }}
+              className={`mt-3 flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-5 text-2xl font-black text-white shadow-lg active:scale-[0.98] ${
+                outOfStock
+                  ? "bg-muted text-muted-foreground shadow-none"
+                  : added
+                    ? "bg-[oklch(0.62_0.19_145)]"
+                    : "bg-[oklch(0.55_0.22_255)]"
+              }`}
+            >
+              {outOfStock ? (
+                "Indisponível"
+              ) : added ? (
+                <>
+                  <Check className="h-8 w-8" strokeWidth={3} /> Adicionado
+                </>
+              ) : (
+                <>
+                  <ShoppingCart className="h-7 w-7" strokeWidth={2.5} /> Adicionar ao
+                  carrinho
+                </>
+              )}
+            </button>
+          </div>
+
+          <div className="mt-5 rounded-2xl border border-border bg-card p-4">
             <h3 className="text-xl font-black text-foreground">Descrição</h3>
             <p className="mt-2 whitespace-pre-line text-lg leading-relaxed text-muted-foreground">
-              {product.description || "Este produto não possui descrição cadastrada."}
+              {product.description}
             </p>
-            {product.sku && (
+            {selected.sku && (
               <p className="mt-3 text-base font-semibold text-muted-foreground">
-                Código: {product.sku}
+                Código: {selected.sku}
               </p>
             )}
           </div>
         </div>
       </main>
-
-      <div className="fixed inset-x-0 bottom-0 z-20 border-t-2 border-border bg-background/95 p-4 backdrop-blur">
-        <div className="mx-auto flex max-w-3xl items-center gap-3">
-          <div className="flex items-center gap-2 rounded-2xl border-2 border-border bg-card p-1">
-            <button
-              aria-label="Diminuir"
-              disabled={qty <= 1 || outOfStock}
-              onClick={() => setQty((q) => Math.max(1, q - 1))}
-              className="grid h-14 w-14 place-items-center rounded-xl bg-muted text-foreground disabled:opacity-40 active:scale-95"
-            >
-              <Minus className="h-7 w-7" strokeWidth={3} />
-            </button>
-            <span className="w-10 text-center text-2xl font-black text-foreground">
-              {qty}
-            </span>
-            <button
-              aria-label="Aumentar"
-              disabled={outOfStock || qty >= maxQty}
-              onClick={() => setQty((q) => Math.min(maxQty, q + 1))}
-              className="grid h-14 w-14 place-items-center rounded-xl bg-muted text-foreground disabled:opacity-40 active:scale-95"
-            >
-              <Plus className="h-7 w-7" strokeWidth={3} />
-            </button>
-          </div>
-
-          <button
-            disabled={outOfStock}
-            onClick={() => {
-              addToCart(
-                {
-                  id: product.id,
-                  name: product.name,
-                  price: product.price,
-                  stock: product.stock,
-                },
-                qty,
-              );
-              setAdded(true);
-              setTimeout(() => setAdded(false), 1200);
-            }}
-            className={`flex flex-1 items-center justify-center gap-2 rounded-2xl px-4 py-5 text-2xl font-black text-white shadow-lg active:scale-[0.98] ${
-              outOfStock
-                ? "bg-muted text-muted-foreground shadow-none"
-                : added
-                  ? "bg-[oklch(0.62_0.19_145)]"
-                  : "bg-[oklch(0.55_0.22_255)]"
-            }`}
-          >
-            {outOfStock ? (
-              "Indisponível"
-            ) : added ? (
-              <>
-                <Check className="h-8 w-8" strokeWidth={3} /> Adicionado
-              </>
-            ) : (
-              <>
-                <Plus className="h-8 w-8" strokeWidth={3} /> Adicionar
-              </>
-            )}
-          </button>
-        </div>
-      </div>
     </div>
   );
 }

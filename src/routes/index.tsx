@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
 import { useSuspenseQuery, queryOptions } from "@tanstack/react-query";
 import { useMemo, useRef, useState } from "react";
 import {
@@ -271,6 +271,8 @@ function CategoryChip({
 }
 
 function ProductCard({ product }: { product: CatalogProduct }) {
+  const navigate = useNavigate();
+  const hasVariants = product.variants.length > 1;
   const outOfStock = product.stock <= 0;
   const [added, setAdded] = useState(false);
   const [limitHit, setLimitHit] = useState(false);
@@ -280,6 +282,10 @@ function ProductCard({ product }: { product: CatalogProduct }) {
   const low = Number.isFinite(product.stock) && product.stock > 0 && product.stock <= 5;
 
   function handleAdd() {
+    if (hasVariants) {
+      void navigate({ to: "/produto/$id", params: { id: product.id } });
+      return;
+    }
     const ok = addToCart(
       {
         id: product.id,
@@ -336,7 +342,14 @@ function ProductCard({ product }: { product: CatalogProduct }) {
           <p className="line-clamp-2 text-base font-semibold leading-snug text-foreground break-words">
             {product.name}
           </p>
+          {hasVariants && (
+            <p className="mt-1 text-sm font-bold text-muted-foreground">
+              {product.variants.length} opções de{" "}
+              {(product.variantAxis || "variação").toLowerCase()}
+            </p>
+          )}
           <p className="mt-auto pt-2 text-xl font-black text-[oklch(0.55_0.22_255)]">
+            {hasVariants ? "a partir de " : ""}
             {formatPrice(product.price)}
           </p>
         </div>
