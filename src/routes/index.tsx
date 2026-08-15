@@ -18,6 +18,7 @@ import { addToCart, useCart, formatPrice } from "@/lib/cart";
 import { fuzzyScore, STRONG_MATCH } from "@/lib/search";
 import { flyToCart } from "@/lib/fly";
 import { shareProduct } from "@/lib/share";
+import { filterCommercialProducts } from "@/lib/product-filters";
 
 export const catalogQuery = queryOptions({
   queryKey: ["catalog"],
@@ -82,12 +83,18 @@ function Home() {
   const [category, setCategory] = useState<string>("todos");
   const [showAllCategories, setShowAllCategories] = useState(false);
 
+  // Filter out system products (e.g., store logo)
+  const commercialProducts = useMemo(
+    () => filterCommercialProducts(data.products),
+    [data.products]
+  );
+
   const byCategory = useMemo(() => {
-    if (category === "todos") return data.products;
+    if (category === "todos") return commercialProducts;
     if (category === "sem-categoria")
-      return data.products.filter((p) => !p.categoryId);
-    return data.products.filter((p) => p.categoryId === category);
-  }, [data.products, category]);
+      return commercialProducts.filter((p) => !p.categoryId);
+    return commercialProducts.filter((p) => p.categoryId === category);
+  }, [commercialProducts, category]);
 
   const { results, suggestions } = useMemo(() => {
     const q = query.trim();

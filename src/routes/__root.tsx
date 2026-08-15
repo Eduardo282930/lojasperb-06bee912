@@ -11,6 +11,7 @@ import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import { useFaviconSync } from "../lib/favicon-sync";
 
 function NotFoundComponent() {
   return (
@@ -118,6 +119,9 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+
+  // Sync favicon with store logo
+  useFaviconSync();
 
   return (
     <QueryClientProvider client={queryClient}>

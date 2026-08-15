@@ -1,0 +1,30 @@
+/**
+ * Product filtering utilities
+ * Ensures system/internal products don't appear in commercial product listings
+ */
+
+import type { CatalogProduct } from "./loyverse.functions";
+
+/**
+ * Check if a product is a commercial product (for sale)
+ * System products like the store logo should be filtered out
+ */
+export function isCommercialProduct(product: CatalogProduct): boolean {
+  // Currently, all products from Loyverse are commercial
+  // This function is a guard for future expansion and to prevent
+  // accidental exposure of system products in the catalog
+  
+  // Safety check: filter out if name matches known system products
+  if (product.name === "Logo da Loja") {
+    return false;
+  }
+  
+  return true;
+}
+
+/**
+ * Filter a list of products to only include commercial products
+ */
+export function filterCommercialProducts(products: CatalogProduct[]): CatalogProduct[] {
+  return products.filter(isCommercialProduct);
+}
