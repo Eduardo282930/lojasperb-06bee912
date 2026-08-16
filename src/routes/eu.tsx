@@ -1,5 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { fetchReceipts, type SimpleReceipt } from "@/lib/loyverse-customers.functions";
 import { ArrowLeft, Ticket, Lock, Trash2, Check, Plus, LogOut } from "lucide-react";
 import {
   useCoupons,
@@ -220,6 +222,7 @@ function EuPage() {
         {isAdmin && (
           <>
             <OwnerPanel />
+            <ReceiptsPanel />
           </>
         )}
       </main>
@@ -554,3 +557,102 @@ function OwnerPanel() {
   );
 }
 
+
+const WHATSAPP_COUNTRY = "55";
+
+function receiptText(r: SimpleReceipt): string {
+  const linhas = r.lines
+    .map((l) => `- ${l.name} x${l.quantity} — ${formatPrice(l.total)}`)
+    .join("\n");
+  const data = new Date(r.date).toLocaleString("pt-BR");
+  return `*Recibo SPERB*\nPedido: ${r.number}\nData: ${data}\nCliente: ${r.customerName}\n\n${linhas}\n\nTotal: ${formatPrice(r.total)}\n\nObrigado pela preferência!`;
+}
+
+function whatsappLink(r: SimpleReceipt): string | null {
+  const digits = (r.customerPhone || "").replace(/\D/g, "");
+  if (digits.length < 10) return null;
+  const phone = digits.startsWith(WHATSAPP_COUNTRY) ? digits : `${WHATSAPP_COUNTRY}${digits}`;
+  return `https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(receiptText(r))}`;
+}
+
+/** Admin-only list of every sale made in Loyverse, with receipt sending. */
+function ReceiptsPanel() {
+  const { data, isLoading, error, refetch, isFetching } = useQuery({
+    queryKey: ["loyverse-receipts"],
+    queryFn: () => fetchReceipts(),
+    staleTime: 60 * 1000,
+  });
+
+  return (
+    <section className="mt-6 rounded-3xl border-2 border-border bg-card p-4">
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-xl font-black text-foreground">Recibos das vendas</h2>
+        <button
+          onClick={() => void refetch()}
+          className="rounded-xl bg-muted px-3 py-2 text-sm font-black text-foreground active:scale-95"
+        >
+          {isFetching ? "..." : "Atualizar"}
+        </button>
+      </div>
+
+      {isLoading && (
+        <p className="mt-3 text-base text-muted-foreground">Carregando vendas…</p>
+      )}
+      {error && (
+        <p className="mt-3 text-base font-bold text-[oklch(0.58_0.22_25)]">
+          Não foi possível carregar os recibos.
+        </p>
+      )}
+
+      {data && data.length === 0 && (
+        <p className="mt-3 text-base text-muted-foreground">Nenhuma venda encontrada.</p>
+      )}
+
+      <ul className="mt-3 flex flex-col gap-2">
+        {(data ?? []).map((r) => {
+          const link = whatsappLink(r);
+          return (
+            <li key={r.id} className="rounded-2xl border border-border bg-background p-3">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="truncate text-base font-black text-foreground">
+                    {r.customerName}
+                  </p>
+                  <p className="text-xs font-semibold text-muted-foreground">
+                    {r.number} · {new Date(r.date).toLocaleString("pt-BR")}
+                  </p>
+                </div>
+                <span className="shrink-0 text-lg font-black text-[oklch(0.45_0.19_145)]">
+                  {formatPrice(r.total)}
+                </span>
+              </div>
+
+              <ul className="mt-2 flex flex-col gap-0.5">
+                {r.lines.map((l, i) => (
+                  <li key={i} className="text-sm text-muted-foreground">
+                    {l.quantity}x {l.name} — {formatPrice(l.total)}
+                  </li>
+                ))}
+              </ul>
+
+              {link ? (
+                <a
+                  href={link}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-2 inline-flex items-center gap-2 rounded-xl bg-[oklch(0.62_0.19_145)] px-3 py-2 text-sm font-black text-white active:scale-95"
+                >
+                  Enviar recibo no WhatsApp
+                </a>
+              ) : (
+                <p className="mt-2 text-xs font-semibold text-muted-foreground">
+                  Cliente sem telefone cadastrado.
+                </p>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}

@@ -96,7 +96,7 @@ function SacolaPage() {
           </div>
         ) : (
           <>
-            <ul className="flex flex-col gap-3">
+            <ul className="flex flex-col gap-2">
               {cart.map((c) => {
                 const max =
                   typeof c.stock === "number" && Number.isFinite(c.stock)
@@ -106,65 +106,61 @@ function SacolaPage() {
                 return (
                   <li
                     key={c.id}
-                    className="rounded-2xl border-2 border-border bg-card p-3"
+                    className="flex items-center gap-2 rounded-xl border border-border bg-card p-2"
                   >
-                    <div className="grid grid-cols-[64px_minmax(0,1fr)] items-start gap-3">
-                      <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-border bg-muted">
-                        {c.image ? (
-                          <img
-                            src={c.image}
-                            alt={c.name}
-                            className="h-full w-full object-cover"
-                            loading="lazy"
-                          />
-                        ) : (
-                          <div className="grid h-full w-full place-items-center text-[10px] font-bold text-muted-foreground">
-                            SPERB
-                          </div>
-                        )}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="line-clamp-2 text-base font-bold leading-snug text-foreground">
-                          {c.name}
-                        </p>
-                        <p className="mt-0.5 text-xl font-black text-[oklch(0.55_0.22_255)]">
-                          {formatPrice(priceValue(c.price) * c.qty)}
-                        </p>
-                        <p className="text-xs font-semibold text-muted-foreground">
-                          {c.qty} x {formatPrice(c.price)}
-                        </p>
-                        {atMax && (
-                          <p className="text-xs font-bold text-[oklch(0.62_0.2_45)]">
-                            Máximo em estoque: {max}
-                          </p>
-                        )}
-                      </div>
+                    <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg border border-border bg-muted">
+                      {c.image ? (
+                        <img
+                          src={c.image}
+                          alt={c.name}
+                          className="h-full w-full object-cover"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="grid h-full w-full place-items-center text-[10px] font-bold text-muted-foreground">
+                          SPERB
+                        </div>
+                      )}
                     </div>
 
-                    <div className="mt-3 flex items-center justify-end gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="line-clamp-2 text-sm font-bold leading-tight text-foreground">
+                        {c.name}
+                      </p>
+                      <p className="text-xs font-semibold text-muted-foreground">
+                        {c.qty} x {formatPrice(c.price)}
+                        {atMax && ` · máx. ${max}`}
+                      </p>
+                    </div>
+
+                    <div className="flex shrink-0 items-center gap-1.5">
                       <button
                         aria-label="Diminuir"
                         onClick={() => updateQty(c.id, c.qty - 1)}
-                        className="grid h-11 w-11 place-items-center rounded-xl bg-muted text-foreground active:scale-95"
+                        className="grid h-8 w-8 place-items-center rounded-lg bg-muted text-foreground active:scale-95"
                       >
                         {c.qty === 1 ? (
-                          <Trash2 className="h-5 w-5" />
+                          <Trash2 className="h-4 w-4" />
                         ) : (
-                          <Minus className="h-5 w-5" strokeWidth={3} />
+                          <Minus className="h-4 w-4" strokeWidth={3} />
                         )}
                       </button>
-                      <span className="w-8 text-center text-2xl font-black text-foreground">
+                      <span className="w-5 text-center text-base font-black text-foreground">
                         {c.qty}
                       </span>
                       <button
                         aria-label="Aumentar"
                         disabled={atMax}
                         onClick={() => updateQty(c.id, c.qty + 1)}
-                        className="grid h-11 w-11 place-items-center rounded-xl bg-[oklch(0.55_0.22_255)] text-white disabled:opacity-40 active:scale-95"
+                        className="grid h-8 w-8 place-items-center rounded-lg bg-[oklch(0.55_0.22_255)] text-white disabled:opacity-40 active:scale-95"
                       >
-                        <Plus className="h-5 w-5" strokeWidth={3} />
+                        <Plus className="h-4 w-4" strokeWidth={3} />
                       </button>
                     </div>
+
+                    <span className="w-20 shrink-0 text-right text-base font-black text-[oklch(0.55_0.22_255)]">
+                      {formatPrice(priceValue(c.price) * c.qty)}
+                    </span>
                   </li>
                 );
               })}

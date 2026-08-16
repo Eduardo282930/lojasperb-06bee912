@@ -12,7 +12,6 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { useFaviconSync } from "../lib/favicon-sync";
-import { Splash } from "../components/splash";
 
 function NotFoundComponent() {
   return (
@@ -130,7 +129,6 @@ function FaviconSyncWrapper() {
   useFaviconSync();
   return (
     <>
-      <Splash />
       <Outlet />
     </>
   );
