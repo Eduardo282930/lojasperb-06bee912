@@ -105,6 +105,9 @@ function normalize(s: string): string {
 const SIZE_TOKEN =
   /^(?:\d{1,3}(?:[/-]\d{1,3})?|pp|p|m|g|gg|xg|xgg|xs|s|l|xl|xxl|un|\d+(?:[.,]\d+)?\s?(?:ml|l|kg|g|mg|cm|mm|m|un|pcs))$/i;
 
+/** Matches measures like 3,5X25, 4.8x50mm, 6X40. */
+const MEASURE_TOKEN = /^\d+(?:[.,]\d+)?\s*[xX×]\s*\d+(?:[.,]\d+)?(?:mm|cm|m)?$/;
+
 const COLOR_TOKEN =
   /^(?:preto|preta|branco|branca|azul|vermelho|vermelha|verde|amarelo|amarela|rosa|cinza|marrom|bege|roxo|roxa|laranja|dourado|prata|nude|vinho)$/i;
 
@@ -114,6 +117,7 @@ function isVariationTail(s: string): boolean {
   const value = s.trim();
   if (!value) return false;
   if (SIZE_TOKEN.test(value)) return true;
+  if (MEASURE_TOKEN.test(value)) return true;
   if (COLOR_TOKEN.test(value)) return true;
 
   const compact = value.replace(/[^a-z0-9]/gi, "").toLowerCase();
@@ -124,6 +128,7 @@ function isVariationTail(s: string): boolean {
 
 /** Axis name inferred from a variation label. */
 function axisForLabel(label: string): string {
+  if (MEASURE_TOKEN.test(label)) return "Medida";
   if (SIZE_TOKEN.test(label)) return "Tamanho";
   if (COLOR_TOKEN.test(label)) return "Cor";
   if (/^[\d.,]+\s*[xX×]\s*[\d.,]+/.test(label)) return "Medida";
@@ -165,7 +170,7 @@ function splitVariation(name: string): { base: string; label: string; axis: stri
     return {
       base: words.slice(0, -1).join(" "),
       label: last,
-      axis: SIZE_TOKEN.test(last) ? "Tamanho" : COLOR_TOKEN.test(last) ? "Cor" : "Variação",
+      axis: axisForLabel(last),
     };
   }
 
