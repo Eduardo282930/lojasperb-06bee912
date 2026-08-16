@@ -11,7 +11,8 @@ import {
   Check,
   Share2,
   ChevronDown,
-  User,
+  UserRound,
+  Sparkles,
 } from "lucide-react";
 import { fetchCatalog, type CatalogProduct } from "@/lib/loyverse.functions";
 import { addToCart, useCart, formatPrice } from "@/lib/cart";
@@ -19,6 +20,7 @@ import { fuzzyScore, STRONG_MATCH } from "@/lib/search";
 import { flyToCart } from "@/lib/fly";
 import { shareProduct } from "@/lib/share";
 import { filterCommercialProducts } from "@/lib/product-filters";
+import { StoreLogoWithFallback } from "@/components/store-logo";
 
 export const catalogQuery = queryOptions({
   queryKey: ["catalog"],
@@ -134,6 +136,13 @@ function Home() {
       <header className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur">
         <div className="mx-auto max-w-5xl px-3 py-2">
           <div className="flex items-center gap-2">
+            <Link to="/" aria-label="SPERB" className="shrink-0">
+              <StoreLogoWithFallback
+                storeName="SPERB"
+                className="h-9 w-auto max-w-24 object-contain"
+                fallbackClassName="text-lg font-black tracking-tight text-foreground"
+              />
+            </Link>
             <div className="relative min-w-0 flex-1">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
               <input
@@ -242,13 +251,15 @@ function Home() {
 
       <Link
         to="/eu"
-        aria-label="Eu"
-        className="fixed bottom-5 right-5 z-30 grid h-16 w-16 place-items-center rounded-full bg-[oklch(0.55_0.22_255)] text-white shadow-xl active:scale-95"
+        aria-label="Minha conta e cupons"
+        className="group fixed bottom-5 right-5 z-30 grid h-16 w-16 place-items-center rounded-full bg-gradient-to-br from-[oklch(0.62_0.22_300)] to-[oklch(0.55_0.22_255)] text-white shadow-[0_10px_25px_-5px_oklch(0.55_0.22_255/0.6)] ring-4 ring-white/70 transition-transform active:scale-95"
       >
-        <span className="flex flex-col items-center leading-none">
-          <User className="h-6 w-6" strokeWidth={2.5} />
-          <span className="mt-0.5 text-xs font-black">Eu</span>
+        <span className="absolute inset-0 animate-ping rounded-full bg-[oklch(0.55_0.22_255)] opacity-20" />
+        <span className="relative flex flex-col items-center leading-none">
+          <UserRound className="h-7 w-7" strokeWidth={2.5} />
+          <span className="mt-0.5 text-[11px] font-black tracking-wide">Eu</span>
         </span>
+        <Sparkles className="absolute -right-0.5 -top-0.5 h-5 w-5 text-[oklch(0.85_0.18_95)] drop-shadow" />
       </Link>
     </div>
   );
