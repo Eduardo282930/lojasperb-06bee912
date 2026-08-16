@@ -18,8 +18,8 @@ export function Splash() {
     if (window.sessionStorage.getItem(SESSION_KEY) === "1") return;
     window.sessionStorage.setItem(SESSION_KEY, "1");
     setVisible(true);
-    const fade = window.setTimeout(() => setFading(true), 1200);
-    const hide = window.setTimeout(() => setVisible(false), 1700);
+    const fade = window.setTimeout(() => setFading(true), 2000);
+    const hide = window.setTimeout(() => setVisible(false), 2500);
     return () => {
       window.clearTimeout(fade);
       window.clearTimeout(hide);
@@ -40,12 +40,10 @@ export function Splash() {
           <img
             src={logo}
             alt="SPERB"
-            className="h-40 w-auto max-w-[80vw] object-contain"
+            className="h-44 w-auto max-w-[82vw] object-contain"
           />
         ) : (
-          <span className="text-5xl font-black tracking-tight text-foreground">
-            SPERB
-          </span>
+          <span className="h-12 w-12 animate-spin rounded-full border-4 border-muted border-t-primary" />
         )}
       </div>
     </div>

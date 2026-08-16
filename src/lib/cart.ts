@@ -6,6 +6,7 @@ export type CartItem = {
   price: number;
   qty: number;
   stock?: number;
+  image?: string | null;
 };
 
 const KEY = "sperb-cart-v1";
