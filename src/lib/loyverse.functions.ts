@@ -290,10 +290,17 @@ async function buildCatalog(token: string): Promise<Catalog> {
   }
 
   const drafts = new Map<string, Draft>();
+  let storeLogo: string | null = null;
 
   for (const it of items) {
+    // The item named "LOGO DA LOJA" is the store brand image, never a product.
+    if (isStoreLogoName(it.item_name)) {
+      if (it.image_url) storeLogo = it.image_url;
+      continue;
+    }
     const itemVariants = it.variants ?? [];
     if (itemVariants.length === 0) continue;
+
 
     const categoryName =
       (it.category_id && categoryNames.get(it.category_id)) || "Outros";
