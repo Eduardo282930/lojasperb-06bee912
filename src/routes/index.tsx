@@ -225,7 +225,7 @@ function Home() {
         ) : (
           <>
             {results.length > 0 && (
-              <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
+              <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                 {results.map((p) => (
                   <ProductCard key={p.id} product={p} />
                 ))}
@@ -239,7 +239,7 @@ function Home() {
                     ? "Produtos parecidos"
                     : "Não achamos exatamente isso — talvez você queira:"}
                 </h2>
-                <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
+                <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                   {suggestions.map((p) => (
                     <ProductCard key={p.id} product={p} />
                   ))}
