@@ -209,26 +209,13 @@ function OwnerLogin({ onClose }: { onClose: () => void }) {
   const { recheck } = useAdmin();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [mode, setMode] = useState<"in" | "up">("in");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [info, setInfo] = useState("");
 
   async function submit() {
     setError("");
-    setInfo("");
     setBusy(true);
     try {
-      if (mode === "up") {
-        const { error } = await adminSignUp(email, password);
-        if (error) {
-          setError(error.message);
-          return;
-        }
-        setInfo("Conta criada. Se pedir confirmação, verifique seu e-mail e entre.");
-        setMode("in");
-        return;
-      }
       const { error } = await adminSignIn(email, password);
       if (error) {
         setError("E-mail ou senha incorretos.");
@@ -236,6 +223,7 @@ function OwnerLogin({ onClose }: { onClose: () => void }) {
       }
       const ok = await recheck();
       if (!ok) {
+        await adminSignOut();
         setError("Esta conta não tem permissão de proprietário.");
         return;
       }
@@ -268,9 +256,7 @@ function OwnerLogin({ onClose }: { onClose: () => void }) {
         </div>
 
         <p className="mt-2 text-sm text-muted-foreground">
-          {mode === "in"
-            ? "Entre com sua conta para gerenciar os cupons."
-            : "Crie a conta do proprietário da loja."}
+          Acesso exclusivo do proprietário da loja.
         </p>
 
         <input
@@ -287,7 +273,7 @@ function OwnerLogin({ onClose }: { onClose: () => void }) {
         />
         <input
           type="password"
-          autoComplete={mode === "in" ? "current-password" : "new-password"}
+          autoComplete="current-password"
           value={password}
           onChange={(e) => {
             setPassword(e.target.value);
@@ -299,9 +285,6 @@ function OwnerLogin({ onClose }: { onClose: () => void }) {
 
         {error && (
           <p className="mt-2 text-base font-bold text-[oklch(0.58_0.22_25)]">{error}</p>
-        )}
-        {info && (
-          <p className="mt-2 text-base font-bold text-[oklch(0.45_0.19_145)]">{info}</p>
         )}
 
         <div className="mt-4 flex gap-2">
@@ -318,20 +301,9 @@ function OwnerLogin({ onClose }: { onClose: () => void }) {
             onClick={submit}
             className="flex-1 rounded-2xl bg-[oklch(0.55_0.22_255)] py-4 text-lg font-black text-white disabled:opacity-50 active:scale-[0.98]"
           >
-            {busy ? "..." : mode === "in" ? "Entrar" : "Criar conta"}
+            {busy ? "..." : "Entrar"}
           </button>
         </div>
-
-        <button
-          type="button"
-          onClick={() => {
-            setMode((m) => (m === "in" ? "up" : "in"));
-            setError("");
-          }}
-          className="mt-3 w-full text-base font-bold text-[oklch(0.55_0.22_255)]"
-        >
-          {mode === "in" ? "Criar conta do proprietário" : "Já tenho conta — entrar"}
-        </button>
       </section>
     </div>
   );
