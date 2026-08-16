@@ -36,7 +36,22 @@ export type Category = {
 export type Catalog = {
   products: CatalogProduct[];
   categories: Category[];
+  /** Image of the Loyverse item named "LOGO DA LOJA" (never sold). */
+  storeLogo: string | null;
 };
+
+/** True for the reserved item that holds the store brand image. */
+export function isStoreLogoName(name: string): boolean {
+  return (
+    name
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/\p{Diacritic}/gu, "")
+      .replace(/\s+/g, " ")
+      .trim() === "logo da loja"
+  );
+}
+
 
 type LoyverseVariant = {
   variant_id: string;
