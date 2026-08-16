@@ -50,14 +50,6 @@ export async function adminSignIn(email: string, password: string) {
   return supabase.auth.signInWithPassword({ email: email.trim(), password });
 }
 
-export async function adminSignUp(email: string, password: string) {
-  return supabase.auth.signUp({
-    email: email.trim(),
-    password,
-    options: { emailRedirectTo: `${window.location.origin}/eu` },
-  });
-}
-
 export async function adminSignOut() {
   await supabase.auth.signOut();
 }

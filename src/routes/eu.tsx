@@ -15,7 +15,7 @@ import {
   isExhausted,
   type Coupon,
 } from "@/lib/coupons";
-import { useAdmin, adminSignIn, adminSignUp, adminSignOut } from "@/lib/admin";
+import { useAdmin, adminSignIn, adminSignOut } from "@/lib/admin";
 import { formatPrice } from "@/lib/cart";
 import { StoreLogoWithFallback } from "@/components/store-logo";
 
