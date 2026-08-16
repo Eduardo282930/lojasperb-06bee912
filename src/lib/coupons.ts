@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSyncExternalStore } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { syncLoyverseCustomer } from "@/lib/loyverse-customers.functions";
 
 export type Coupon = {
   id: string;
