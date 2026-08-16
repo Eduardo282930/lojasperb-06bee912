@@ -40,16 +40,13 @@ export function Splash() {
           <img
             src={logo}
             alt="SPERB"
-            className="h-32 w-auto max-w-[70vw] object-contain"
+            className="h-40 w-auto max-w-[80vw] object-contain"
           />
         ) : (
           <span className="text-5xl font-black tracking-tight text-foreground">
             SPERB
           </span>
         )}
-        <span className="text-base font-bold tracking-[0.35em] text-muted-foreground">
-          SPERB
-        </span>
       </div>
     </div>
   );

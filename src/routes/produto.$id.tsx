@@ -159,23 +159,6 @@ function ProdutoPage() {
               </div>
             )}
           </div>
-
-          {productImages.length > 1 && (
-            <div className="flex gap-2 overflow-x-auto border-t border-border bg-background p-3">
-              {productImages.map((img, index) => (
-                <button
-                  key={`${img}-${index}`}
-                  type="button"
-                  onClick={() => setSelectedId(product.variants[index]?.id ?? selected.id)}
-                  className={`h-16 w-16 shrink-0 overflow-hidden rounded-xl border-2 bg-muted ${
-                    selectedImage === img ? "border-[oklch(0.55_0.22_255)]" : "border-border"
-                  }`}
-                >
-                  <img src={img} alt={`${product.name} imagem ${index + 1}`} className="h-full w-full object-cover" />
-                </button>
-              ))}
-            </div>
-          )}
         </div>
 
         <div className="mt-5">
