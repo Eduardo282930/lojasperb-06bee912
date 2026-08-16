@@ -261,6 +261,7 @@ function ProdutoPage() {
                     name: fullName,
                     price: selected.price,
                     stock: selected.stock,
+                    image: selectedImage ?? null,
                   },
                   qty,
                 );

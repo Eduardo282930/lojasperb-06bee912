@@ -108,12 +108,30 @@ function SacolaPage() {
                     key={c.id}
                     className="flex items-center gap-3 rounded-3xl border-2 border-border bg-card p-4"
                   >
+                    <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl border border-border bg-muted">
+                      {c.image ? (
+                        <img
+                          src={c.image}
+                          alt={c.name}
+                          className="h-full w-full object-cover"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="grid h-full w-full place-items-center text-xs font-bold text-muted-foreground">
+                          SPERB
+                        </div>
+                      )}
+                    </div>
                     <div className="min-w-0 flex-1">
-                      <p className="text-xl font-bold text-foreground break-words">
+                      <p className="text-lg font-bold leading-snug text-foreground break-words">
                         {c.name}
                       </p>
-                      <p className="mt-1 text-2xl font-black text-foreground">
+                      <p className="mt-1 text-2xl font-black text-[oklch(0.55_0.22_255)]">
                         {formatPrice(c.price)}
+                      </p>
+                      <p className="text-sm font-semibold text-muted-foreground">
+                        {c.qty} x {formatPrice(c.price)} ={" "}
+                        {formatPrice(priceValue(c.price) * c.qty)}
                       </p>
                       {atMax && (
                         <p className="text-sm font-bold text-[oklch(0.62_0.2_45)]">
