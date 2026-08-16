@@ -9,14 +9,14 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as IndexRouteImport } from './routes/index'
-import { Route as EuRouteImport } from './routes/eu'
 import { Route as SacolaRouteImport } from './routes/sacola'
+import { Route as EuRouteImport } from './routes/eu'
+import { Route as IndexRouteImport } from './routes/index'
 import { Route as ProdutoIdRouteImport } from './routes/produto.$id'
 
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const SacolaRoute = SacolaRouteImport.update({
+  id: '/sacola',
+  path: '/sacola',
   getParentRoute: () => rootRouteImport,
 } as any)
 const EuRoute = EuRouteImport.update({
@@ -24,9 +24,9 @@ const EuRoute = EuRouteImport.update({
   path: '/eu',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SacolaRoute = SacolaRouteImport.update({
-  id: '/sacola',
-  path: '/sacola',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProdutoIdRoute = ProdutoIdRouteImport.update({
@@ -71,11 +71,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/sacola': {
+      id: '/sacola'
+      path: '/sacola'
+      fullPath: '/sacola'
+      preLoaderRoute: typeof SacolaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/eu': {
@@ -85,11 +85,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof EuRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/sacola': {
-      id: '/sacola'
-      path: '/sacola'
-      fullPath: '/sacola'
-      preLoaderRoute: typeof SacolaRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/produto/$id': {
