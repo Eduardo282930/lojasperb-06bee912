@@ -7,7 +7,6 @@
 
 import { useQuery, useQueryClient, queryOptions } from "@tanstack/react-query";
 import { createServerFn } from "@tanstack/react-start";
-import { buildCatalogLogo } from "./loyverse.functions";
 
 export const STORE_LOGO_KEY = ["store_logo"] as const;
 
@@ -15,13 +14,15 @@ export const STORE_LOGO_KEY = ["store_logo"] as const;
 export const fetchStoreLogo = createServerFn({ method: "GET" }).handler(
   async (): Promise<string | null> => {
     try {
-      return await buildCatalogLogo();
+      const { fetchStoreLogoUrl } = await import("./store-logo.server");
+      return await fetchStoreLogoUrl();
     } catch (err) {
       console.error("[Store Logo] Falha ao buscar logo:", err);
       return null;
     }
   },
 );
+
 
 export const storeLogoQuery = queryOptions({
   queryKey: STORE_LOGO_KEY,
