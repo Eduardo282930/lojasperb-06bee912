@@ -231,7 +231,7 @@ export function useProfile(): Profile {
   );
 }
 
-/** Saves the customer in the database and keeps a local copy for offline use. */
+/** Saves the customer in the database, Loyverse, and keeps a local copy. */
 export async function saveProfile(profile: Profile): Promise<void> {
   ensureInit();
   profileCache = profile;
@@ -245,6 +245,12 @@ export async function saveProfile(profile: Profile): Promise<void> {
     p_phone: profile.phone,
   });
   if (error) throw error;
+  // Mirror the customer into the Loyverse "Clientes" tab (never blocks saving).
+  try {
+    await syncLoyverseCustomer({ data: { name: profile.name, phone: profile.phone } });
+  } catch (err) {
+    console.warn("[saveProfile] Loyverse sync falhou", err);
+  }
 }
 
 export function redeemCoupon(id: string) {
