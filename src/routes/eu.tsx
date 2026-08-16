@@ -17,11 +17,7 @@ import {
 } from "@/lib/coupons";
 import { useAdmin, adminSignIn, adminSignUp, adminSignOut } from "@/lib/admin";
 import { formatPrice } from "@/lib/cart";
-import {
-  useStoreLogo,
-  updateStoreLogo,
-  useStoreLogoRefresh,
-} from "@/lib/store-logo";
+import { StoreLogoWithFallback } from "@/components/store-logo";
 
 export const Route = createFileRoute("/eu")({
   head: () => ({
@@ -196,7 +192,6 @@ function EuPage() {
         {isAdmin && (
           <>
             <OwnerPanel />
-            <LogoPanel />
           </>
         )}
       </main>
@@ -559,116 +554,3 @@ function OwnerPanel() {
   );
 }
 
-function LogoPanel() {
-  const logoUrl = useStoreLogo();
-  const refresh = useStoreLogoRefresh();
-  const [imageUrl, setImageUrl] = useState(logoUrl || "");
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState(false);
-
-  async function handleSave() {
-    if (!imageUrl.trim()) {
-      setError("Cole a URL da imagem do logo");
-      return;
-    }
-
-    setSaving(true);
-    setError("");
-    setSuccess(false);
-
-    try {
-      await updateStoreLogo(imageUrl.trim());
-      setSuccess(true);
-      refresh();
-      setTimeout(() => setSuccess(false), 3000);
-    } catch (err) {
-      console.error("[LogoPanel] Failed to update logo:", err);
-      const message =
-        err instanceof Error && err.message
-          ? err.message
-          : "Não foi possível salvar o logo.";
-      setError(message);
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function handleDelete() {
-    if (!logoUrl) return;
-    setSaving(true);
-    setError("");
-    try {
-      await updateStoreLogo(null);
-      setImageUrl("");
-      refresh();
-    } catch (err) {
-      console.error("[LogoPanel] Failed to delete logo:", err);
-      setError("Não foi possível remover o logo.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <section className="mt-6 rounded-3xl border-2 border-[oklch(0.55_0.22_255)] bg-card p-4">
-      <h2 className="text-xl font-black text-foreground">Logo da Loja</h2>
-
-      <div className="mt-4">
-        {logoUrl && (
-          <div className="mb-4 rounded-2xl border-2 border-border p-3">
-            <p className="mb-2 text-sm font-bold text-muted-foreground">
-              Logo atual:
-            </p>
-            <img
-              src={logoUrl}
-              alt="Logo da Loja"
-              className="h-16 w-auto rounded-lg"
-            />
-          </div>
-        )}
-
-        <label className="block text-base font-bold text-muted-foreground">
-          URL da imagem do logo
-          <textarea
-            value={imageUrl}
-            onChange={(e) => setImageUrl(e.target.value)}
-            placeholder="Cole a URL completa da imagem (ex: https://...)"
-            className="mt-1 min-h-20 w-full rounded-2xl border-2 border-border bg-background px-4 py-3 text-lg font-semibold text-foreground outline-none focus:border-[oklch(0.55_0.22_255)]"
-          />
-        </label>
-
-        <div className="mt-3 flex gap-2">
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="flex-1 rounded-2xl bg-[oklch(0.55_0.22_255)] py-3 text-lg font-black text-white disabled:opacity-60 active:scale-[0.98]"
-          >
-            {saving ? "Salvando..." : "Salvar logo"}
-          </button>
-          {logoUrl && (
-            <button
-              onClick={handleDelete}
-              disabled={saving}
-              className="rounded-xl bg-muted p-3 text-[oklch(0.58_0.22_25)] disabled:opacity-60"
-              aria-label="Excluir logo"
-            >
-              <Trash2 className="h-5 w-5" />
-            </button>
-          )}
-        </div>
-
-        {error && (
-          <p className="mt-2 text-base font-bold text-[oklch(0.58_0.22_25)]">
-            {error}
-          </p>
-        )}
-        {success && (
-          <p className="mt-2 text-base font-bold text-[oklch(0.62_0.19_145)]">
-            ✓ Logo atualizado com sucesso!
-          </p>
-        )}
-      </div>
-    </section>
-  );
-}
