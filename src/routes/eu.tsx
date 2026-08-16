@@ -67,7 +67,13 @@ function EuPage() {
           >
             <ArrowLeft className="h-7 w-7" strokeWidth={2.5} />
           </Link>
+          <StoreLogoWithFallback
+            storeName="SPERB"
+            className="h-9 w-auto"
+            fallbackClassName="text-2xl font-black text-foreground"
+          />
           <h1 className="text-2xl font-black text-foreground">Eu</h1>
+
           <button
             type="button"
             onClick={() => setOwnerOpen(true)}
