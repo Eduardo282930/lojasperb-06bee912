@@ -47,37 +47,3 @@ export function useFaviconSync() {
     }
   }, [logoUrl]);
 }
-
-/**
- * Script to inject in the HTML head for static favicon fallback
- * This ensures the favicon is available immediately on page load
- * before React hydration
- */
-export function getFaviconScript(defaultFaviconUrl?: string): string {
-  return `
-    (function() {
-      // Try to get favicon from localStorage (cached from previous load)
-      const cachedFavicon = localStorage.getItem('store_favicon');
-      if (cachedFavicon && cachedFavicon !== 'null') {
-        const link = document.querySelector('link[rel="icon"]');
-        if (link) {
-          link.href = cachedFavicon;
-        }
-      }
-      
-      // Fetch the favicon URL from API
-      fetch('/api/store-logo-url')
-        .then(r => r.json())
-        .then(data => {
-          if (data?.imageUrl) {
-            localStorage.setItem('store_favicon', data.imageUrl);
-            const link = document.querySelector('link[rel="icon"]');
-            if (link) {
-              link.href = data.imageUrl;
-            }
-          }
-        })
-        .catch(e => console.debug('Failed to fetch favicon:', e));
-    })();
-  `;
-}

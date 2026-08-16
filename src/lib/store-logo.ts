@@ -1,159 +1,44 @@
 /**
- * Centralized store logo management
- * This module provides a single source of truth for the store logo,
- * ensuring all components use the same logo fetched from the system_products table.
+ * Store logo — single source of truth.
+ *
+ * The logo is the image of the Loyverse item named exactly "LOGO DA LOJA".
+ * That item is never shown as a product to customers.
  */
 
 import { useQuery, useQueryClient, queryOptions } from "@tanstack/react-query";
 import { createServerFn } from "@tanstack/react-start";
-import { supabase } from "@/integrations/supabase/client";
 
-export type SystemProduct = {
-  id: string;
-  product_type: "store_logo";
-  display_name: string;
-  image_url: string | null;
-  metadata: Record<string, unknown>;
-};
-
-// Query key for React Query
 export const STORE_LOGO_KEY = ["store_logo"] as const;
 
-/**
- * Server function to fetch the store logo from the database
- */
+/** Fetches the store logo image URL from Loyverse. */
 export const fetchStoreLogo = createServerFn({ method: "GET" }).handler(
-  async (): Promise<SystemProduct | null> => {
+  async (): Promise<string | null> => {
     try {
-      const { data, error } = await supabase
-        .from("system_products")
-        .select("*")
-        .eq("product_type", "store_logo")
-        .single();
-
-      if (error) {
-        // PGRST116: No rows found (table exists but no store_logo record)
-        if (error.code === "PGRST116") {
-          return null;
-        }
-        
-        // 42P01: Relation (table) does not exist (migration not applied)
-        if (error.code === "42P01") {
-          console.warn("[Store Logo] Table does not exist (migration not applied). This is safe to ignore.");
-          return null;
-        }
-        
-        // Other database errors - log but don't break
-        console.error("[Store Logo] Database error:", {
-          code: error.code,
-          message: error.message,
-        });
-        return null;
-      }
-
-      return data as SystemProduct;
+      const { fetchStoreLogoUrl } = await import("./store-logo.server");
+      return await fetchStoreLogoUrl();
     } catch (err) {
-      // Network or other runtime errors - fail gracefully
-      console.error("[Store Logo] Unexpected error:", err);
+      console.error("[Store Logo] Falha ao buscar logo:", err);
       return null;
     }
   },
 );
 
-/**
- * Query options for React Query integration
- */
+
 export const storeLogoQuery = queryOptions({
   queryKey: STORE_LOGO_KEY,
-  queryFn: fetchStoreLogo,
-  staleTime: 5 * 60 * 1000, // 5 minutes
-  gcTime: 30 * 60 * 1000, // 30 minutes (formerly cacheTime)
+  queryFn: () => fetchStoreLogo(),
+  staleTime: 5 * 60 * 1000,
+  gcTime: 30 * 60 * 1000,
 });
 
-/**
- * Hook to get the store logo URL
- * Returns null if no logo is set
- */
+/** Hook returning the store logo URL (null when the item has no image). */
 export function useStoreLogo(): string | null {
-  const { data } = useQuery(storeLogoQuery);
-  return data?.image_url ?? null;
-}
-
-/**
- * Hook to refresh the store logo cache (useful after updating the logo)
- */
-export function useStoreLogoRefresh() {
-  const qc = useQueryClient();
-  return () => qc.invalidateQueries({ queryKey: STORE_LOGO_KEY });
-}
-
-/**
- * Get the store logo data (returns the full object, not just URL)
- */
-export function useStoreLogoProd(): SystemProduct | null {
   const { data } = useQuery(storeLogoQuery);
   return data ?? null;
 }
 
-/**
- * Check if a product type is a system/internal product (not for sale)
- */
-export function isSystemProduct(product_type?: string | null): boolean {
-  if (!product_type) return false;
-  return product_type === "store_logo";
-}
-
-/**
- * Create or update the store logo
- * Only one store logo can exist at a time
- */
-export async function updateStoreLogo(imageUrl: string | null): Promise<void> {
-  // Try to fetch existing logo first
-  const { data: existing } = await supabase
-    .from("system_products")
-    .select("id")
-    .eq("product_type", "store_logo")
-    .single();
-
-  const payload = {
-    product_type: "store_logo" as const,
-    display_name: "Logo da Loja",
-    image_url: imageUrl,
-  };
-
-  if (existing?.id) {
-    // Update existing
-    const { error } = await supabase
-      .from("system_products")
-      .update(payload)
-      .eq("id", existing.id);
-    if (error) {
-      console.error("[Store Logo] Update failed:", error);
-      throw error;
-    }
-  } else {
-    // Create new
-    const { error } = await supabase
-      .from("system_products")
-      .insert(payload);
-    if (error) {
-      console.error("[Store Logo] Insert failed:", error);
-      throw error;
-    }
-  }
-}
-
-/**
- * Delete the store logo
- */
-export async function deleteStoreLogo(): Promise<void> {
-  const { error } = await supabase
-    .from("system_products")
-    .delete()
-    .eq("product_type", "store_logo");
-
-  if (error) {
-    console.error("[Store Logo] Delete failed:", error);
-    throw error;
-  }
+/** Invalidates the cached logo. */
+export function useStoreLogoRefresh() {
+  const qc = useQueryClient();
+  return () => qc.invalidateQueries({ queryKey: STORE_LOGO_KEY });
 }

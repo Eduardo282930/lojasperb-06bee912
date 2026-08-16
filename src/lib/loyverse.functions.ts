@@ -36,7 +36,22 @@ export type Category = {
 export type Catalog = {
   products: CatalogProduct[];
   categories: Category[];
+  /** Image of the Loyverse item named "LOGO DA LOJA" (never sold). */
+  storeLogo: string | null;
 };
+
+/** True for the reserved item that holds the store brand image. */
+export function isStoreLogoName(name: string): boolean {
+  return (
+    name
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/\p{Diacritic}/gu, "")
+      .replace(/\s+/g, " ")
+      .trim() === "logo da loja"
+  );
+}
+
 
 type LoyverseVariant = {
   variant_id: string;
@@ -107,13 +122,29 @@ function isVariationTail(s: string): boolean {
   return false;
 }
 
-/** Splits "Chinelo 41/42" into base "Chinelo" and label "41/42". */
+/** Axis name inferred from a variation label. */
+function axisForLabel(label: string): string {
+  if (SIZE_TOKEN.test(label)) return "Tamanho";
+  if (COLOR_TOKEN.test(label)) return "Cor";
+  if (/^[\d.,]+\s*[xX×]\s*[\d.,]+/.test(label)) return "Medida";
+  return "Variação";
+}
+
+/** Splits "Chinelo 41/42" or "Parafuso Chip (3,5X25)" into base + label. */
 function splitVariation(name: string): { base: string; label: string; axis: string } {
   const cleaned = name.replace(/\s+/g, " ").trim();
   if (!cleaned) return { base: "", label: "", axis: "" };
 
+  // Trailing parentheses always mark a variation: "Parafuso Chip (3,5X25)".
+  const paren = cleaned.match(/^(.+?)\s*\(([^()]+)\)$/);
+  if (paren && paren[1].trim() && paren[2].trim()) {
+    const label = paren[2].trim();
+    return { base: paren[1].trim(), label, axis: axisForLabel(label) };
+  }
+
   const words = cleaned.split(/\s+/);
   if (words.length < 2) return { base: cleaned, label: "", axis: "" };
+
 
   const last = words[words.length - 1].replace(/[.,;]+$/g, "");
   const beforeLast = words[words.length - 2];
@@ -274,10 +305,17 @@ async function buildCatalog(token: string): Promise<Catalog> {
   }
 
   const drafts = new Map<string, Draft>();
+  let storeLogo: string | null = null;
 
   for (const it of items) {
+    // The item named "LOGO DA LOJA" is the store brand image, never a product.
+    if (isStoreLogoName(it.item_name)) {
+      if (it.image_url) storeLogo = it.image_url;
+      continue;
+    }
     const itemVariants = it.variants ?? [];
     if (itemVariants.length === 0) continue;
+
 
     const categoryName =
       (it.category_id && categoryNames.get(it.category_id)) || "Outros";
@@ -373,7 +411,9 @@ async function buildCatalog(token: string): Promise<Catalog> {
       name: d.name,
       price,
       image: d.image,
+      images: d.images,
       stock,
+
       description: generated
         ? buildDescription(d.name, d.categoryName, variants, axis, price)
         : d.description,
@@ -396,7 +436,7 @@ async function buildCatalog(token: string): Promise<Catalog> {
     categories.push({ id: "sem-categoria", name: "Outros" });
   }
 
-  return { products, categories };
+  return { products, categories, storeLogo };
 }
 
 export const fetchCatalog = createServerFn({ method: "GET" }).handler(

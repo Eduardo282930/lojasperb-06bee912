@@ -12,6 +12,7 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { useFaviconSync } from "../lib/favicon-sync";
+import { Splash } from "../components/splash";
 
 function NotFoundComponent() {
   return (
@@ -78,13 +79,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "SPERB — Catálogo" },
+      { title: "SPERB" },
       { name: "description", content: "Catálogo SPERB. Escolha seus produtos e envie o pedido pelo WhatsApp." },
-      { property: "og:title", content: "SPERB — Catálogo" },
+      { property: "og:title", content: "SPERB" },
       { property: "og:description", content: "Catálogo SPERB. Escolha seus produtos e envie o pedido pelo WhatsApp." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:title", content: "SPERB — Catálogo" },
+      { name: "twitter:title", content: "SPERB" },
       { name: "twitter:description", content: "Catálogo SPERB. Escolha seus produtos e envie o pedido pelo WhatsApp." },
       { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/e110b080-dcdf-4710-ac8d-dfb63680bcde/id-preview-2b496283--50628d9d-ee67-4887-b808-5e0452dad905.lovable.app-1784287422036.png" },
       { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/e110b080-dcdf-4710-ac8d-dfb63680bcde/id-preview-2b496283--50628d9d-ee67-4887-b808-5e0452dad905.lovable.app-1784287422036.png" },
@@ -123,7 +124,12 @@ function RootShell({ children }: { children: ReactNode }) {
  */
 function FaviconSyncWrapper() {
   useFaviconSync();
-  return <Outlet />;
+  return (
+    <>
+      <Splash />
+      <Outlet />
+    </>
+  );
 }
 
 function RootComponent() {
