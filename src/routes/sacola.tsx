@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowLeft, Minus, Plus, Trash2, Ticket } from "lucide-react";
+import { StoreLogoWithFallback } from "@/components/store-logo";
 import { useCart, updateQty, formatPrice, priceValue, clearCart } from "@/lib/cart";
 import {
   useCoupons,
@@ -71,7 +72,12 @@ function SacolaPage() {
           >
             <ArrowLeft className="h-8 w-8" strokeWidth={2.5} />
           </Link>
-          <h1 className="text-3xl font-black text-foreground">Meu Carrinho</h1>
+          <StoreLogoWithFallback
+            storeName="SPERB"
+            className="h-9 w-auto max-w-24 object-contain"
+            fallbackClassName="text-lg font-black text-foreground"
+          />
+          <h1 className="text-2xl font-black text-foreground">Meu Carrinho</h1>
         </div>
       </header>
 
