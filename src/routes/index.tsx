@@ -25,9 +25,10 @@ import { StoreLogoWithFallback } from "@/components/store-logo";
 export const catalogQuery = queryOptions({
   queryKey: ["catalog"],
   queryFn: () => fetchCatalog(),
-  staleTime: 30 * 1000,
-  refetchInterval: 60 * 1000,
-  refetchOnWindowFocus: true,
+  staleTime: 5 * 60 * 1000,
+  gcTime: 30 * 60 * 1000,
+  refetchOnWindowFocus: false,
+  retry: 1,
 });
 
 export const Route = createFileRoute("/")({
@@ -224,7 +225,7 @@ function Home() {
         ) : (
           <>
             {results.length > 0 && (
-              <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+              <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
                 {results.map((p) => (
                   <ProductCard key={p.id} product={p} />
                 ))}
@@ -238,7 +239,7 @@ function Home() {
                     ? "Produtos parecidos"
                     : "Não achamos exatamente isso — talvez você queira:"}
                 </h2>
-                <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
                   {suggestions.map((p) => (
                     <ProductCard key={p.id} product={p} />
                   ))}
@@ -346,19 +347,19 @@ function ProductCard({ product }: { product: CatalogProduct }) {
           )}
           {outOfStock && (
             <div className="absolute inset-0 grid place-items-center bg-background/70">
-              <span className="rounded-lg bg-muted px-3 py-1 text-base font-bold text-muted-foreground">
+              <span className="rounded-lg bg-muted px-3 py-1 text-sm font-bold text-muted-foreground">
                 Indisponível
               </span>
             </div>
           )}
           {low && (
-            <span className="absolute left-2 top-2 rounded-md bg-[oklch(0.62_0.2_45)] px-2 py-0.5 text-sm font-bold text-white">
+            <span className="absolute left-2 top-2 rounded-md bg-[oklch(0.62_0.2_45)] px-1.5 py-0.5 text-[11px] font-bold text-white">
               Últimas {product.stock}
             </span>
           )}
         </div>
-        <div className="flex flex-1 flex-col p-3 pb-12">
-          <p className="line-clamp-2 text-base font-semibold leading-snug text-foreground break-words">
+        <div className="flex flex-1 flex-col p-2 pb-11">
+          <p className="line-clamp-2 text-sm font-semibold leading-snug text-foreground break-words">
             {product.name}
           </p>
           {hasVariants && (
@@ -367,7 +368,7 @@ function ProductCard({ product }: { product: CatalogProduct }) {
               {(product.variantAxis || "variação").toLowerCase()}
             </p>
           )}
-          <p className="mt-auto pt-2 text-xl font-black text-[oklch(0.55_0.22_255)]">
+          <p className="mt-auto pt-1.5 text-base font-black text-[oklch(0.55_0.22_255)]">
             {hasVariants ? "a partir de " : ""}
             {formatPrice(product.price)}
           </p>
@@ -377,7 +378,7 @@ function ProductCard({ product }: { product: CatalogProduct }) {
       <button
         aria-label={`Compartilhar ${product.name}`}
         onClick={() => shareProduct(product.id, product.name, product.price)}
-        className="absolute bottom-3 left-3 grid h-9 w-9 place-items-center rounded-full border border-border bg-background text-foreground active:scale-90"
+        className="absolute bottom-2 left-2 grid h-8 w-8 place-items-center rounded-full border border-border bg-background text-foreground active:scale-90"
       >
         <Share2 className="h-4 w-4" />
       </button>
@@ -389,7 +390,7 @@ function ProductCard({ product }: { product: CatalogProduct }) {
       )}
 
       {outOfStock ? (
-        <span className="absolute bottom-3 right-3 grid h-9 w-9 place-items-center rounded-full bg-muted text-muted-foreground">
+        <span className="absolute bottom-2 right-2 grid h-8 w-8 place-items-center rounded-full bg-muted text-muted-foreground">
           <X className="h-4 w-4" strokeWidth={3} />
         </span>
       ) : (
@@ -397,14 +398,14 @@ function ProductCard({ product }: { product: CatalogProduct }) {
           ref={btnRef}
           aria-label={`Adicionar ${product.name}`}
           onClick={handleAdd}
-          className={`absolute bottom-3 right-3 grid h-9 w-9 place-items-center rounded-full text-white shadow transition-transform active:scale-90 ${
+          className={`absolute bottom-2 right-2 grid h-8 w-8 place-items-center rounded-full text-white shadow transition-transform active:scale-90 ${
             added ? "bg-[oklch(0.62_0.19_145)]" : "bg-[oklch(0.55_0.22_255)]"
           }`}
         >
           {added ? (
-            <Check className="h-5 w-5" strokeWidth={3} />
+            <Check className="h-4 w-4" strokeWidth={3} />
           ) : (
-            <Plus className="h-5 w-5" strokeWidth={3} />
+            <Plus className="h-4 w-4" strokeWidth={3} />
           )}
         </button>
       )}

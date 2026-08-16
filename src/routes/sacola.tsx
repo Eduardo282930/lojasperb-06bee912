@@ -62,7 +62,7 @@ function SacolaPage() {
 
 
   return (
-    <div className="min-h-screen bg-background pb-40">
+    <div className="min-h-screen bg-background pb-28">
       <header className="sticky top-0 z-10 border-b-2 border-border bg-background/95 backdrop-blur">
         <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-3">
           <Link
@@ -106,67 +106,70 @@ function SacolaPage() {
                 return (
                   <li
                     key={c.id}
-                    className="flex items-center gap-3 rounded-3xl border-2 border-border bg-card p-4"
+                    className="rounded-2xl border-2 border-border bg-card p-3"
                   >
-                    <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl border border-border bg-muted">
-                      {c.image ? (
-                        <img
-                          src={c.image}
-                          alt={c.name}
-                          className="h-full w-full object-cover"
-                          loading="lazy"
-                        />
-                      ) : (
-                        <div className="grid h-full w-full place-items-center text-xs font-bold text-muted-foreground">
-                          SPERB
-                        </div>
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-lg font-bold leading-snug text-foreground break-words">
-                        {c.name}
-                      </p>
-                      <p className="mt-1 text-2xl font-black text-[oklch(0.55_0.22_255)]">
-                        {formatPrice(c.price)}
-                      </p>
-                      <p className="text-sm font-semibold text-muted-foreground">
-                        {c.qty} x {formatPrice(c.price)} ={" "}
-                        {formatPrice(priceValue(c.price) * c.qty)}
-                      </p>
-                      {atMax && (
-                        <p className="text-sm font-bold text-[oklch(0.62_0.2_45)]">
-                          Máximo em estoque: {max}
+                    <div className="grid grid-cols-[64px_minmax(0,1fr)] items-start gap-3">
+                      <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-border bg-muted">
+                        {c.image ? (
+                          <img
+                            src={c.image}
+                            alt={c.name}
+                            className="h-full w-full object-cover"
+                            loading="lazy"
+                          />
+                        ) : (
+                          <div className="grid h-full w-full place-items-center text-[10px] font-bold text-muted-foreground">
+                            SPERB
+                          </div>
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="line-clamp-2 text-base font-bold leading-snug text-foreground">
+                          {c.name}
                         </p>
-                      )}
+                        <p className="mt-0.5 text-xl font-black text-[oklch(0.55_0.22_255)]">
+                          {formatPrice(priceValue(c.price) * c.qty)}
+                        </p>
+                        <p className="text-xs font-semibold text-muted-foreground">
+                          {c.qty} x {formatPrice(c.price)}
+                        </p>
+                        {atMax && (
+                          <p className="text-xs font-bold text-[oklch(0.62_0.2_45)]">
+                            Máximo em estoque: {max}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
+
+                    <div className="mt-3 flex items-center justify-end gap-3">
                       <button
                         aria-label="Diminuir"
                         onClick={() => updateQty(c.id, c.qty - 1)}
-                        className="grid h-14 w-14 place-items-center rounded-2xl bg-muted text-foreground active:scale-95"
+                        className="grid h-11 w-11 place-items-center rounded-xl bg-muted text-foreground active:scale-95"
                       >
                         {c.qty === 1 ? (
-                          <Trash2 className="h-7 w-7" />
+                          <Trash2 className="h-5 w-5" />
                         ) : (
-                          <Minus className="h-7 w-7" strokeWidth={3} />
+                          <Minus className="h-5 w-5" strokeWidth={3} />
                         )}
                       </button>
-                      <span className="w-10 text-center text-3xl font-black text-foreground">
+                      <span className="w-8 text-center text-2xl font-black text-foreground">
                         {c.qty}
                       </span>
                       <button
                         aria-label="Aumentar"
                         disabled={atMax}
                         onClick={() => updateQty(c.id, c.qty + 1)}
-                        className="grid h-14 w-14 place-items-center rounded-2xl bg-[oklch(0.55_0.22_255)] text-white disabled:opacity-40 active:scale-95"
+                        className="grid h-11 w-11 place-items-center rounded-xl bg-[oklch(0.55_0.22_255)] text-white disabled:opacity-40 active:scale-95"
                       >
-                        <Plus className="h-7 w-7" strokeWidth={3} />
+                        <Plus className="h-5 w-5" strokeWidth={3} />
                       </button>
                     </div>
                   </li>
                 );
               })}
             </ul>
+
 
             <div className="mt-6 rounded-3xl border-2 border-border bg-card p-5">
               <div className="flex items-center justify-between text-xl font-bold text-muted-foreground">
@@ -210,17 +213,18 @@ function SacolaPage() {
       </main>
 
       {cart.length > 0 && (
-        <div className="fixed inset-x-0 bottom-0 z-20 border-t-2 border-border bg-background/95 p-4 backdrop-blur">
+        <div className="fixed inset-x-0 bottom-0 z-20 border-t-2 border-border bg-background/95 p-3 backdrop-blur">
           <div className="mx-auto max-w-3xl">
             <button
               onClick={enviarWhatsApp}
-              className="flex w-full items-center justify-center gap-3 rounded-3xl bg-[oklch(0.62_0.19_145)] px-6 py-7 text-3xl font-black text-white shadow-xl active:scale-[0.98]"
+              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[oklch(0.62_0.19_145)] px-4 py-4 text-xl font-black text-white shadow-lg active:scale-[0.98]"
             >
-              <WhatsAppIcon className="h-10 w-10" />
-              Enviar Pedido pelo WhatsApp
+              <WhatsAppIcon className="h-6 w-6" />
+              Enviar pelo WhatsApp
             </button>
           </div>
         </div>
+
       )}
     </div>
   );
