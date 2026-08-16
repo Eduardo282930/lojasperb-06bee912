@@ -213,17 +213,18 @@ function SacolaPage() {
       </main>
 
       {cart.length > 0 && (
-        <div className="fixed inset-x-0 bottom-0 z-20 border-t-2 border-border bg-background/95 p-4 backdrop-blur">
+        <div className="fixed inset-x-0 bottom-0 z-20 border-t-2 border-border bg-background/95 p-3 backdrop-blur">
           <div className="mx-auto max-w-3xl">
             <button
               onClick={enviarWhatsApp}
-              className="flex w-full items-center justify-center gap-3 rounded-3xl bg-[oklch(0.62_0.19_145)] px-6 py-7 text-3xl font-black text-white shadow-xl active:scale-[0.98]"
+              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[oklch(0.62_0.19_145)] px-4 py-4 text-xl font-black text-white shadow-lg active:scale-[0.98]"
             >
-              <WhatsAppIcon className="h-10 w-10" />
-              Enviar Pedido pelo WhatsApp
+              <WhatsAppIcon className="h-6 w-6" />
+              Enviar pelo WhatsApp
             </button>
           </div>
         </div>
+
       )}
     </div>
   );
