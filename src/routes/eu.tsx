@@ -15,7 +15,7 @@ import {
   isExhausted,
   type Coupon,
 } from "@/lib/coupons";
-import { useAdmin, adminSignIn, adminSignUp, adminSignOut } from "@/lib/admin";
+import { useAdmin, adminSignIn, adminSignOut } from "@/lib/admin";
 import { formatPrice } from "@/lib/cart";
 import { StoreLogoWithFallback } from "@/components/store-logo";
 
@@ -86,7 +86,23 @@ function EuPage() {
       </header>
 
       <main className="mx-auto max-w-3xl px-4 pt-4">
-        <section className="rounded-3xl border-2 border-border bg-card p-4">
+        <section className="overflow-hidden rounded-3xl bg-gradient-to-br from-[oklch(0.55_0.22_255)] to-[oklch(0.45_0.2_290)] p-5 text-white shadow-lg">
+          <div className="flex items-center gap-4">
+            <div className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-white/20 text-3xl font-black">
+              {(name || "?").trim().charAt(0).toUpperCase()}
+            </div>
+            <div className="min-w-0">
+              <p className="truncate text-2xl font-black">
+                {name.trim() || "Bem-vindo à SPERB"}
+              </p>
+              <p className="truncate text-base font-semibold text-white/80">
+                {phone.trim() || "Complete seu cadastro abaixo"}
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-5 rounded-3xl border-2 border-border bg-card p-5 shadow-sm">
           <h2 className="text-xl font-black text-foreground">Meus dados</h2>
           <label className="mt-3 block text-base font-bold text-muted-foreground">
             Nome
@@ -120,7 +136,9 @@ function EuPage() {
                 setSaveError("Não foi possível salvar agora. Tente de novo.");
               }
             }}
-            className="mt-4 w-full rounded-2xl bg-[oklch(0.55_0.22_255)] py-4 text-xl font-black text-white active:scale-[0.98]"
+            className={`mt-4 w-full rounded-2xl py-4 text-xl font-black text-white shadow-md transition-colors active:scale-[0.98] ${
+              saved ? "bg-[oklch(0.62_0.19_145)]" : "bg-[oklch(0.55_0.22_255)]"
+            }`}
           >
             {saved ? "Salvo!" : "Salvar cadastro"}
           </button>
@@ -134,9 +152,9 @@ function EuPage() {
           </p>
         </section>
 
-        <section className="mt-5">
+        <section className="mt-6">
           <h2 className="flex items-center gap-2 text-xl font-black text-foreground">
-            <Ticket className="h-6 w-6" /> Cupons de desconto
+            <Ticket className="h-6 w-6 text-[oklch(0.55_0.22_255)]" /> Cupons de desconto
           </h2>
           {visible.length === 0 ? (
             <p className="mt-3 rounded-2xl border-2 border-dashed border-border p-5 text-center text-lg text-muted-foreground">
@@ -149,13 +167,17 @@ function EuPage() {
                 return (
                   <li
                     key={c.id}
-                    className="flex items-center gap-3 rounded-3xl border-2 border-border bg-card p-4"
+                    className={`flex items-center gap-3 rounded-3xl border-2 bg-card p-4 shadow-sm transition-colors ${
+                      isRedeemed
+                        ? "border-[oklch(0.62_0.19_145)]"
+                        : "border-border"
+                    }`}
                   >
                     <div className="min-w-0 flex-1">
-                      <p className="text-lg font-black text-foreground">
+                      <p className="text-sm font-black uppercase tracking-wide text-muted-foreground">
                         CUPOM SPERB · {c.code}
                       </p>
-                      <p className="text-xl font-black text-[oklch(0.62_0.19_145)]">
+                      <p className="text-2xl font-black text-[oklch(0.62_0.19_145)]">
                         {couponLabel(c)}
                       </p>
                       {c.description && (
@@ -209,26 +231,13 @@ function OwnerLogin({ onClose }: { onClose: () => void }) {
   const { recheck } = useAdmin();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [mode, setMode] = useState<"in" | "up">("in");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [info, setInfo] = useState("");
 
   async function submit() {
     setError("");
-    setInfo("");
     setBusy(true);
     try {
-      if (mode === "up") {
-        const { error } = await adminSignUp(email, password);
-        if (error) {
-          setError(error.message);
-          return;
-        }
-        setInfo("Conta criada. Se pedir confirmação, verifique seu e-mail e entre.");
-        setMode("in");
-        return;
-      }
       const { error } = await adminSignIn(email, password);
       if (error) {
         setError("E-mail ou senha incorretos.");
@@ -236,6 +245,7 @@ function OwnerLogin({ onClose }: { onClose: () => void }) {
       }
       const ok = await recheck();
       if (!ok) {
+        await adminSignOut();
         setError("Esta conta não tem permissão de proprietário.");
         return;
       }
@@ -268,9 +278,7 @@ function OwnerLogin({ onClose }: { onClose: () => void }) {
         </div>
 
         <p className="mt-2 text-sm text-muted-foreground">
-          {mode === "in"
-            ? "Entre com sua conta para gerenciar os cupons."
-            : "Crie a conta do proprietário da loja."}
+          Acesso exclusivo do proprietário da loja.
         </p>
 
         <input
@@ -287,7 +295,7 @@ function OwnerLogin({ onClose }: { onClose: () => void }) {
         />
         <input
           type="password"
-          autoComplete={mode === "in" ? "current-password" : "new-password"}
+          autoComplete="current-password"
           value={password}
           onChange={(e) => {
             setPassword(e.target.value);
@@ -299,9 +307,6 @@ function OwnerLogin({ onClose }: { onClose: () => void }) {
 
         {error && (
           <p className="mt-2 text-base font-bold text-[oklch(0.58_0.22_25)]">{error}</p>
-        )}
-        {info && (
-          <p className="mt-2 text-base font-bold text-[oklch(0.45_0.19_145)]">{info}</p>
         )}
 
         <div className="mt-4 flex gap-2">
@@ -318,20 +323,9 @@ function OwnerLogin({ onClose }: { onClose: () => void }) {
             onClick={submit}
             className="flex-1 rounded-2xl bg-[oklch(0.55_0.22_255)] py-4 text-lg font-black text-white disabled:opacity-50 active:scale-[0.98]"
           >
-            {busy ? "..." : mode === "in" ? "Entrar" : "Criar conta"}
+            {busy ? "..." : "Entrar"}
           </button>
         </div>
-
-        <button
-          type="button"
-          onClick={() => {
-            setMode((m) => (m === "in" ? "up" : "in"));
-            setError("");
-          }}
-          className="mt-3 w-full text-base font-bold text-[oklch(0.55_0.22_255)]"
-        >
-          {mode === "in" ? "Criar conta do proprietário" : "Já tenho conta — entrar"}
-        </button>
       </section>
     </div>
   );

@@ -5,6 +5,7 @@
  * That item is never shown as a product to customers.
  */
 
+import { useEffect, useState } from "react";
 import { useQuery, useQueryClient, queryOptions } from "@tanstack/react-query";
 import { createServerFn } from "@tanstack/react-start";
 
@@ -34,7 +35,11 @@ export const storeLogoQuery = queryOptions({
 /** Hook returning the store logo URL (null when the item has no image). */
 export function useStoreLogo(): string | null {
   const { data } = useQuery(storeLogoQuery);
-  return data ?? null;
+  // Only render the logo after hydration: the server markup has no logo yet,
+  // so painting it during hydration would mismatch the SSR output.
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => setHydrated(true), []);
+  return hydrated ? (data ?? null) : null;
 }
 
 /** Invalidates the cached logo. */
