@@ -1,0 +1,16 @@
+{
+  "name": "SPERB",
+  "short_name": "SPERB",
+  "description": "Catálogo SPERB. Escolha seus produtos e envie o pedido pelo WhatsApp.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "any",
+      "type": "image/x-icon"
+    }
+  ]
+}
