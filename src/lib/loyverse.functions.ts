@@ -389,7 +389,9 @@ async function buildCatalog(token: string): Promise<Catalog> {
       name: d.name,
       price,
       image: d.image,
+      images: d.images,
       stock,
+
       description: generated
         ? buildDescription(d.name, d.categoryName, variants, axis, price)
         : d.description,
