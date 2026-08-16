@@ -436,7 +436,7 @@ async function buildCatalog(token: string): Promise<Catalog> {
     categories.push({ id: "sem-categoria", name: "Outros" });
   }
 
-  return { products, categories };
+  return { products, categories, storeLogo };
 }
 
 export const fetchCatalog = createServerFn({ method: "GET" }).handler(
