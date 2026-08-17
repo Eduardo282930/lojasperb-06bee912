@@ -143,3 +143,41 @@ export const fetchReceipts = createServerFn({ method: "GET" }).handler(
       .sort((a, b) => (a.date < b.date ? 1 : -1));
   },
 );
+
+export type SimpleCustomer = {
+  id: string;
+  name: string;
+  phone: string;
+  email: string;
+  totalSpent: number;
+  totalVisits: number;
+};
+
+/** Every customer registered in the Loyverse "Clientes" tab. */
+export const fetchLoyverseCustomers = createServerFn({ method: "GET" }).handler(
+  async (): Promise<SimpleCustomer[]> => {
+    const token = process.env["LOYVERSE_TOKEN"];
+    if (!token) throw new Error("LOYVERSE_TOKEN não configurado");
+
+    const list = await loyverse<{
+      customers?: Array<
+        LoyverseCustomer & {
+          email?: string | null;
+          total_spent?: number | null;
+          total_visits?: number | null;
+        }
+      >;
+    }>("customers?limit=250", token);
+
+    return (list.customers ?? [])
+      .map((c) => ({
+        id: c.id,
+        name: c.name?.trim() || "Cliente sem nome",
+        phone: c.phone_number ?? "",
+        email: c.email ?? "",
+        totalSpent: Number(c.total_spent) || 0,
+        totalVisits: Number(c.total_visits) || 0,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+  },
+);
