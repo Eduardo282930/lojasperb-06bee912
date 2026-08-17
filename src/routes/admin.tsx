@@ -1,0 +1,768 @@
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import {
+  ArrowLeft,
+  Check,
+  LogOut,
+  Plus,
+  Receipt,
+  Ticket,
+  Trash2,
+  Users,
+} from "lucide-react";
+import {
+  fetchReceipts,
+  fetchLoyverseCustomers,
+  type SimpleReceipt,
+  type SimpleCustomer,
+} from "@/lib/loyverse-customers.functions";
+import {
+  useCoupons,
+  useCouponsRefresh,
+  saveCoupon,
+  deleteCoupon,
+  isExhausted,
+  type Coupon,
+} from "@/lib/coupons";
+import { fetchOrders, onlyDigits, type Order } from "@/lib/orders";
+import { useAdmin, adminSignIn, adminSignOut } from "@/lib/admin";
+import { formatPrice } from "@/lib/cart";
+
+export const Route = createFileRoute("/admin")({
+  ssr: false,
+  head: () => ({
+    meta: [
+      { title: "Administração — SPERB" },
+      {
+        name: "description",
+        content: "Painel do proprietário SPERB: cupons, recibos do Loyverse e clientes.",
+      },
+      { property: "og:title", content: "Administração — SPERB" },
+      {
+        property: "og:description",
+        content: "Painel do proprietário SPERB: cupons, recibos e clientes.",
+      },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+      { name: "robots", content: "noindex" },
+    ],
+  }),
+  component: AdminPage,
+});
+
+const BLUE = "oklch(0.55 0.22 255)";
+const GREEN = "oklch(0.62 0.19 145)";
+const RED = "oklch(0.58 0.22 25)";
+
+function couponLabel(c: Coupon): string {
+  return c.type === "percent" ? `${c.value}% OFF` : `${formatPrice(c.value)} OFF`;
+}
+
+type Tab = "cupons" | "recibos" | "clientes";
+
+function AdminPage() {
+  const { isAdmin, checking } = useAdmin();
+  const [tab, setTab] = useState<Tab>("cupons");
+
+  if (checking) {
+    return (
+      <div className="grid min-h-screen place-items-center bg-background text-lg font-bold text-muted-foreground">
+        Carregando…
+      </div>
+    );
+  }
+
+  if (!isAdmin) return <AdminLogin />;
+
+  return (
+    <div className="min-h-screen bg-background pb-16">
+      <header className="sticky top-0 z-10 border-b-2 border-border bg-background/95 backdrop-blur">
+        <div className="mx-auto flex max-w-4xl items-center gap-3 px-4 py-3">
+          <Link
+            to="/"
+            aria-label="Voltar à loja"
+            className="grid h-11 w-11 place-items-center rounded-2xl bg-muted text-foreground active:scale-95"
+          >
+            <ArrowLeft className="h-6 w-6" strokeWidth={2.5} />
+          </Link>
+          <h1 className="text-xl font-black text-foreground">Administração SPERB</h1>
+          <button
+            onClick={() => adminSignOut()}
+            className="ml-auto inline-flex items-center gap-1 rounded-xl bg-muted px-3 py-2 text-sm font-black text-foreground"
+          >
+            <LogOut className="h-4 w-4" /> Sair
+          </button>
+        </div>
+
+        <nav className="mx-auto flex max-w-4xl gap-2 overflow-x-auto px-4 pb-3">
+          <TabButton
+            active={tab === "cupons"}
+            onClick={() => setTab("cupons")}
+            icon={<Ticket className="h-5 w-5" />}
+            label="Cupons dos clientes"
+          />
+          <TabButton
+            active={tab === "recibos"}
+            onClick={() => setTab("recibos")}
+            icon={<Receipt className="h-5 w-5" />}
+            label="Recibos Loyverse"
+          />
+          <TabButton
+            active={tab === "clientes"}
+            onClick={() => setTab("clientes")}
+            icon={<Users className="h-5 w-5" />}
+            label="Clientes"
+          />
+        </nav>
+      </header>
+
+      <main className="mx-auto max-w-4xl px-4 pt-4">
+        {tab === "cupons" && <CouponsPanel />}
+        {tab === "recibos" && <ReceiptsPanel />}
+        {tab === "clientes" && <CustomersPanel />}
+      </main>
+    </div>
+  );
+}
+
+function TabButton({
+  active,
+  onClick,
+  icon,
+  label,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: React.ReactNode;
+  label: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`inline-flex shrink-0 items-center gap-2 rounded-2xl px-4 py-3 text-base font-black active:scale-95 ${
+        active
+          ? "text-white shadow-md"
+          : "border-2 border-border bg-card text-foreground"
+      }`}
+      style={active ? { backgroundColor: BLUE } : undefined}
+    >
+      {icon}
+      {label}
+    </button>
+  );
+}
+
+function AdminLogin() {
+  const { recheck } = useAdmin();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function submit() {
+    setError("");
+    setBusy(true);
+    try {
+      const { error } = await adminSignIn(email, password);
+      if (error) {
+        setError("E-mail ou senha incorretos.");
+        return;
+      }
+      const ok = await recheck();
+      if (!ok) {
+        await adminSignOut();
+        setError("Esta conta não tem permissão de proprietário.");
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="grid min-h-screen place-items-center bg-background px-4">
+      <div className="w-full max-w-sm rounded-3xl border-2 border-border bg-card p-6 shadow-lg">
+        <h1 className="text-2xl font-black text-foreground">Área do proprietário</h1>
+        <p className="mt-1 text-base text-muted-foreground">
+          Entre com sua conta de administrador.
+        </p>
+        <input
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          type="email"
+          autoComplete="email"
+          placeholder="E-mail"
+          className="mt-4 w-full rounded-2xl border-2 border-border bg-background px-4 py-3 text-lg font-semibold text-foreground outline-none"
+        />
+        <input
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          type="password"
+          autoComplete="current-password"
+          placeholder="Senha"
+          onKeyDown={(e) => e.key === "Enter" && void submit()}
+          className="mt-3 w-full rounded-2xl border-2 border-border bg-background px-4 py-3 text-lg font-semibold text-foreground outline-none"
+        />
+        <button
+          onClick={() => void submit()}
+          disabled={busy}
+          className="mt-4 w-full rounded-2xl py-4 text-xl font-black text-white disabled:opacity-60"
+          style={{ backgroundColor: BLUE }}
+        >
+          {busy ? "Entrando…" : "Entrar"}
+        </button>
+        {error && (
+          <p className="mt-3 text-base font-bold" style={{ color: RED }}>
+            {error}
+          </p>
+        )}
+        <Link
+          to="/"
+          className="mt-4 block text-center text-base font-bold text-muted-foreground"
+        >
+          Voltar à loja
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------- Cupons -------------------------------- */
+
+const emptyCoupon: Coupon = {
+  id: "",
+  code: "",
+  description: "",
+  type: "percent",
+  value: 10,
+  maxDiscount: null,
+  minOrder: 0,
+  maxUses: null,
+  uses: 0,
+  active: true,
+  customerPhone: null,
+};
+
+function CouponForm({
+  initial,
+  onSaved,
+  compact,
+}: {
+  initial?: Partial<Coupon>;
+  onSaved: () => void;
+  compact?: boolean;
+}) {
+  const [draft, setDraft] = useState<Coupon>({ ...emptyCoupon, ...initial });
+  const [capped, setCapped] = useState(Boolean(initial?.maxDiscount));
+  const [limited, setLimited] = useState(initial?.maxUses != null);
+  const [error, setError] = useState("");
+  const [ok, setOk] = useState(false);
+
+  async function submit() {
+    setError("");
+    const code = draft.code.trim().toUpperCase();
+    if (!code) {
+      setError("Dê um nome ao cupom.");
+      return;
+    }
+    try {
+      await saveCoupon({
+        ...draft,
+        code,
+        maxDiscount: draft.type === "percent" && capped ? draft.maxDiscount ?? 0 : null,
+        maxUses: limited ? draft.maxUses ?? 1 : null,
+      });
+      setOk(true);
+      setTimeout(() => setOk(false), 1500);
+      setDraft({ ...emptyCoupon, ...initial });
+      onSaved();
+    } catch (err) {
+      setError(
+        err instanceof Error && err.message
+          ? err.message
+          : "Não foi possível salvar o cupom.",
+      );
+    }
+  }
+
+  const input =
+    "w-full rounded-2xl border-2 border-border bg-background px-4 py-3 text-lg font-semibold text-foreground outline-none";
+
+  return (
+    <div className={`flex flex-col gap-3 ${compact ? "" : "mt-3"}`}>
+      <input
+        value={draft.code}
+        onChange={(e) => setDraft({ ...draft, code: e.target.value })}
+        maxLength={24}
+        placeholder="Nome do cupom (ex: NATAL10)"
+        className={input}
+      />
+      <input
+        value={draft.description}
+        onChange={(e) => setDraft({ ...draft, description: e.target.value })}
+        maxLength={120}
+        placeholder="O que ele faz (ex: 10% em toda a loja)"
+        className={input}
+      />
+      <div className="flex gap-2">
+        <select
+          value={draft.type}
+          onChange={(e) => setDraft({ ...draft, type: e.target.value as Coupon["type"] })}
+          className="rounded-2xl border-2 border-border bg-background px-3 py-3 text-lg font-bold text-foreground"
+        >
+          <option value="percent">% desconto</option>
+          <option value="fixed">R$ desconto</option>
+        </select>
+        <input
+          type="number"
+          min={0}
+          value={draft.value}
+          onChange={(e) => setDraft({ ...draft, value: Number(e.target.value) })}
+          className={`min-w-0 flex-1 ${input}`}
+          placeholder="Valor"
+        />
+      </div>
+
+      {draft.type === "percent" && (
+        <>
+          <label className="flex items-center gap-3 text-lg font-bold text-foreground">
+            <input
+              type="checkbox"
+              checked={capped}
+              onChange={(e) => setCapped(e.target.checked)}
+              className="h-6 w-6"
+            />
+            Limitar desconto máximo (R$)
+          </label>
+          {capped && (
+            <input
+              type="number"
+              min={0}
+              value={draft.maxDiscount ?? 0}
+              onChange={(e) => setDraft({ ...draft, maxDiscount: Number(e.target.value) })}
+              placeholder="Ex: 20"
+              className={input}
+            />
+          )}
+        </>
+      )}
+
+      <input
+        type="number"
+        min={0}
+        value={draft.minOrder}
+        onChange={(e) => setDraft({ ...draft, minOrder: Number(e.target.value) })}
+        placeholder="Valor mínimo do pedido (R$)"
+        className={input}
+      />
+      <label className="flex items-center gap-3 text-lg font-bold text-foreground">
+        <input
+          type="checkbox"
+          checked={limited}
+          onChange={(e) => setLimited(e.target.checked)}
+          className="h-6 w-6"
+        />
+        Limitar número de usos
+      </label>
+      {limited && (
+        <input
+          type="number"
+          min={1}
+          value={draft.maxUses ?? 1}
+          onChange={(e) => setDraft({ ...draft, maxUses: Number(e.target.value) })}
+          placeholder="Quantidade de usos"
+          className={input}
+        />
+      )}
+
+      <button
+        onClick={() => void submit()}
+        className="inline-flex items-center justify-center gap-2 rounded-2xl py-4 text-xl font-black text-white active:scale-[0.98]"
+        style={{ backgroundColor: ok ? GREEN : BLUE }}
+      >
+        <Plus className="h-6 w-6" strokeWidth={3} />
+        {ok ? "Cupom salvo!" : "Salvar cupom"}
+      </button>
+      {error && (
+        <p className="text-base font-bold" style={{ color: RED }}>
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function CouponList({ coupons, onChanged }: { coupons: Coupon[]; onChanged: () => void }) {
+  if (coupons.length === 0)
+    return <p className="mt-2 text-muted-foreground">Nenhum cupom ainda.</p>;
+  return (
+    <ul className="mt-2 flex flex-col gap-2">
+      {coupons.map((c) => (
+        <li
+          key={c.id}
+          className="flex items-center gap-3 rounded-2xl border-2 border-border p-3"
+        >
+          <div className="min-w-0 flex-1">
+            <p className="font-black text-foreground">
+              {c.code} · {couponLabel(c)}
+              {c.customerPhone && " · exclusivo"}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Mín. {formatPrice(c.minOrder)}
+              {c.type === "percent" &&
+                c.maxDiscount !== null &&
+                ` · máx. ${formatPrice(c.maxDiscount)}`}{" "}
+              ·{" "}
+              {c.maxUses === null ? "usos ilimitados" : `${c.uses}/${c.maxUses} usos`}
+              {isExhausted(c) && " · esgotado"}
+            </p>
+          </div>
+          <button
+            onClick={async () => {
+              await saveCoupon({ ...c, active: !c.active });
+              onChanged();
+            }}
+            className={`rounded-xl px-3 py-2 text-sm font-black ${
+              c.active ? "text-white" : "bg-muted text-muted-foreground"
+            }`}
+            style={c.active ? { backgroundColor: GREEN } : undefined}
+          >
+            {c.active ? <Check className="h-4 w-4" /> : "Off"}
+          </button>
+          <button
+            aria-label={`Excluir ${c.code}`}
+            onClick={async () => {
+              await deleteCoupon(c.id);
+              onChanged();
+            }}
+            className="rounded-xl bg-muted p-2"
+            style={{ color: RED }}
+          >
+            <Trash2 className="h-5 w-5" />
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function CouponsPanel() {
+  const coupons = useCoupons();
+  const refresh = useCouponsRefresh();
+
+  return (
+    <section className="rounded-3xl border-2 border-border bg-card p-4">
+      <h2 className="text-xl font-black text-foreground">Cupons dos clientes SPERB</h2>
+      <CouponForm onSaved={() => void refresh()} />
+      <h3 className="mt-6 text-lg font-black text-foreground">Cupons cadastrados</h3>
+      <CouponList coupons={coupons} onChanged={() => void refresh()} />
+    </section>
+  );
+}
+
+/* ------------------------------- Recibos ------------------------------- */
+
+const WHATSAPP_COUNTRY = "55";
+
+function receiptText(r: SimpleReceipt): string {
+  const linhas = r.lines
+    .map((l) => `- ${l.name} x${l.quantity} — ${formatPrice(l.total)}`)
+    .join("\n");
+  const data = new Date(r.date).toLocaleString("pt-BR");
+  return `*Recibo SPERB*\nPedido: ${r.number}\nData: ${data}\nCliente: ${r.customerName}\n\n${linhas}\n\nTotal: ${formatPrice(r.total)}\n\nObrigado pela preferência!`;
+}
+
+function whatsappLink(r: SimpleReceipt): string | null {
+  const digits = onlyDigits(r.customerPhone);
+  if (digits.length < 10) return null;
+  const phone = digits.startsWith(WHATSAPP_COUNTRY) ? digits : `${WHATSAPP_COUNTRY}${digits}`;
+  return `https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(receiptText(r))}`;
+}
+
+function useReceipts() {
+  return useQuery({
+    queryKey: ["loyverse-receipts"],
+    queryFn: () => fetchReceipts(),
+    staleTime: 60 * 1000,
+  });
+}
+
+function ReceiptCard({ r }: { r: SimpleReceipt }) {
+  const link = whatsappLink(r);
+  return (
+    <li className="rounded-2xl border border-border bg-background p-3">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="truncate text-base font-black text-foreground">{r.customerName}</p>
+          <p className="text-xs font-semibold text-muted-foreground">
+            {r.number} · {new Date(r.date).toLocaleString("pt-BR")}
+          </p>
+        </div>
+        <span className="shrink-0 text-lg font-black" style={{ color: GREEN }}>
+          {formatPrice(r.total)}
+        </span>
+      </div>
+      <ul className="mt-2 flex flex-col gap-0.5">
+        {r.lines.map((l, i) => (
+          <li key={i} className="text-sm text-muted-foreground">
+            {l.quantity}x {l.name} — {formatPrice(l.total)}
+          </li>
+        ))}
+      </ul>
+      {link ? (
+        <a
+          href={link}
+          target="_blank"
+          rel="noreferrer"
+          className="mt-2 inline-flex rounded-xl px-3 py-2 text-sm font-black text-white"
+          style={{ backgroundColor: GREEN }}
+        >
+          Enviar recibo no WhatsApp
+        </a>
+      ) : (
+        <p className="mt-2 text-xs font-bold text-muted-foreground">
+          Cliente sem telefone cadastrado no Loyverse.
+        </p>
+      )}
+    </li>
+  );
+}
+
+function ReceiptsPanel() {
+  const { data, isLoading, error, refetch, isFetching } = useReceipts();
+
+  return (
+    <section className="rounded-3xl border-2 border-border bg-card p-4">
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-xl font-black text-foreground">Recibos do Loyverse</h2>
+        <button
+          onClick={() => void refetch()}
+          className="rounded-xl bg-muted px-3 py-2 text-sm font-black text-foreground active:scale-95"
+        >
+          {isFetching ? "..." : "Atualizar"}
+        </button>
+      </div>
+
+      {isLoading && <p className="mt-3 text-base text-muted-foreground">Carregando vendas…</p>}
+      {error && (
+        <p className="mt-3 text-base font-bold" style={{ color: RED }}>
+          Não foi possível carregar os recibos do Loyverse.
+        </p>
+      )}
+      {data && (
+        <p className="mt-1 text-sm font-bold text-muted-foreground">
+          {data.length} venda(s) sincronizada(s).
+        </p>
+      )}
+
+      <ul className="mt-3 flex flex-col gap-2">
+        {(data ?? []).map((r) => (
+          <ReceiptCard key={r.id} r={r} />
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/* ------------------------------ Clientes ------------------------------- */
+
+function CustomersPanel() {
+  const customers = useQuery({
+    queryKey: ["loyverse-customers"],
+    queryFn: () => fetchLoyverseCustomers(),
+    staleTime: 60 * 1000,
+  });
+  const receipts = useReceipts();
+  const orders = useQuery({
+    queryKey: ["orders"],
+    queryFn: fetchOrders,
+    staleTime: 30 * 1000,
+  });
+  const [selected, setSelected] = useState<SimpleCustomer | null>(null);
+  const [search, setSearch] = useState("");
+
+  const list = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const all = customers.data ?? [];
+    if (!q) return all;
+    return all.filter(
+      (c) => c.name.toLowerCase().includes(q) || onlyDigits(c.phone).includes(onlyDigits(q)),
+    );
+  }, [customers.data, search]);
+
+  if (selected) {
+    return (
+      <CustomerDetail
+        customer={selected}
+        receipts={receipts.data ?? []}
+        orders={orders.data ?? []}
+        onBack={() => setSelected(null)}
+      />
+    );
+  }
+
+  return (
+    <section className="rounded-3xl border-2 border-border bg-card p-4">
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-xl font-black text-foreground">Clientes do Loyverse</h2>
+        <button
+          onClick={() => void customers.refetch()}
+          className="rounded-xl bg-muted px-3 py-2 text-sm font-black text-foreground"
+        >
+          {customers.isFetching ? "..." : "Atualizar"}
+        </button>
+      </div>
+
+      <input
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder="Buscar por nome ou telefone"
+        className="mt-3 w-full rounded-2xl border-2 border-border bg-background px-4 py-3 text-lg font-semibold text-foreground outline-none"
+      />
+
+      {customers.isLoading && (
+        <p className="mt-3 text-muted-foreground">Carregando clientes…</p>
+      )}
+      {customers.error && (
+        <p className="mt-3 font-bold" style={{ color: RED }}>
+          Não foi possível carregar os clientes do Loyverse.
+        </p>
+      )}
+
+      <ul className="mt-3 flex flex-col gap-2">
+        {list.map((c) => (
+          <li key={c.id}>
+            <button
+              onClick={() => setSelected(c)}
+              className="flex w-full items-center gap-3 rounded-2xl border border-border bg-background p-3 text-left active:scale-[0.99]"
+            >
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-base font-black text-foreground">{c.name}</p>
+                <p className="text-sm font-semibold text-muted-foreground">
+                  {c.phone || "sem telefone"}
+                </p>
+              </div>
+              <span className="shrink-0 text-sm font-black" style={{ color: GREEN }}>
+                {c.totalVisits} compra(s)
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function CustomerDetail({
+  customer,
+  receipts,
+  orders,
+  onBack,
+}: {
+  customer: SimpleCustomer;
+  receipts: SimpleReceipt[];
+  orders: Order[];
+  onBack: () => void;
+}) {
+  const coupons = useCoupons();
+  const refresh = useCouponsRefresh();
+  const phone = onlyDigits(customer.phone);
+
+  const mineReceipts = receipts.filter((r) => phone && onlyDigits(r.customerPhone) === phone);
+  const mineOrders = orders.filter((o) => phone && onlyDigits(o.customerPhone) === phone);
+  const usedCoupons = Array.from(
+    new Set(mineOrders.map((o) => o.couponCode).filter(Boolean)),
+  );
+  const exclusive = coupons.filter(
+    (c) => c.customerPhone && onlyDigits(c.customerPhone) === phone,
+  );
+  const spent = mineReceipts.reduce((s, r) => s + r.total, 0) || customer.totalSpent;
+
+  return (
+    <section className="rounded-3xl border-2 border-border bg-card p-4">
+      <button
+        onClick={onBack}
+        className="inline-flex items-center gap-2 rounded-xl bg-muted px-3 py-2 text-sm font-black text-foreground"
+      >
+        <ArrowLeft className="h-4 w-4" /> Todos os clientes
+      </button>
+
+      <h2 className="mt-3 text-2xl font-black text-foreground">{customer.name}</h2>
+      <p className="text-base font-semibold text-muted-foreground">
+        {customer.phone || "sem telefone"} · total comprado {formatPrice(spent)}
+      </p>
+
+      <h3 className="mt-5 text-lg font-black text-foreground">
+        Pedidos enviados pelo app ({mineOrders.length})
+      </h3>
+      {mineOrders.length === 0 ? (
+        <p className="text-muted-foreground">Nenhum pedido pelo app ainda.</p>
+      ) : (
+        <ul className="mt-2 flex flex-col gap-2">
+          {mineOrders.map((o) => (
+            <li key={o.id} className="rounded-2xl border border-border bg-background p-3">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-black text-foreground">
+                  {new Date(o.createdAt).toLocaleString("pt-BR")}
+                </p>
+                <span className="text-base font-black" style={{ color: BLUE }}>
+                  {formatPrice(o.total)}
+                </span>
+              </div>
+              <ul className="mt-1">
+                {o.items.map((it, i) => (
+                  <li key={i} className="text-sm text-muted-foreground">
+                    {it.qty}x {it.name} — {formatPrice(it.price * it.qty)}
+                  </li>
+                ))}
+              </ul>
+              {o.couponCode && (
+                <p className="mt-1 text-sm font-bold" style={{ color: GREEN }}>
+                  Cupom {o.couponCode} · -{formatPrice(o.discount)}
+                </p>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <h3 className="mt-5 text-lg font-black text-foreground">
+        Recibos de venda ({mineReceipts.length})
+      </h3>
+      {mineReceipts.length === 0 ? (
+        <p className="text-muted-foreground">Nenhuma venda no Loyverse para este cliente.</p>
+      ) : (
+        <ul className="mt-2 flex flex-col gap-2">
+          {mineReceipts.map((r) => (
+            <ReceiptCard key={r.id} r={r} />
+          ))}
+        </ul>
+      )}
+
+      <h3 className="mt-5 text-lg font-black text-foreground">Cupons usados</h3>
+      {usedCoupons.length === 0 ? (
+        <p className="text-muted-foreground">Nenhum cupom usado.</p>
+      ) : (
+        <p className="mt-1 text-base font-bold text-foreground">{usedCoupons.join(", ")}</p>
+      )}
+
+      <h3 className="mt-5 text-lg font-black text-foreground">Cupons exclusivos dele</h3>
+      <CouponList coupons={exclusive} onChanged={() => void refresh()} />
+
+      <h3 className="mt-5 text-lg font-black text-foreground">
+        Criar cupom exclusivo para {customer.name}
+      </h3>
+      {phone ? (
+        <CouponForm
+          compact
+          initial={{ customerPhone: phone, description: `Exclusivo ${customer.name}` }}
+          onSaved={() => void refresh()}
+        />
+      ) : (
+        <p className="text-muted-foreground">
+          Cadastre um telefone para este cliente no Loyverse para criar cupons exclusivos.
+        </p>
+      )}
+    </section>
+  );
+}
