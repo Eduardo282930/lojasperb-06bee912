@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SacolaRouteImport } from './routes/sacola'
 import { Route as EuRouteImport } from './routes/eu'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ProdutoIdRouteImport } from './routes/produto.$id'
 import { Route as ApiPublicManifestRouteImport } from './routes/api/public/manifest'
@@ -23,6 +24,11 @@ const SacolaRoute = SacolaRouteImport.update({
 const EuRoute = EuRouteImport.update({
   id: '/eu',
   path: '/eu',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -43,6 +49,7 @@ const ApiPublicManifestRoute = ApiPublicManifestRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/eu': typeof EuRoute
   '/sacola': typeof SacolaRoute
   '/produto/$id': typeof ProdutoIdRoute
@@ -50,6 +57,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/eu': typeof EuRoute
   '/sacola': typeof SacolaRoute
   '/produto/$id': typeof ProdutoIdRoute
@@ -58,6 +66,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/eu': typeof EuRoute
   '/sacola': typeof SacolaRoute
   '/produto/$id': typeof ProdutoIdRoute
@@ -65,12 +74,25 @@ export interface FileRoutesById {
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/eu' | '/sacola' | '/produto/$id' | '/api/public/manifest'
+  fullPaths:
+    | '/'
+    | '/admin'
+    | '/eu'
+    | '/sacola'
+    | '/produto/$id'
+    | '/api/public/manifest'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/eu' | '/sacola' | '/produto/$id' | '/api/public/manifest'
+  to:
+    | '/'
+    | '/admin'
+    | '/eu'
+    | '/sacola'
+    | '/produto/$id'
+    | '/api/public/manifest'
   id:
     | '__root__'
     | '/'
+    | '/admin'
     | '/eu'
     | '/sacola'
     | '/produto/$id'
@@ -79,6 +101,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRoute: typeof AdminRoute
   EuRoute: typeof EuRoute
   SacolaRoute: typeof SacolaRoute
   ProdutoIdRoute: typeof ProdutoIdRoute
@@ -99,6 +122,13 @@ declare module '@tanstack/react-router' {
       path: '/eu'
       fullPath: '/eu'
       preLoaderRoute: typeof EuRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -127,6 +157,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRoute: AdminRoute,
   EuRoute: EuRoute,
   SacolaRoute: SacolaRoute,
   ProdutoIdRoute: ProdutoIdRoute,

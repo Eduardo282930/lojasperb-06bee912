@@ -11,6 +11,7 @@ import {
   consumeCoupon,
   unredeemCoupon,
 } from "@/lib/coupons";
+import { recordOrder } from "@/lib/orders";
 
 
 const WHATSAPP_NUMBER = "5551996109657";
@@ -53,12 +54,29 @@ function SacolaPage() {
     const url = `https://api.whatsapp.com/send?phone=${WHATSAPP_NUMBER}&text=${encodeURIComponent(texto)}`;
     window.open(url, "_blank");
 
+    // Registers the order so it appears in the owner's panel.
+    void recordOrder({
+      name: profile.name,
+      phone: profile.phone,
+      items: cart.map((c) => ({
+        id: c.id,
+        name: c.name,
+        qty: c.qty,
+        price: priceValue(c.price),
+      })),
+      subtotal,
+      discount: applied?.discount ?? 0,
+      total,
+      couponCode: applied?.coupon.code ?? "",
+    });
+
     if (applied) {
       await consumeCoupon(applied.coupon.id);
       unredeemCoupon(applied.coupon.id);
       await refreshCoupons();
     }
   }
+
 
 
   return (
