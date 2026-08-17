@@ -15,6 +15,8 @@ export type Coupon = {
   maxUses: number | null;
   uses: number;
   active: boolean;
+  /** When set, the coupon is exclusive to this customer's phone. */
+  customerPhone: string | null;
 };
 
 export type Profile = {
@@ -33,6 +35,7 @@ type CouponRow = {
   max_uses: number | null;
   uses: number | null;
   active: boolean;
+  customer_phone?: string | null;
 };
 
 function num(v: number | string | null | undefined, fallback = 0): number {
@@ -52,6 +55,7 @@ function toCoupon(r: CouponRow): Coupon {
     maxUses: r.max_uses ?? null,
     uses: r.uses ?? 0,
     active: r.active,
+    customerPhone: r.customer_phone ?? null,
   };
 }
 
@@ -66,13 +70,31 @@ async function fetchCoupons(): Promise<Coupon[]> {
   return (data as CouponRow[]).map(toCoupon);
 }
 
+/** Coupons that belong exclusively to one phone number. */
+export async function fetchCouponsForPhone(phone: string): Promise<Coupon[]> {
+  const digits = (phone || "").replace(/\D/g, "");
+  if (digits.length < 8) return [];
+  const { data, error } = await supabase.rpc("coupons_for_phone", { p_phone: digits });
+  if (error) return [];
+  return ((data ?? []) as CouponRow[]).map(toCoupon);
+}
+
 export function useCoupons(): Coupon[] {
+  const phone = useProfile().phone;
   const { data } = useQuery({
     queryKey: COUPONS_KEY,
     queryFn: fetchCoupons,
-    staleTime: 15 * 1000,
+    staleTime: 60 * 1000,
   });
-  return data ?? [];
+  const { data: mine } = useQuery({
+    queryKey: [...COUPONS_KEY, "phone", (phone || "").replace(/\D/g, "")],
+    queryFn: () => fetchCouponsForPhone(phone),
+    staleTime: 60 * 1000,
+    enabled: (phone || "").replace(/\D/g, "").length >= 8,
+  });
+  const all = [...(data ?? []), ...(mine ?? [])];
+  const seen = new Set<string>();
+  return all.filter((c) => (seen.has(c.id) ? false : (seen.add(c.id), true)));
 }
 
 export function useCouponsRefresh() {
@@ -90,6 +112,9 @@ export async function saveCoupon(coupon: Coupon): Promise<void> {
     min_order: coupon.minOrder,
     max_uses: coupon.maxUses,
     active: coupon.active,
+    customer_phone: coupon.customerPhone
+      ? coupon.customerPhone.replace(/\D/g, "")
+      : null,
   };
 
   if (coupon.id) {
@@ -233,8 +258,19 @@ export function useProfile(): Profile {
 }
 
 /** Saves the customer in the database, Loyverse, and keeps a local copy. */
+/** Name already registered for a phone number (locked by the store). */
+export async function lookupCustomerName(phone: string): Promise<string> {
+  const digits = (phone || "").replace(/\D/g, "");
+  if (digits.length < 8) return "";
+  const { data, error } = await supabase.rpc("lookup_customer_name", { p_phone: digits });
+  if (error) return "";
+  return (data as string | null) ?? "";
+}
+
 export async function saveProfile(profile: Profile): Promise<void> {
   ensureInit();
+  const locked = await lookupCustomerName(profile.phone);
+  if (locked) profile = { ...profile, name: locked };
   profileCache = profile;
   if (typeof window !== "undefined") {
     window.localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
