@@ -11,6 +11,7 @@ import {
   consumeCoupon,
   unredeemCoupon,
 } from "@/lib/coupons";
+import { recordOrder } from "@/lib/orders";
 
 
 const WHATSAPP_NUMBER = "5551996109657";
