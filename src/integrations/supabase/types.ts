@@ -19,6 +19,7 @@ export type Database = {
           active: boolean
           code: string
           created_at: string
+          customer_phone: string | null
           description: string
           id: string
           max_discount: number | null
@@ -33,6 +34,7 @@ export type Database = {
           active?: boolean
           code: string
           created_at?: string
+          customer_phone?: string | null
           description?: string
           id?: string
           max_discount?: number | null
@@ -47,6 +49,7 @@ export type Database = {
           active?: boolean
           code?: string
           created_at?: string
+          customer_phone?: string | null
           description?: string
           id?: string
           max_discount?: number | null
@@ -91,9 +94,13 @@ export type Database = {
       }
       orders: {
         Row: {
+          coupon_code: string
           coupon_id: string | null
           created_at: string
           customer_id: string | null
+          customer_name: string
+          customer_phone: string
+          device_id: string
           discount: number
           id: string
           items: Json
@@ -102,9 +109,13 @@ export type Database = {
           total: number
         }
         Insert: {
+          coupon_code?: string
           coupon_id?: string | null
           created_at?: string
           customer_id?: string | null
+          customer_name?: string
+          customer_phone?: string
+          device_id?: string
           discount?: number
           id?: string
           items?: Json
@@ -113,9 +124,13 @@ export type Database = {
           total?: number
         }
         Update: {
+          coupon_code?: string
           coupon_id?: string | null
           created_at?: string
           customer_id?: string | null
+          customer_name?: string
+          customer_phone?: string
+          device_id?: string
           discount?: number
           id?: string
           items?: Json
@@ -168,6 +183,43 @@ export type Database = {
     Functions: {
       claim_admin: { Args: never; Returns: boolean }
       consume_coupon: { Args: { p_coupon_id: string }; Returns: boolean }
+      coupons_for_phone: {
+        Args: { p_phone: string }
+        Returns: {
+          active: boolean
+          code: string
+          created_at: string
+          customer_phone: string | null
+          description: string
+          id: string
+          max_discount: number | null
+          max_uses: number | null
+          min_order: number
+          type: string
+          updated_at: string
+          uses: number
+          value: number
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "coupons"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      create_order: {
+        Args: {
+          p_coupon_code: string
+          p_device_id: string
+          p_discount: number
+          p_items: Json
+          p_name: string
+          p_phone: string
+          p_subtotal: number
+          p_total: number
+        }
+        Returns: string
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -175,6 +227,8 @@ export type Database = {
         }
         Returns: boolean
       }
+      lookup_customer_name: { Args: { p_phone: string }; Returns: string }
+      only_digits: { Args: { p: string }; Returns: string }
       save_customer: {
         Args: { p_device_id: string; p_name: string; p_phone: string }
         Returns: undefined
