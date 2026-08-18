@@ -87,11 +87,21 @@ export const syncLoyverseCustomer = createServerFn({ method: "POST" })
         method: "POST",
         body: JSON.stringify(body),
       });
+      // Liga o cliente do Supabase ao id do Loyverse (identificador estável).
+      try {
+        const { persistLoyverseCustomers } = await import("./catalog-cache.server");
+        await persistLoyverseCustomers([
+          { id: saved.id, name: data.name, phone: data.phone, email: "" },
+        ]);
+      } catch (err) {
+        console.error("[Clientes] vínculo Supabase falhou:", err);
+      }
       return { ok: true, id: saved.id };
     } catch {
       return { ok: false };
     }
   });
+
 
 type LoyverseReceipt = {
   receipt_number: string;
