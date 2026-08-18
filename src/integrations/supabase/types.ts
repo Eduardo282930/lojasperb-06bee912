@@ -14,6 +14,114 @@ export type Database = {
   }
   public: {
     Tables: {
+      catalog_categories: {
+        Row: {
+          created_at: string
+          external_id: string
+          id: string
+          name: string
+          source: string
+          store_key: string
+          synced_at: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          external_id: string
+          id?: string
+          name?: string
+          source?: string
+          store_key?: string
+          synced_at?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          external_id?: string
+          id?: string
+          name?: string
+          source?: string
+          store_key?: string
+          synced_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      catalog_products: {
+        Row: {
+          active: boolean
+          category_external_id: string | null
+          category_name: string
+          created_at: string
+          description: string
+          external_item_id: string | null
+          external_variant_id: string | null
+          generated_description: boolean
+          id: string
+          image: string | null
+          images: Json
+          name: string
+          price: number
+          product_key: string
+          sku: string
+          source: string
+          stock: number
+          store_key: string
+          synced_at: string
+          updated_at: string
+          variant_axis: string
+          variants: Json
+        }
+        Insert: {
+          active?: boolean
+          category_external_id?: string | null
+          category_name?: string
+          created_at?: string
+          description?: string
+          external_item_id?: string | null
+          external_variant_id?: string | null
+          generated_description?: boolean
+          id?: string
+          image?: string | null
+          images?: Json
+          name: string
+          price?: number
+          product_key: string
+          sku?: string
+          source?: string
+          stock?: number
+          store_key?: string
+          synced_at?: string
+          updated_at?: string
+          variant_axis?: string
+          variants?: Json
+        }
+        Update: {
+          active?: boolean
+          category_external_id?: string | null
+          category_name?: string
+          created_at?: string
+          description?: string
+          external_item_id?: string | null
+          external_variant_id?: string | null
+          generated_description?: boolean
+          id?: string
+          image?: string | null
+          images?: Json
+          name?: string
+          price?: number
+          product_key?: string
+          sku?: string
+          source?: string
+          stock?: number
+          store_key?: string
+          synced_at?: string
+          updated_at?: string
+          variant_axis?: string
+          variants?: Json
+        }
+        Relationships: []
+      }
       coupons: {
         Row: {
           active: boolean
@@ -65,28 +173,40 @@ export type Database = {
       customers: {
         Row: {
           created_at: string
-          device_id: string
+          device_id: string | null
+          email: string
           id: string
+          loyverse_id: string | null
           name: string
           phone: string
+          source: string
+          synced_at: string | null
           updated_at: string
           user_id: string | null
         }
         Insert: {
           created_at?: string
-          device_id: string
+          device_id?: string | null
+          email?: string
           id?: string
+          loyverse_id?: string | null
           name?: string
           phone?: string
+          source?: string
+          synced_at?: string | null
           updated_at?: string
           user_id?: string | null
         }
         Update: {
           created_at?: string
-          device_id?: string
+          device_id?: string | null
+          email?: string
           id?: string
+          loyverse_id?: string | null
           name?: string
           phone?: string
+          source?: string
+          synced_at?: string | null
           updated_at?: string
           user_id?: string | null
         }
@@ -154,6 +274,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      store_settings: {
+        Row: {
+          created_at: string
+          id: string
+          logo_source: string
+          logo_synced_at: string | null
+          logo_url: string | null
+          name: string
+          store_key: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          logo_source?: string
+          logo_synced_at?: string | null
+          logo_url?: string | null
+          name?: string
+          store_key: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          logo_source?: string
+          logo_synced_at?: string | null
+          logo_url?: string | null
+          name?: string
+          store_key?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       user_roles: {
         Row: {
@@ -232,6 +385,15 @@ export type Database = {
       save_customer: {
         Args: { p_device_id: string; p_name: string; p_phone: string }
         Returns: undefined
+      }
+      upsert_customer_from_loyverse: {
+        Args: {
+          p_email: string
+          p_loyverse_id: string
+          p_name: string
+          p_phone: string
+        }
+        Returns: string
       }
     }
     Enums: {
