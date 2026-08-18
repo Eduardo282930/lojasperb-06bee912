@@ -49,27 +49,37 @@ function EuPage() {
   const [phone, setPhone] = useState(profile.phone);
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState("");
-  const [locked, setLocked] = useState(false);
+  const [status, setStatus] = useState<"idle" | "checking" | "known" | "new">(
+    profile.name ? "known" : "idle",
+  );
+  const locked = status === "known";
 
-  // The name registered for a phone number can only be changed in the Loyverse.
+  // Basta o telefone: se o número já tem cadastro, o nome vem do banco central
+  // e não pode ser alterado no app (só a loja altera no Loyverse).
   useEffect(() => {
     const digits = phone.replace(/\D/g, "");
     if (digits.length < 10) {
-      setLocked(false);
+      setStatus("idle");
       return;
     }
     let alive = true;
+    setStatus("checking");
     const t = setTimeout(async () => {
       const registered = await lookupCustomerName(phone);
-      if (!alive || !registered) return;
-      setName(registered);
-      setLocked(true);
+      if (!alive) return;
+      if (registered) {
+        setName(registered);
+        setStatus("known");
+      } else {
+        setStatus("new");
+      }
     }, 500);
     return () => {
       alive = false;
       clearTimeout(t);
     };
   }, [phone]);
+
 
   const visible = coupons.filter(isAvailable);
 
