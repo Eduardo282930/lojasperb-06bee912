@@ -87,11 +87,21 @@ export const syncLoyverseCustomer = createServerFn({ method: "POST" })
         method: "POST",
         body: JSON.stringify(body),
       });
+      // Liga o cliente do Supabase ao id do Loyverse (identificador estável).
+      try {
+        const { persistLoyverseCustomers } = await import("./catalog-cache.server");
+        await persistLoyverseCustomers([
+          { id: saved.id, name: data.name, phone: data.phone, email: "" },
+        ]);
+      } catch (err) {
+        console.error("[Clientes] vínculo Supabase falhou:", err);
+      }
       return { ok: true, id: saved.id };
     } catch {
       return { ok: false };
     }
   });
+
 
 type LoyverseReceipt = {
   receipt_number: string;
@@ -169,7 +179,7 @@ export const fetchLoyverseCustomers = createServerFn({ method: "GET" }).handler(
       >;
     }>("customers?limit=250", token);
 
-    return (list.customers ?? [])
+    const customers = (list.customers ?? [])
       .map((c) => ({
         id: c.id,
         name: c.name?.trim() || "Cliente sem nome",
@@ -179,5 +189,42 @@ export const fetchLoyverseCustomers = createServerFn({ method: "GET" }).handler(
         totalVisits: Number(c.total_visits) || 0,
       }))
       .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+
+    // Espelha os clientes no Supabase (fonte central para o ERP), sem duplicar.
+    try {
+      const { persistLoyverseCustomers } = await import("./catalog-cache.server");
+      await persistLoyverseCustomers(customers);
+    } catch (err) {
+      console.error("[Clientes] falha ao sincronizar com Supabase:", err);
+    }
+
+    return customers;
   },
 );
+
+/** Importa todos os clientes do Loyverse para o Supabase (sem duplicar). */
+export const syncCustomersToSupabase = createServerFn({ method: "POST" }).handler(
+  async (): Promise<{ ok: boolean; saved: number }> => {
+    const token = process.env["LOYVERSE_TOKEN"];
+    if (!token) return { ok: false, saved: 0 };
+    try {
+      const list = await loyverse<{
+        customers?: Array<LoyverseCustomer & { email?: string | null }>;
+      }>("customers?limit=250", token);
+      const { persistLoyverseCustomers } = await import("./catalog-cache.server");
+      const saved = await persistLoyverseCustomers(
+        (list.customers ?? []).map((c) => ({
+          id: c.id,
+          name: c.name?.trim() ?? "",
+          phone: c.phone_number ?? "",
+          email: c.email ?? "",
+        })),
+      );
+      return { ok: true, saved };
+    } catch (err) {
+      console.error("[Clientes] sync falhou:", err);
+      return { ok: false, saved: 0 };
+    }
+  },
+);
+

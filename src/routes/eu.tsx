@@ -49,27 +49,37 @@ function EuPage() {
   const [phone, setPhone] = useState(profile.phone);
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState("");
-  const [locked, setLocked] = useState(false);
+  const [status, setStatus] = useState<"idle" | "checking" | "known" | "new">(
+    profile.name ? "known" : "idle",
+  );
+  const locked = status === "known";
 
-  // The name registered for a phone number can only be changed in the Loyverse.
+  // Basta o telefone: se o número já tem cadastro, o nome vem do banco central
+  // e não pode ser alterado no app (só a loja altera no Loyverse).
   useEffect(() => {
     const digits = phone.replace(/\D/g, "");
     if (digits.length < 10) {
-      setLocked(false);
+      setStatus("idle");
       return;
     }
     let alive = true;
+    setStatus("checking");
     const t = setTimeout(async () => {
       const registered = await lookupCustomerName(phone);
-      if (!alive || !registered) return;
-      setName(registered);
-      setLocked(true);
+      if (!alive) return;
+      if (registered) {
+        setName(registered);
+        setStatus("known");
+      } else {
+        setStatus("new");
+      }
     }, 500);
     return () => {
       alive = false;
       clearTimeout(t);
     };
   }, [phone]);
+
 
   const visible = coupons.filter(isAvailable);
 
@@ -121,24 +131,6 @@ function EuPage() {
         <section className="mt-5 rounded-3xl border-2 border-border bg-card p-5 shadow-sm">
           <h2 className="text-xl font-black text-foreground">Meus dados</h2>
           <label className="mt-3 block text-base font-bold text-muted-foreground">
-            Nome
-            <input
-              value={name}
-              maxLength={80}
-              onChange={(e) => setName(e.target.value)}
-              readOnly={locked}
-              placeholder="Seu nome completo"
-              className={`mt-1 w-full rounded-2xl border-2 border-border px-4 py-3 text-lg font-semibold text-foreground outline-none focus:border-[oklch(0.55_0.22_255)] ${
-                locked ? "bg-muted" : "bg-background"
-              }`}
-            />
-            {locked && (
-              <span className="mt-1 block text-sm font-semibold text-muted-foreground">
-                Este número já tem cadastro. O nome só pode ser alterado pela loja.
-              </span>
-            )}
-          </label>
-          <label className="mt-3 block text-base font-bold text-muted-foreground">
             WhatsApp
             <input
               value={phone}
@@ -149,18 +141,58 @@ function EuPage() {
               className="mt-1 w-full rounded-2xl border-2 border-border bg-background px-4 py-3 text-lg font-semibold text-foreground outline-none focus:border-[oklch(0.55_0.22_255)]"
             />
           </label>
+
+          {status === "checking" && (
+            <p className="mt-2 text-base font-semibold text-muted-foreground">
+              Procurando seu cadastro...
+            </p>
+          )}
+
+          {locked && (
+            <div className="mt-3 rounded-2xl border-2 border-[oklch(0.62_0.19_145)] bg-muted px-4 py-3">
+              <p className="text-sm font-bold uppercase tracking-wide text-muted-foreground">
+                Cadastro encontrado
+              </p>
+              <p className="text-xl font-black text-foreground">{name}</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                O nome deste número só pode ser alterado pela loja.
+              </p>
+            </div>
+          )}
+
+          {status === "new" && (
+            <label className="mt-3 block text-base font-bold text-muted-foreground">
+              Nome completo
+              <input
+                value={name}
+                maxLength={80}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Seu nome completo"
+                className="mt-1 w-full rounded-2xl border-2 border-border bg-background px-4 py-3 text-lg font-semibold text-foreground outline-none focus:border-[oklch(0.55_0.22_255)]"
+              />
+              <span className="mt-1 block text-sm font-semibold text-muted-foreground">
+                Pedimos o nome só nesta primeira vez para este número.
+              </span>
+            </label>
+          )}
+
           <button
+            disabled={
+              phone.replace(/\D/g, "").length < 10 ||
+              (status === "new" && name.trim().length < 2)
+            }
             onClick={async () => {
               setSaveError("");
               try {
                 await saveProfile({ name: name.trim(), phone: phone.trim() });
+                setStatus("known");
                 setSaved(true);
                 setTimeout(() => setSaved(false), 1500);
               } catch {
                 setSaveError("Não foi possível salvar agora. Tente de novo.");
               }
             }}
-            className={`mt-4 w-full rounded-2xl py-4 text-xl font-black text-white shadow-md transition-colors active:scale-[0.98] ${
+            className={`mt-4 w-full rounded-2xl py-4 text-xl font-black text-white shadow-md transition-colors active:scale-[0.98] disabled:opacity-50 ${
               saved ? "bg-[oklch(0.62_0.19_145)]" : "bg-[oklch(0.55_0.22_255)]"
             }`}
           >
@@ -175,6 +207,7 @@ function EuPage() {
             Seus dados ficam guardados na sua conta da loja.
           </p>
         </section>
+
 
         <section className="mt-6">
           <h2 className="flex items-center gap-2 text-xl font-black text-foreground">
