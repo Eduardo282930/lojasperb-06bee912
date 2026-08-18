@@ -444,20 +444,40 @@ async function buildCatalog(token: string): Promise<Catalog> {
   return { products, categories, storeLogo };
 }
 
+/**
+ * Loyverse continua sendo a origem. Quando ele responde, o resultado FINAL
+ * (já agrupado/processado) é gravado no Supabase; quando ele falha, o
+ * catálogo é servido a partir da cópia persistida no Supabase.
+ */
+async function getCatalog(): Promise<Catalog> {
+  const token = process.env.LOYVERSE_TOKEN;
+  if (token) {
+    try {
+      const catalog = await buildCatalog(token);
+      try {
+        const { persistCatalog } = await import("./catalog-cache.server");
+        await persistCatalog(catalog);
+      } catch (err) {
+        console.error("[Catalog] falha ao salvar no Supabase:", err);
+      }
+      return catalog;
+    } catch (err) {
+      console.error("[Catalog] Loyverse indisponível, usando Supabase:", err);
+    }
+  }
+
+  const { loadCatalogFromSupabase } = await import("./catalog-cache.server");
+  const cached = await loadCatalogFromSupabase();
+  if (cached) return cached;
+  throw new Error("Catálogo indisponível no momento");
+}
+
 export const fetchCatalog = createServerFn({ method: "GET" }).handler(
-  async (): Promise<Catalog> => {
-    const token = process.env.LOYVERSE_TOKEN;
-    if (!token) throw new Error("LOYVERSE_TOKEN não configurado");
-    return buildCatalog(token);
-  },
+  async (): Promise<Catalog> => getCatalog(),
 );
 
 export const fetchProducts = createServerFn({ method: "GET" }).handler(
-  async (): Promise<CatalogProduct[]> => {
-    const token = process.env.LOYVERSE_TOKEN;
-    if (!token) throw new Error("LOYVERSE_TOKEN não configurado");
-    return (await buildCatalog(token)).products;
-  },
+  async (): Promise<CatalogProduct[]> => (await getCatalog()).products,
 );
 
 export const fetchProduct = createServerFn({ method: "GET" })
@@ -468,12 +488,11 @@ export const fetchProduct = createServerFn({ method: "GET" })
     return { id: data.id };
   })
   .handler(async ({ data }): Promise<CatalogProduct | null> => {
-    const token = process.env.LOYVERSE_TOKEN;
-    if (!token) throw new Error("LOYVERSE_TOKEN não configurado");
-    const { products } = await buildCatalog(token);
+    const { products } = await getCatalog();
     return (
       products.find((p) => p.id === data.id) ??
       products.find((p) => p.variants.some((v) => v.id === data.id)) ??
       null
     );
   });
+
