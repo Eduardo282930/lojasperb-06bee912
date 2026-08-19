@@ -6,6 +6,8 @@ export type OrderItem = {
   name: string;
   qty: number;
   price: number;
+  image?: string | null;
+  sku?: string;
 };
 
 export type Order = {
@@ -19,7 +21,32 @@ export type Order = {
   discount: number;
   total: number;
   status: string;
+  paymentStatus: string;
 };
+
+/* ------------------------- Status do pedido ---------------------------- */
+
+export const ORDER_STATUSES = [
+  { value: "sent", label: "Pedido recebido" },
+  { value: "preparing", label: "Em preparação" },
+  { value: "shipping", label: "A caminho" },
+  { value: "delivered", label: "Entregue" },
+  { value: "canceled", label: "Cancelado" },
+] as const;
+
+export const PAYMENT_STATUSES = [
+  { value: "pending", label: "Aguardando pagamento" },
+  { value: "paid", label: "Pago" },
+  { value: "refunded", label: "Estornado" },
+] as const;
+
+export function statusLabel(v: string): string {
+  return ORDER_STATUSES.find((s) => s.value === v)?.label ?? "Pedido recebido";
+}
+
+export function paymentLabel(v: string): string {
+  return PAYMENT_STATUSES.find((s) => s.value === v)?.label ?? "Aguardando pagamento";
+}
 
 /** Registers the WhatsApp order so it shows up in the admin panel. */
 export async function recordOrder(input: {
@@ -49,6 +76,10 @@ function num(v: unknown): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+function toItems(raw: unknown): OrderItem[] {
+  return Array.isArray(raw) ? (raw as unknown as OrderItem[]) : [];
+}
+
 /** Admin-only: every order sent through the app. */
 export async function fetchOrders(): Promise<Order[]> {
   const { data, error } = await supabase
@@ -63,12 +94,133 @@ export async function fetchOrders(): Promise<Order[]> {
     customerName: r.customer_name ?? "",
     customerPhone: r.customer_phone ?? "",
     couponCode: r.coupon_code ?? "",
-    items: Array.isArray(r.items) ? (r.items as unknown as OrderItem[]) : [],
+    items: toItems(r.items),
     subtotal: num(r.subtotal),
     discount: num(r.discount),
     total: num(r.total),
     status: r.status,
+    paymentStatus: (r as { payment_status?: string }).payment_status ?? "pending",
   }));
+}
+
+/** Customer area: only the orders of this device / phone number. */
+export async function fetchMyOrders(phone: string): Promise<Order[]> {
+  const { data, error } = await supabase.rpc("orders_for_customer", {
+    p_device_id: deviceId(),
+    p_phone: phone || "",
+  });
+  if (error) throw error;
+  return (data ?? []).map((r) => ({
+    id: r.id,
+    createdAt: r.created_at,
+    customerName: r.customer_name ?? "",
+    customerPhone: phone,
+    couponCode: r.coupon_code ?? "",
+    items: toItems(r.items),
+    subtotal: num(r.subtotal),
+    discount: num(r.discount),
+    total: num(r.total),
+    status: r.status,
+    paymentStatus: r.payment_status ?? "pending",
+  }));
+}
+
+export type TimelineEntry = {
+  status: string;
+  paymentStatus: string | null;
+  note: string;
+  createdAt: string;
+};
+
+export async function fetchOrderTimeline(
+  orderId: string,
+  phone: string,
+): Promise<TimelineEntry[]> {
+  const { data, error } = await supabase.rpc("order_history_for_customer", {
+    p_order_id: orderId,
+    p_device_id: deviceId(),
+    p_phone: phone || "",
+  });
+  if (error) return [];
+  return (data ?? []).map((r) => ({
+    status: r.status,
+    paymentStatus: r.payment_status ?? null,
+    note: r.note ?? "",
+    createdAt: r.created_at,
+  }));
+}
+
+/** Admin-only: changes the order status and records it in the history. */
+export async function setOrderStatus(
+  orderId: string,
+  status: string,
+  paymentStatus: string,
+  note = "",
+): Promise<boolean> {
+  const { data, error } = await supabase.rpc("admin_set_order_status", {
+    p_order_id: orderId,
+    p_status: status,
+    p_payment_status: paymentStatus,
+    p_note: note,
+  });
+  if (error) return false;
+  return Boolean(data);
+}
+
+/* --------------------- Revisão de clientes duplicados ------------------- */
+
+export type DuplicateReview = {
+  id: string;
+  existingName: string;
+  existingPhone: string;
+  incomingName: string;
+  incomingPhone: string;
+  createdAt: string;
+  status: string;
+};
+
+export async function fetchDuplicates(): Promise<DuplicateReview[]> {
+  const { data, error } = await supabase
+    .from("customer_duplicates")
+    .select("id, incoming_name, incoming_phone, created_at, status, existing_customer_id")
+    .eq("status", "pending")
+    .order("created_at", { ascending: false })
+    .limit(50);
+  if (error) throw error;
+  const rows = data ?? [];
+  const ids = rows.map((r) => r.existing_customer_id).filter(Boolean) as string[];
+  const names = new Map<string, { name: string; phone: string }>();
+  if (ids.length > 0) {
+    const { data: cs } = await supabase
+      .from("customers")
+      .select("id, name, phone")
+      .in("id", ids);
+    (cs ?? []).forEach((c) => names.set(c.id, { name: c.name, phone: c.phone }));
+  }
+  return rows.map((r) => {
+    const existing = r.existing_customer_id ? names.get(r.existing_customer_id) : undefined;
+    return {
+      id: r.id,
+      existingName: existing?.name ?? "—",
+      existingPhone: existing?.phone ?? "",
+      incomingName: r.incoming_name ?? "",
+      incomingPhone: r.incoming_phone ?? "",
+      createdAt: r.created_at,
+      status: r.status,
+    };
+  });
+}
+
+export async function resolveDuplicate(
+  id: string,
+  action: "update_phone" | "keep_new" | "later",
+): Promise<boolean> {
+  const { data, error } = await supabase.rpc("admin_resolve_duplicate", {
+    p_id: id,
+    p_action: action,
+  });
+  if (error) return false;
+  return Boolean(data);
 }
 
 export function onlyDigits(s: string): string {
