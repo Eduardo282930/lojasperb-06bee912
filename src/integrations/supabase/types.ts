@@ -122,17 +122,110 @@ export type Database = {
         }
         Relationships: []
       }
+      coupon_audit: {
+        Row: {
+          action: string
+          after_data: Json | null
+          before_data: Json | null
+          changed_by: string | null
+          coupon_id: string | null
+          created_at: string
+          id: string
+          store_key: string
+        }
+        Insert: {
+          action: string
+          after_data?: Json | null
+          before_data?: Json | null
+          changed_by?: string | null
+          coupon_id?: string | null
+          created_at?: string
+          id?: string
+          store_key?: string
+        }
+        Update: {
+          action?: string
+          after_data?: Json | null
+          before_data?: Json | null
+          changed_by?: string | null
+          coupon_id?: string | null
+          created_at?: string
+          id?: string
+          store_key?: string
+        }
+        Relationships: []
+      }
+      coupon_redemptions: {
+        Row: {
+          coupon_code: string
+          coupon_id: string | null
+          created_at: string
+          customer_id: string | null
+          customer_phone: string
+          discount: number
+          id: string
+          order_id: string | null
+          store_key: string
+        }
+        Insert: {
+          coupon_code?: string
+          coupon_id?: string | null
+          created_at?: string
+          customer_id?: string | null
+          customer_phone?: string
+          discount?: number
+          id?: string
+          order_id?: string | null
+          store_key?: string
+        }
+        Update: {
+          coupon_code?: string
+          coupon_id?: string | null
+          created_at?: string
+          customer_id?: string | null
+          customer_phone?: string
+          discount?: number
+          id?: string
+          order_id?: string | null
+          store_key?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coupon_redemptions_coupon_id_fkey"
+            columns: ["coupon_id"]
+            isOneToOne: false
+            referencedRelation: "coupons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coupon_redemptions_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coupon_redemptions_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       coupons: {
         Row: {
           active: boolean
           code: string
           created_at: string
+          customer_id: string | null
           customer_phone: string | null
           description: string
           id: string
           max_discount: number | null
           max_uses: number | null
           min_order: number
+          store_key: string
           type: string
           updated_at: string
           uses: number
@@ -142,12 +235,14 @@ export type Database = {
           active?: boolean
           code: string
           created_at?: string
+          customer_id?: string | null
           customer_phone?: string | null
           description?: string
           id?: string
           max_discount?: number | null
           max_uses?: number | null
           min_order?: number
+          store_key?: string
           type?: string
           updated_at?: string
           uses?: number
@@ -157,18 +252,88 @@ export type Database = {
           active?: boolean
           code?: string
           created_at?: string
+          customer_id?: string | null
           customer_phone?: string | null
           description?: string
           id?: string
           max_discount?: number | null
           max_uses?: number | null
           min_order?: number
+          store_key?: string
           type?: string
           updated_at?: string
           uses?: number
           value?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "coupons_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customer_duplicates: {
+        Row: {
+          created_at: string
+          device_id: string
+          existing_customer_id: string | null
+          id: string
+          incoming_name: string
+          incoming_phone: string
+          new_customer_id: string | null
+          reason: string
+          resolved_at: string | null
+          resolved_by: string | null
+          status: string
+          store_key: string
+        }
+        Insert: {
+          created_at?: string
+          device_id?: string
+          existing_customer_id?: string | null
+          id?: string
+          incoming_name?: string
+          incoming_phone?: string
+          new_customer_id?: string | null
+          reason?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+          store_key?: string
+        }
+        Update: {
+          created_at?: string
+          device_id?: string
+          existing_customer_id?: string | null
+          id?: string
+          incoming_name?: string
+          incoming_phone?: string
+          new_customer_id?: string | null
+          reason?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+          store_key?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_duplicates_existing_customer_id_fkey"
+            columns: ["existing_customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_duplicates_new_customer_id_fkey"
+            columns: ["new_customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       customers: {
         Row: {
@@ -180,6 +345,7 @@ export type Database = {
           name: string
           phone: string
           source: string
+          store_key: string
           synced_at: string | null
           updated_at: string
           user_id: string | null
@@ -193,6 +359,7 @@ export type Database = {
           name?: string
           phone?: string
           source?: string
+          store_key?: string
           synced_at?: string | null
           updated_at?: string
           user_id?: string | null
@@ -206,11 +373,145 @@ export type Database = {
           name?: string
           phone?: string
           source?: string
+          store_key?: string
           synced_at?: string | null
           updated_at?: string
           user_id?: string | null
         }
         Relationships: []
+      }
+      inventory_movements: {
+        Row: {
+          created_at: string
+          delta: number
+          external_variant_id: string | null
+          id: string
+          new_stock: number | null
+          previous_stock: number | null
+          product_key: string
+          reason: string
+          source: string
+          store_key: string
+        }
+        Insert: {
+          created_at?: string
+          delta?: number
+          external_variant_id?: string | null
+          id?: string
+          new_stock?: number | null
+          previous_stock?: number | null
+          product_key?: string
+          reason?: string
+          source?: string
+          store_key?: string
+        }
+        Update: {
+          created_at?: string
+          delta?: number
+          external_variant_id?: string | null
+          id?: string
+          new_stock?: number | null
+          previous_stock?: number | null
+          product_key?: string
+          reason?: string
+          source?: string
+          store_key?: string
+        }
+        Relationships: []
+      }
+      order_items: {
+        Row: {
+          created_at: string
+          external_variant_id: string | null
+          id: string
+          image: string | null
+          name: string
+          order_id: string
+          product_key: string
+          qty: number
+          sku: string
+          store_key: string
+          total: number
+          unit_price: number
+        }
+        Insert: {
+          created_at?: string
+          external_variant_id?: string | null
+          id?: string
+          image?: string | null
+          name?: string
+          order_id: string
+          product_key?: string
+          qty?: number
+          sku?: string
+          store_key?: string
+          total?: number
+          unit_price?: number
+        }
+        Update: {
+          created_at?: string
+          external_variant_id?: string | null
+          id?: string
+          image?: string | null
+          name?: string
+          order_id?: string
+          product_key?: string
+          qty?: number
+          sku?: string
+          store_key?: string
+          total?: number
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      order_status_history: {
+        Row: {
+          changed_by: string | null
+          created_at: string
+          id: string
+          note: string
+          order_id: string
+          payment_status: string | null
+          status: string
+          store_key: string
+        }
+        Insert: {
+          changed_by?: string | null
+          created_at?: string
+          id?: string
+          note?: string
+          order_id: string
+          payment_status?: string | null
+          status: string
+          store_key?: string
+        }
+        Update: {
+          changed_by?: string | null
+          created_at?: string
+          id?: string
+          note?: string
+          order_id?: string
+          payment_status?: string | null
+          status?: string
+          store_key?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_status_history_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       orders: {
         Row: {
@@ -224,9 +525,13 @@ export type Database = {
           discount: number
           id: string
           items: Json
+          notes: string
+          payment_status: string
           status: string
+          store_key: string
           subtotal: number
           total: number
+          updated_at: string
         }
         Insert: {
           coupon_code?: string
@@ -239,9 +544,13 @@ export type Database = {
           discount?: number
           id?: string
           items?: Json
+          notes?: string
+          payment_status?: string
           status?: string
+          store_key?: string
           subtotal?: number
           total?: number
+          updated_at?: string
         }
         Update: {
           coupon_code?: string
@@ -254,9 +563,13 @@ export type Database = {
           discount?: number
           id?: string
           items?: Json
+          notes?: string
+          payment_status?: string
           status?: string
+          store_key?: string
           subtotal?: number
           total?: number
+          updated_at?: string
         }
         Relationships: [
           {
@@ -283,6 +596,7 @@ export type Database = {
           logo_synced_at: string | null
           logo_url: string | null
           name: string
+          settings: Json
           store_key: string
           updated_at: string
         }
@@ -293,6 +607,7 @@ export type Database = {
           logo_synced_at?: string | null
           logo_url?: string | null
           name?: string
+          settings?: Json
           store_key: string
           updated_at?: string
         }
@@ -303,6 +618,7 @@ export type Database = {
           logo_synced_at?: string | null
           logo_url?: string | null
           name?: string
+          settings?: Json
           store_key?: string
           updated_at?: string
         }
@@ -334,6 +650,19 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_resolve_duplicate: {
+        Args: { p_action: string; p_id: string }
+        Returns: boolean
+      }
+      admin_set_order_status: {
+        Args: {
+          p_note: string
+          p_order_id: string
+          p_payment_status: string
+          p_status: string
+        }
+        Returns: boolean
+      }
       claim_admin: { Args: never; Returns: boolean }
       consume_coupon: { Args: { p_coupon_id: string }; Returns: boolean }
       coupons_for_phone: {
@@ -342,12 +671,14 @@ export type Database = {
           active: boolean
           code: string
           created_at: string
+          customer_id: string | null
           customer_phone: string | null
           description: string
           id: string
           max_discount: number | null
           max_uses: number | null
           min_order: number
+          store_key: string
           type: string
           updated_at: string
           uses: number
@@ -382,9 +713,33 @@ export type Database = {
       }
       lookup_customer_name: { Args: { p_phone: string }; Returns: string }
       only_digits: { Args: { p: string }; Returns: string }
+      order_history_for_customer: {
+        Args: { p_device_id: string; p_order_id: string; p_phone: string }
+        Returns: {
+          created_at: string
+          note: string
+          payment_status: string
+          status: string
+        }[]
+      }
+      orders_for_customer: {
+        Args: { p_device_id: string; p_phone: string }
+        Returns: {
+          coupon_code: string
+          created_at: string
+          customer_name: string
+          discount: number
+          id: string
+          items: Json
+          payment_status: string
+          status: string
+          subtotal: number
+          total: number
+        }[]
+      }
       save_customer: {
         Args: { p_device_id: string; p_name: string; p_phone: string }
-        Returns: undefined
+        Returns: string
       }
       upsert_customer_from_loyverse: {
         Args: {
