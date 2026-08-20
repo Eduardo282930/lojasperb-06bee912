@@ -4,6 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import {
   ArrowLeft,
   Check,
+  ClipboardList,
+  UserSearch,
   LogOut,
   Plus,
   Receipt,
@@ -25,7 +27,18 @@ import {
   isExhausted,
   type Coupon,
 } from "@/lib/coupons";
-import { fetchOrders, onlyDigits, type Order } from "@/lib/orders";
+import {
+  fetchOrders,
+  onlyDigits,
+  setOrderStatus,
+  fetchDuplicates,
+  resolveDuplicate,
+  statusLabel,
+  paymentLabel,
+  ORDER_STATUSES,
+  PAYMENT_STATUSES,
+  type Order,
+} from "@/lib/orders";
 import { useAdmin, adminSignIn, adminSignOut } from "@/lib/admin";
 import { formatPrice } from "@/lib/cart";
 
@@ -797,5 +810,170 @@ function CustomerDetail({
         </p>
       )}
     </section>
+  );
+}
+
+/* ----------------------------- Pedidos --------------------------------- */
+
+function OrdersPanel() {
+  const { data, isLoading, refetch } = useQuery({
+    queryKey: ["admin-orders"],
+    queryFn: fetchOrders,
+    staleTime: 30 * 1000,
+  });
+  const [busy, setBusy] = useState<string | null>(null);
+
+  async function change(o: Order, status: string, payment: string) {
+    setBusy(o.id);
+    await setOrderStatus(o.id, status, payment);
+    setBusy(null);
+    void refetch();
+  }
+
+  if (isLoading) {
+    return <p className="text-lg font-semibold text-muted-foreground">Carregando…</p>;
+  }
+  if ((data ?? []).length === 0) {
+    return <p className="text-lg font-semibold text-muted-foreground">Nenhum pedido ainda.</p>;
+  }
+
+  return (
+    <ul className="flex flex-col gap-3">
+      {(data ?? []).map((o) => (
+        <li key={o.id} className="rounded-3xl border-2 border-border bg-card p-4 shadow-sm">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-lg font-black text-foreground">
+                {o.customerName || "Sem nome"}
+              </p>
+              <p className="text-sm font-bold text-muted-foreground">
+                {o.customerPhone} · {new Date(o.createdAt).toLocaleString("pt-BR")}
+              </p>
+            </div>
+            <span className="shrink-0 text-xl font-black" style={{ color: BLUE }}>
+              {formatPrice(o.total)}
+            </span>
+          </div>
+
+          <ul className="mt-2 flex flex-col gap-1">
+            {o.items.map((it, i) => (
+              <li key={i} className="text-base font-semibold text-foreground">
+                {it.qty}x {it.name} — {formatPrice(it.price * it.qty)}
+              </li>
+            ))}
+          </ul>
+
+          {o.discount > 0 && (
+            <p className="mt-1 text-base font-bold text-muted-foreground">
+              Cupom {o.couponCode}: -{formatPrice(o.discount)}
+            </p>
+          )}
+
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <select
+              value={o.status}
+              disabled={busy === o.id}
+              onChange={(e) => void change(o, e.target.value, o.paymentStatus)}
+              aria-label={`Status do pedido de ${o.customerName}`}
+              className="rounded-xl border-2 border-border bg-background px-3 py-2 text-base font-black text-foreground"
+            >
+              {ORDER_STATUSES.map((s) => (
+                <option key={s.value} value={s.value}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+            <select
+              value={o.paymentStatus}
+              disabled={busy === o.id}
+              onChange={(e) => void change(o, o.status, e.target.value)}
+              aria-label={`Pagamento do pedido de ${o.customerName}`}
+              className="rounded-xl border-2 border-border bg-background px-3 py-2 text-base font-black text-foreground"
+            >
+              {PAYMENT_STATUSES.map((s) => (
+                <option key={s.value} value={s.value}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+            <span className="text-sm font-bold text-muted-foreground">
+              {statusLabel(o.status)} · {paymentLabel(o.paymentStatus)}
+            </span>
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/* -------------------------- Duplicidades ------------------------------- */
+
+function DuplicatesPanel() {
+  const { data, isLoading, refetch } = useQuery({
+    queryKey: ["admin-duplicates"],
+    queryFn: fetchDuplicates,
+    staleTime: 30 * 1000,
+  });
+  const [busy, setBusy] = useState<string | null>(null);
+
+  async function act(id: string, action: "update_phone" | "keep_new" | "later") {
+    setBusy(id);
+    await resolveDuplicate(id, action);
+    setBusy(null);
+    void refetch();
+  }
+
+  if (isLoading) {
+    return <p className="text-lg font-semibold text-muted-foreground">Carregando…</p>;
+  }
+  if ((data ?? []).length === 0) {
+    return (
+      <p className="text-lg font-semibold text-muted-foreground">
+        Nenhum cadastro suspeito de duplicidade.
+      </p>
+    );
+  }
+
+  return (
+    <ul className="flex flex-col gap-3">
+      {(data ?? []).map((d) => (
+        <li key={d.id} className="rounded-3xl border-2 border-border bg-card p-4 shadow-sm">
+          <p className="text-base font-bold text-muted-foreground">
+            Cadastro existente
+          </p>
+          <p className="text-lg font-black text-foreground">
+            {d.existingName} · {d.existingPhone}
+          </p>
+          <p className="mt-2 text-base font-bold text-muted-foreground">Novo cadastro</p>
+          <p className="text-lg font-black text-foreground">
+            {d.incomingName} · {d.incomingPhone}
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              disabled={busy === d.id}
+              onClick={() => void act(d.id, "update_phone")}
+              className="rounded-xl px-4 py-2 text-base font-black text-white"
+              style={{ backgroundColor: BLUE }}
+            >
+              É a mesma pessoa
+            </button>
+            <button
+              disabled={busy === d.id}
+              onClick={() => void act(d.id, "keep_new")}
+              className="rounded-xl border-2 border-border bg-card px-4 py-2 text-base font-black text-foreground"
+            >
+              São clientes diferentes
+            </button>
+            <button
+              disabled={busy === d.id}
+              onClick={() => void act(d.id, "later")}
+              className="rounded-xl bg-muted px-4 py-2 text-base font-black text-foreground"
+            >
+              Decidir depois
+            </button>
+          </div>
+        </li>
+      ))}
+    </ul>
   );
 }
