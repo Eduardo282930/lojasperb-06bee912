@@ -128,6 +128,23 @@ function EuPage() {
           </div>
         </section>
 
+        <Link
+          to="/pedidos"
+          className="mt-4 flex items-center gap-4 rounded-3xl border-2 border-border bg-card p-5 shadow-sm active:scale-[0.99]"
+        >
+          <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-[oklch(0.55_0.22_255)] text-white">
+            <Package className="h-7 w-7" strokeWidth={2.5} />
+          </span>
+          <span className="min-w-0">
+            <span className="block text-lg font-black text-foreground">Meus pedidos</span>
+            <span className="block text-base font-semibold text-muted-foreground">
+              Acompanhe pagamento e entrega
+            </span>
+          </span>
+        </Link>
+
+
+
         <section className="mt-5 rounded-3xl border-2 border-border bg-card p-5 shadow-sm">
           <h2 className="text-xl font-black text-foreground">Meus dados</h2>
           <label className="mt-3 block text-base font-bold text-muted-foreground">
