@@ -4,6 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import {
   ArrowLeft,
   Check,
+  ClipboardList,
+  UserSearch,
   LogOut,
   Plus,
   Receipt,
@@ -25,7 +27,18 @@ import {
   isExhausted,
   type Coupon,
 } from "@/lib/coupons";
-import { fetchOrders, onlyDigits, type Order } from "@/lib/orders";
+import {
+  fetchOrders,
+  onlyDigits,
+  setOrderStatus,
+  fetchDuplicates,
+  resolveDuplicate,
+  statusLabel,
+  paymentLabel,
+  ORDER_STATUSES,
+  PAYMENT_STATUSES,
+  type Order,
+} from "@/lib/orders";
 import { useAdmin, adminSignIn, adminSignOut } from "@/lib/admin";
 import { formatPrice } from "@/lib/cart";
 
@@ -59,11 +72,49 @@ function couponLabel(c: Coupon): string {
   return c.type === "percent" ? `${c.value}% OFF` : `${formatPrice(c.value)} OFF`;
 }
 
-type Tab = "cupons" | "recibos" | "clientes";
+type Section = "home" | "pedidos" | "cupons" | "recibos" | "clientes" | "duplicidades";
+
+const SECTIONS: {
+  id: Exclude<Section, "home">;
+  label: string;
+  hint: string;
+  icon: React.ReactNode;
+}[] = [
+  {
+    id: "pedidos",
+    label: "Pedidos",
+    hint: "Status, pagamento e entrega",
+    icon: <ClipboardList className="h-7 w-7" />,
+  },
+  {
+    id: "clientes",
+    label: "Clientes",
+    hint: "Histórico, compras e cupons",
+    icon: <Users className="h-7 w-7" />,
+  },
+  {
+    id: "cupons",
+    label: "Cupons",
+    hint: "Criar, editar e desativar",
+    icon: <Ticket className="h-7 w-7" />,
+  },
+  {
+    id: "recibos",
+    label: "Recibos Loyverse",
+    hint: "Vendas registradas na loja",
+    icon: <Receipt className="h-7 w-7" />,
+  },
+  {
+    id: "duplicidades",
+    label: "Revisão de cadastros",
+    hint: "Possíveis clientes repetidos",
+    icon: <UserSearch className="h-7 w-7" />,
+  },
+];
 
 function AdminPage() {
   const { isAdmin, checking } = useAdmin();
-  const [tab, setTab] = useState<Tab>("cupons");
+  const [section, setSection] = useState<Section>("home");
 
   if (checking) {
     return (
@@ -75,18 +126,32 @@ function AdminPage() {
 
   if (!isAdmin) return <AdminLogin />;
 
+  const current = SECTIONS.find((s) => s.id === section);
+
   return (
     <div className="min-h-screen bg-background pb-16">
       <header className="sticky top-0 z-10 border-b-2 border-border bg-background/95 backdrop-blur">
         <div className="mx-auto flex max-w-4xl items-center gap-3 px-4 py-3">
-          <Link
-            to="/"
-            aria-label="Voltar à loja"
-            className="grid h-11 w-11 place-items-center rounded-2xl bg-muted text-foreground active:scale-95"
-          >
-            <ArrowLeft className="h-6 w-6" strokeWidth={2.5} />
-          </Link>
-          <h1 className="text-xl font-black text-foreground">Administração SPERB</h1>
+          {section === "home" ? (
+            <Link
+              to="/"
+              aria-label="Voltar à loja"
+              className="grid h-11 w-11 place-items-center rounded-2xl bg-muted text-foreground active:scale-95"
+            >
+              <ArrowLeft className="h-6 w-6" strokeWidth={2.5} />
+            </Link>
+          ) : (
+            <button
+              onClick={() => setSection("home")}
+              aria-label="Voltar ao menu"
+              className="grid h-11 w-11 place-items-center rounded-2xl bg-muted text-foreground active:scale-95"
+            >
+              <ArrowLeft className="h-6 w-6" strokeWidth={2.5} />
+            </button>
+          )}
+          <h1 className="text-xl font-black text-foreground">
+            {current ? current.label : "Administração SPERB"}
+          </h1>
           <button
             onClick={() => adminSignOut()}
             className="ml-auto inline-flex items-center gap-1 rounded-xl bg-muted px-3 py-2 text-sm font-black text-foreground"
@@ -94,62 +159,43 @@ function AdminPage() {
             <LogOut className="h-4 w-4" /> Sair
           </button>
         </div>
-
-        <nav className="mx-auto flex max-w-4xl gap-2 overflow-x-auto px-4 pb-3">
-          <TabButton
-            active={tab === "cupons"}
-            onClick={() => setTab("cupons")}
-            icon={<Ticket className="h-5 w-5" />}
-            label="Cupons dos clientes"
-          />
-          <TabButton
-            active={tab === "recibos"}
-            onClick={() => setTab("recibos")}
-            icon={<Receipt className="h-5 w-5" />}
-            label="Recibos Loyverse"
-          />
-          <TabButton
-            active={tab === "clientes"}
-            onClick={() => setTab("clientes")}
-            icon={<Users className="h-5 w-5" />}
-            label="Clientes"
-          />
-        </nav>
       </header>
 
       <main className="mx-auto max-w-4xl px-4 pt-4">
-        {tab === "cupons" && <CouponsPanel />}
-        {tab === "recibos" && <ReceiptsPanel />}
-        {tab === "clientes" && <CustomersPanel />}
+        {section === "home" && (
+          <ul className="grid gap-3 sm:grid-cols-2">
+            {SECTIONS.map((s) => (
+              <li key={s.id}>
+                <button
+                  onClick={() => setSection(s.id)}
+                  className="flex w-full items-center gap-4 rounded-3xl border-2 border-border bg-card p-5 text-left shadow-sm active:scale-[0.99]"
+                >
+                  <span
+                    className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl text-white"
+                    style={{ backgroundColor: BLUE }}
+                  >
+                    {s.icon}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-lg font-black text-foreground">
+                      {s.label}
+                    </span>
+                    <span className="block text-sm font-semibold text-muted-foreground">
+                      {s.hint}
+                    </span>
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        {section === "pedidos" && <OrdersPanel />}
+        {section === "cupons" && <CouponsPanel />}
+        {section === "recibos" && <ReceiptsPanel />}
+        {section === "clientes" && <CustomersPanel />}
+        {section === "duplicidades" && <DuplicatesPanel />}
       </main>
     </div>
-  );
-}
-
-function TabButton({
-  active,
-  onClick,
-  icon,
-  label,
-}: {
-  active: boolean;
-  onClick: () => void;
-  icon: React.ReactNode;
-  label: string;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`inline-flex shrink-0 items-center gap-2 rounded-2xl px-4 py-3 text-base font-black active:scale-95 ${
-        active
-          ? "text-white shadow-md"
-          : "border-2 border-border bg-card text-foreground"
-      }`}
-      style={active ? { backgroundColor: BLUE } : undefined}
-    >
-      {icon}
-      {label}
-    </button>
   );
 }
 
@@ -764,5 +810,170 @@ function CustomerDetail({
         </p>
       )}
     </section>
+  );
+}
+
+/* ----------------------------- Pedidos --------------------------------- */
+
+function OrdersPanel() {
+  const { data, isLoading, refetch } = useQuery({
+    queryKey: ["admin-orders"],
+    queryFn: fetchOrders,
+    staleTime: 30 * 1000,
+  });
+  const [busy, setBusy] = useState<string | null>(null);
+
+  async function change(o: Order, status: string, payment: string) {
+    setBusy(o.id);
+    await setOrderStatus(o.id, status, payment);
+    setBusy(null);
+    void refetch();
+  }
+
+  if (isLoading) {
+    return <p className="text-lg font-semibold text-muted-foreground">Carregando…</p>;
+  }
+  if ((data ?? []).length === 0) {
+    return <p className="text-lg font-semibold text-muted-foreground">Nenhum pedido ainda.</p>;
+  }
+
+  return (
+    <ul className="flex flex-col gap-3">
+      {(data ?? []).map((o) => (
+        <li key={o.id} className="rounded-3xl border-2 border-border bg-card p-4 shadow-sm">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-lg font-black text-foreground">
+                {o.customerName || "Sem nome"}
+              </p>
+              <p className="text-sm font-bold text-muted-foreground">
+                {o.customerPhone} · {new Date(o.createdAt).toLocaleString("pt-BR")}
+              </p>
+            </div>
+            <span className="shrink-0 text-xl font-black" style={{ color: BLUE }}>
+              {formatPrice(o.total)}
+            </span>
+          </div>
+
+          <ul className="mt-2 flex flex-col gap-1">
+            {o.items.map((it, i) => (
+              <li key={i} className="text-base font-semibold text-foreground">
+                {it.qty}x {it.name} — {formatPrice(it.price * it.qty)}
+              </li>
+            ))}
+          </ul>
+
+          {o.discount > 0 && (
+            <p className="mt-1 text-base font-bold text-muted-foreground">
+              Cupom {o.couponCode}: -{formatPrice(o.discount)}
+            </p>
+          )}
+
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <select
+              value={o.status}
+              disabled={busy === o.id}
+              onChange={(e) => void change(o, e.target.value, o.paymentStatus)}
+              aria-label={`Status do pedido de ${o.customerName}`}
+              className="rounded-xl border-2 border-border bg-background px-3 py-2 text-base font-black text-foreground"
+            >
+              {ORDER_STATUSES.map((s) => (
+                <option key={s.value} value={s.value}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+            <select
+              value={o.paymentStatus}
+              disabled={busy === o.id}
+              onChange={(e) => void change(o, o.status, e.target.value)}
+              aria-label={`Pagamento do pedido de ${o.customerName}`}
+              className="rounded-xl border-2 border-border bg-background px-3 py-2 text-base font-black text-foreground"
+            >
+              {PAYMENT_STATUSES.map((s) => (
+                <option key={s.value} value={s.value}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+            <span className="text-sm font-bold text-muted-foreground">
+              {statusLabel(o.status)} · {paymentLabel(o.paymentStatus)}
+            </span>
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/* -------------------------- Duplicidades ------------------------------- */
+
+function DuplicatesPanel() {
+  const { data, isLoading, refetch } = useQuery({
+    queryKey: ["admin-duplicates"],
+    queryFn: fetchDuplicates,
+    staleTime: 30 * 1000,
+  });
+  const [busy, setBusy] = useState<string | null>(null);
+
+  async function act(id: string, action: "update_phone" | "keep_new" | "later") {
+    setBusy(id);
+    await resolveDuplicate(id, action);
+    setBusy(null);
+    void refetch();
+  }
+
+  if (isLoading) {
+    return <p className="text-lg font-semibold text-muted-foreground">Carregando…</p>;
+  }
+  if ((data ?? []).length === 0) {
+    return (
+      <p className="text-lg font-semibold text-muted-foreground">
+        Nenhum cadastro suspeito de duplicidade.
+      </p>
+    );
+  }
+
+  return (
+    <ul className="flex flex-col gap-3">
+      {(data ?? []).map((d) => (
+        <li key={d.id} className="rounded-3xl border-2 border-border bg-card p-4 shadow-sm">
+          <p className="text-base font-bold text-muted-foreground">
+            Cadastro existente
+          </p>
+          <p className="text-lg font-black text-foreground">
+            {d.existingName} · {d.existingPhone}
+          </p>
+          <p className="mt-2 text-base font-bold text-muted-foreground">Novo cadastro</p>
+          <p className="text-lg font-black text-foreground">
+            {d.incomingName} · {d.incomingPhone}
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              disabled={busy === d.id}
+              onClick={() => void act(d.id, "update_phone")}
+              className="rounded-xl px-4 py-2 text-base font-black text-white"
+              style={{ backgroundColor: BLUE }}
+            >
+              É a mesma pessoa
+            </button>
+            <button
+              disabled={busy === d.id}
+              onClick={() => void act(d.id, "keep_new")}
+              className="rounded-xl border-2 border-border bg-card px-4 py-2 text-base font-black text-foreground"
+            >
+              São clientes diferentes
+            </button>
+            <button
+              disabled={busy === d.id}
+              onClick={() => void act(d.id, "later")}
+              className="rounded-xl bg-muted px-4 py-2 text-base font-black text-foreground"
+            >
+              Decidir depois
+            </button>
+          </div>
+        </li>
+      ))}
+    </ul>
   );
 }

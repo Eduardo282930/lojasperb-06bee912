@@ -63,6 +63,7 @@ function SacolaPage() {
         name: c.name,
         qty: c.qty,
         price: priceValue(c.price),
+        image: c.image ?? null,
       })),
       subtotal,
       discount: applied?.discount ?? 0,
