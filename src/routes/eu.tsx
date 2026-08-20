@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { ArrowLeft, Ticket, Lock } from "lucide-react";
+import { ArrowLeft, Ticket, Lock, Package } from "lucide-react";
 import {
   useCoupons,
   useProfile,
