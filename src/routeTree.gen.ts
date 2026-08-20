@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SacolaRouteImport } from './routes/sacola'
+import { Route as PedidosRouteImport } from './routes/pedidos'
 import { Route as EuRouteImport } from './routes/eu'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
@@ -19,6 +20,11 @@ import { Route as ApiPublicManifestRouteImport } from './routes/api/public/manif
 const SacolaRoute = SacolaRouteImport.update({
   id: '/sacola',
   path: '/sacola',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PedidosRoute = PedidosRouteImport.update({
+  id: '/pedidos',
+  path: '/pedidos',
   getParentRoute: () => rootRouteImport,
 } as any)
 const EuRoute = EuRouteImport.update({
@@ -51,6 +57,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/eu': typeof EuRoute
+  '/pedidos': typeof PedidosRoute
   '/sacola': typeof SacolaRoute
   '/produto/$id': typeof ProdutoIdRoute
   '/api/public/manifest': typeof ApiPublicManifestRoute
@@ -59,6 +66,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/eu': typeof EuRoute
+  '/pedidos': typeof PedidosRoute
   '/sacola': typeof SacolaRoute
   '/produto/$id': typeof ProdutoIdRoute
   '/api/public/manifest': typeof ApiPublicManifestRoute
@@ -68,6 +76,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/eu': typeof EuRoute
+  '/pedidos': typeof PedidosRoute
   '/sacola': typeof SacolaRoute
   '/produto/$id': typeof ProdutoIdRoute
   '/api/public/manifest': typeof ApiPublicManifestRoute
@@ -78,6 +87,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/eu'
+    | '/pedidos'
     | '/sacola'
     | '/produto/$id'
     | '/api/public/manifest'
@@ -86,6 +96,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/eu'
+    | '/pedidos'
     | '/sacola'
     | '/produto/$id'
     | '/api/public/manifest'
@@ -94,6 +105,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/eu'
+    | '/pedidos'
     | '/sacola'
     | '/produto/$id'
     | '/api/public/manifest'
@@ -103,6 +115,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
   EuRoute: typeof EuRoute
+  PedidosRoute: typeof PedidosRoute
   SacolaRoute: typeof SacolaRoute
   ProdutoIdRoute: typeof ProdutoIdRoute
   ApiPublicManifestRoute: typeof ApiPublicManifestRoute
@@ -115,6 +128,13 @@ declare module '@tanstack/react-router' {
       path: '/sacola'
       fullPath: '/sacola'
       preLoaderRoute: typeof SacolaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pedidos': {
+      id: '/pedidos'
+      path: '/pedidos'
+      fullPath: '/pedidos'
+      preLoaderRoute: typeof PedidosRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/eu': {
@@ -159,6 +179,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
   EuRoute: EuRoute,
+  PedidosRoute: PedidosRoute,
   SacolaRoute: SacolaRoute,
   ProdutoIdRoute: ProdutoIdRoute,
   ApiPublicManifestRoute: ApiPublicManifestRoute,
