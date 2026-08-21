@@ -104,7 +104,22 @@ export async function persistCatalog(catalog: Catalog): Promise<void> {
   }
 }
 
+/** Momento (ms) da última sincronização gravada no Supabase. */
+export async function getCatalogSyncedAt(): Promise<number | null> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data } = await supabaseAdmin
+    .from("catalog_products")
+    .select("synced_at")
+    .eq("store_key", STORE_KEY)
+    .order("synced_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const t = data?.synced_at ? Date.parse(data.synced_at) : NaN;
+  return Number.isFinite(t) ? t : null;
+}
+
 /** Reads the last synced catalog from Supabase (offline fallback). */
+
 export async function loadCatalogFromSupabase(): Promise<Catalog | null> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 

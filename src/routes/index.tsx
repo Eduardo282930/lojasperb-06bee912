@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
 import { useSuspenseQuery, queryOptions } from "@tanstack/react-query";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Plus,
   ShoppingCart,
@@ -21,6 +21,8 @@ import { flyToCart } from "@/lib/fly";
 import { shareProduct } from "@/lib/share";
 import { filterCommercialProducts } from "@/lib/product-filters";
 import { StoreLogoWithFallback } from "@/components/store-logo";
+
+const PAGE_SIZE = 30;
 
 export const catalogQuery = queryOptions({
   queryKey: ["catalog"],
@@ -128,9 +130,35 @@ function Home() {
     return { results: [], suggestions: scored.slice(0, 20).map((r) => r.p) };
   }, [byCategory, query]);
 
+  // Carrega 30 produtos por vez conforme o cliente rola a tela.
+  const [visible, setVisible] = useState(PAGE_SIZE);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setVisible(PAGE_SIZE);
+  }, [query, category]);
+
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          setVisible((v) => (v < results.length ? v + PAGE_SIZE : v));
+        }
+      },
+      { rootMargin: "600px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [results.length]);
+
+  const shownResults = results.slice(0, visible);
+
   const categoryChips = showAllCategories
     ? data.categories
     : data.categories.slice(0, 8);
+
 
   return (
     <div className="min-h-screen bg-background pb-24">
@@ -226,11 +254,13 @@ function Home() {
           <>
             {results.length > 0 && (
               <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-                {results.map((p) => (
+                {shownResults.map((p) => (
                   <ProductCard key={p.id} product={p} />
                 ))}
               </ul>
             )}
+
+            <div ref={sentinelRef} className="h-1 w-full" />
 
             {suggestions.length > 0 && (
               <>

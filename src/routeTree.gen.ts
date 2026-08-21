@@ -15,6 +15,7 @@ import { Route as EuRouteImport } from './routes/eu'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ProdutoIdRouteImport } from './routes/produto.$id'
+import { Route as ApiPublicSyncCatalogRouteImport } from './routes/api/public/sync-catalog'
 import { Route as ApiPublicManifestRouteImport } from './routes/api/public/manifest'
 
 const SacolaRoute = SacolaRouteImport.update({
@@ -47,6 +48,11 @@ const ProdutoIdRoute = ProdutoIdRouteImport.update({
   path: '/produto/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicSyncCatalogRoute = ApiPublicSyncCatalogRouteImport.update({
+  id: '/api/public/sync-catalog',
+  path: '/api/public/sync-catalog',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicManifestRoute = ApiPublicManifestRouteImport.update({
   id: '/api/public/manifest',
   path: '/api/public/manifest',
@@ -61,6 +67,7 @@ export interface FileRoutesByFullPath {
   '/sacola': typeof SacolaRoute
   '/produto/$id': typeof ProdutoIdRoute
   '/api/public/manifest': typeof ApiPublicManifestRoute
+  '/api/public/sync-catalog': typeof ApiPublicSyncCatalogRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -70,6 +77,7 @@ export interface FileRoutesByTo {
   '/sacola': typeof SacolaRoute
   '/produto/$id': typeof ProdutoIdRoute
   '/api/public/manifest': typeof ApiPublicManifestRoute
+  '/api/public/sync-catalog': typeof ApiPublicSyncCatalogRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -80,6 +88,7 @@ export interface FileRoutesById {
   '/sacola': typeof SacolaRoute
   '/produto/$id': typeof ProdutoIdRoute
   '/api/public/manifest': typeof ApiPublicManifestRoute
+  '/api/public/sync-catalog': typeof ApiPublicSyncCatalogRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -91,6 +100,7 @@ export interface FileRouteTypes {
     | '/sacola'
     | '/produto/$id'
     | '/api/public/manifest'
+    | '/api/public/sync-catalog'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -100,6 +110,7 @@ export interface FileRouteTypes {
     | '/sacola'
     | '/produto/$id'
     | '/api/public/manifest'
+    | '/api/public/sync-catalog'
   id:
     | '__root__'
     | '/'
@@ -109,6 +120,7 @@ export interface FileRouteTypes {
     | '/sacola'
     | '/produto/$id'
     | '/api/public/manifest'
+    | '/api/public/sync-catalog'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -119,6 +131,7 @@ export interface RootRouteChildren {
   SacolaRoute: typeof SacolaRoute
   ProdutoIdRoute: typeof ProdutoIdRoute
   ApiPublicManifestRoute: typeof ApiPublicManifestRoute
+  ApiPublicSyncCatalogRoute: typeof ApiPublicSyncCatalogRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -165,6 +178,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProdutoIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/sync-catalog': {
+      id: '/api/public/sync-catalog'
+      path: '/api/public/sync-catalog'
+      fullPath: '/api/public/sync-catalog'
+      preLoaderRoute: typeof ApiPublicSyncCatalogRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/manifest': {
       id: '/api/public/manifest'
       path: '/api/public/manifest'
@@ -183,6 +203,7 @@ const rootRouteChildren: RootRouteChildren = {
   SacolaRoute: SacolaRoute,
   ProdutoIdRoute: ProdutoIdRoute,
   ApiPublicManifestRoute: ApiPublicManifestRoute,
+  ApiPublicSyncCatalogRoute: ApiPublicSyncCatalogRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
