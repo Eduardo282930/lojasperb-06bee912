@@ -444,29 +444,42 @@ async function buildCatalog(token: string): Promise<Catalog> {
   return { products, categories, storeLogo };
 }
 
+/** Janela de frescor: acima disso o Supabase é ressincronizado com o Loyverse. */
+const FRESH_MS = 60_000;
+
 /**
- * Loyverse continua sendo a origem. Quando ele responde, o resultado FINAL
- * (já agrupado/processado) é gravado no Supabase; quando ele falha, o
- * catálogo é servido a partir da cópia persistida no Supabase.
+ * Sincroniza Loyverse -> Supabase (upsert, sem duplicar) e devolve o catálogo.
+ * Usado pelo endpoint de sincronização e pela revalidação automática.
+ */
+export async function syncCatalogFromLoyverse(): Promise<Catalog> {
+  const token = process.env.LOYVERSE_TOKEN;
+  if (!token) throw new Error("LOYVERSE_TOKEN ausente");
+  const catalog = await buildCatalog(token);
+  const { persistCatalog } = await import("./catalog-cache.server");
+  await persistCatalog(catalog);
+  return catalog;
+}
+
+/**
+ * Catálogo e ERP leem SOMENTE do Supabase. O Loyverse alimenta o Supabase
+ * por upsert (sem duplicados) sempre que a cópia está velha ou vazia.
  */
 async function getCatalog(): Promise<Catalog> {
-  const token = process.env.LOYVERSE_TOKEN;
-  if (token) {
+  const { loadCatalogFromSupabase, getCatalogSyncedAt } = await import(
+    "./catalog-cache.server"
+  );
+
+  const syncedAt = await getCatalogSyncedAt();
+  const stale = !syncedAt || Date.now() - syncedAt > FRESH_MS;
+
+  if (stale) {
     try {
-      const catalog = await buildCatalog(token);
-      try {
-        const { persistCatalog } = await import("./catalog-cache.server");
-        await persistCatalog(catalog);
-      } catch (err) {
-        console.error("[Catalog] falha ao salvar no Supabase:", err);
-      }
-      return catalog;
+      await syncCatalogFromLoyverse();
     } catch (err) {
-      console.error("[Catalog] Loyverse indisponível, usando Supabase:", err);
+      console.error("[Catalog] falha ao sincronizar com o Loyverse:", err);
     }
   }
 
-  const { loadCatalogFromSupabase } = await import("./catalog-cache.server");
   const cached = await loadCatalogFromSupabase();
   if (cached) return cached;
   throw new Error("Catálogo indisponível no momento");
@@ -475,6 +488,7 @@ async function getCatalog(): Promise<Catalog> {
 export const fetchCatalog = createServerFn({ method: "GET" }).handler(
   async (): Promise<Catalog> => getCatalog(),
 );
+
 
 export const fetchProducts = createServerFn({ method: "GET" }).handler(
   async (): Promise<CatalogProduct[]> => (await getCatalog()).products,
