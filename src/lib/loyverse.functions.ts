@@ -445,7 +445,7 @@ async function buildCatalog(token: string): Promise<Catalog> {
 }
 
 /** Janela de frescor: acima disso o Supabase é ressincronizado com o Loyverse. */
-const FRESH_MS = 60_000;
+const FRESH_MS = 5_000;
 
 /**
  * Sincroniza Loyverse -> Supabase (upsert, sem duplicar) e devolve o catálogo.
