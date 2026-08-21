@@ -27,11 +27,14 @@ const PAGE_SIZE = 30;
 export const catalogQuery = queryOptions({
   queryKey: ["catalog"],
   queryFn: () => fetchCatalog(),
-  staleTime: 5 * 60 * 1000,
+  staleTime: 5 * 1000,
   gcTime: 30 * 60 * 1000,
-  refetchOnWindowFocus: false,
+  refetchInterval: 5 * 1000,
+  refetchIntervalInBackground: false,
+  refetchOnWindowFocus: true,
   retry: 1,
 });
+
 
 export const Route = createFileRoute("/")({
   head: () => ({
