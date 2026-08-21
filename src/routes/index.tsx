@@ -128,9 +128,35 @@ function Home() {
     return { results: [], suggestions: scored.slice(0, 20).map((r) => r.p) };
   }, [byCategory, query]);
 
+  // Carrega 30 produtos por vez conforme o cliente rola a tela.
+  const [visible, setVisible] = useState(PAGE_SIZE);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setVisible(PAGE_SIZE);
+  }, [query, category]);
+
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          setVisible((v) => (v < results.length ? v + PAGE_SIZE : v));
+        }
+      },
+      { rootMargin: "600px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [results.length]);
+
+  const shownResults = results.slice(0, visible);
+
   const categoryChips = showAllCategories
     ? data.categories
     : data.categories.slice(0, 8);
+
 
   return (
     <div className="min-h-screen bg-background pb-24">
