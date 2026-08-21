@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
 import { useSuspenseQuery, queryOptions } from "@tanstack/react-query";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Plus,
   ShoppingCart,
@@ -21,6 +21,8 @@ import { flyToCart } from "@/lib/fly";
 import { shareProduct } from "@/lib/share";
 import { filterCommercialProducts } from "@/lib/product-filters";
 import { StoreLogoWithFallback } from "@/components/store-logo";
+
+const PAGE_SIZE = 30;
 
 export const catalogQuery = queryOptions({
   queryKey: ["catalog"],
@@ -252,11 +254,13 @@ function Home() {
           <>
             {results.length > 0 && (
               <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-                {results.map((p) => (
+                {shownResults.map((p) => (
                   <ProductCard key={p.id} product={p} />
                 ))}
               </ul>
             )}
+
+            <div ref={sentinelRef} className="h-1 w-full" />
 
             {suggestions.length > 0 && (
               <>
