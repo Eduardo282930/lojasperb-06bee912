@@ -10,8 +10,8 @@ const productQuery = (id: string) =>
   queryOptions({
     queryKey: ["produto", id],
     queryFn: () => fetchProduct({ data: { id } }),
-    staleTime: 10 * 1000,
-    refetchInterval: 20 * 1000,
+    staleTime: 5 * 1000,
+    refetchInterval: 5 * 1000,
     refetchOnWindowFocus: true,
   });
 
