@@ -275,6 +275,99 @@ export type Database = {
           },
         ]
       }
+      customer_coin_ledger: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          customer_id: string
+          delta: number
+          id: string
+          order_id: string | null
+          reason: string
+          store_key: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          customer_id: string
+          delta: number
+          id?: string
+          order_id?: string | null
+          reason?: string
+          store_key?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string
+          delta?: number
+          id?: string
+          order_id?: string | null
+          reason?: string
+          store_key?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_coin_ledger_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_coin_ledger_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customer_coupon_claims: {
+        Row: {
+          claimed_at: string
+          coupon_id: string
+          created_at: string
+          customer_id: string
+          id: string
+          store_key: string
+          updated_at: string
+        }
+        Insert: {
+          claimed_at?: string
+          coupon_id: string
+          created_at?: string
+          customer_id: string
+          id?: string
+          store_key?: string
+          updated_at?: string
+        }
+        Update: {
+          claimed_at?: string
+          coupon_id?: string
+          created_at?: string
+          customer_id?: string
+          id?: string
+          store_key?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_coupon_claims_coupon_id_fkey"
+            columns: ["coupon_id"]
+            isOneToOne: false
+            referencedRelation: "coupons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_coupon_claims_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customer_duplicates: {
         Row: {
           created_at: string
@@ -515,6 +608,8 @@ export type Database = {
       }
       orders: {
         Row: {
+          coins_discount: number
+          coins_used: number
           coupon_code: string
           coupon_id: string | null
           created_at: string
@@ -534,6 +629,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          coins_discount?: number
+          coins_used?: number
           coupon_code?: string
           coupon_id?: string | null
           created_at?: string
@@ -553,6 +650,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          coins_discount?: number
+          coins_used?: number
           coupon_code?: string
           coupon_id?: string | null
           created_at?: string
@@ -650,6 +749,11 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_adjust_coins: {
+        Args: { p_customer_id: string; p_delta: number; p_reason: string }
+        Returns: number
+      }
+      admin_coin_balance: { Args: { p_customer_id: string }; Returns: number }
       admin_resolve_duplicate: {
         Args: { p_action: string; p_id: string }
         Returns: boolean
@@ -664,7 +768,51 @@ export type Database = {
         Returns: boolean
       }
       claim_admin: { Args: never; Returns: boolean }
+      claim_coupon: {
+        Args: { p_coupon_id: string; p_device_id: string; p_phone: string }
+        Returns: boolean
+      }
+      coin_balance_for_customer: {
+        Args: { p_device_id: string; p_phone: string }
+        Returns: number
+      }
+      coin_history_for_customer: {
+        Args: { p_device_id: string; p_phone: string }
+        Returns: {
+          created_at: string
+          delta: number
+          id: string
+          order_id: string
+          reason: string
+        }[]
+      }
       consume_coupon: { Args: { p_coupon_id: string }; Returns: boolean }
+      coupons_claimed_for_customer: {
+        Args: { p_device_id: string; p_phone: string }
+        Returns: {
+          active: boolean
+          code: string
+          created_at: string
+          customer_id: string | null
+          customer_phone: string | null
+          description: string
+          id: string
+          max_discount: number | null
+          max_uses: number | null
+          min_order: number
+          store_key: string
+          type: string
+          updated_at: string
+          uses: number
+          value: number
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "coupons"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       coupons_for_phone: {
         Args: { p_phone: string }
         Returns: {
@@ -693,6 +841,7 @@ export type Database = {
       }
       create_order: {
         Args: {
+          p_coins?: number
           p_coupon_code: string
           p_device_id: string
           p_discount: number
@@ -736,6 +885,10 @@ export type Database = {
           subtotal: number
           total: number
         }[]
+      }
+      resolve_customer: {
+        Args: { p_device_id: string; p_phone: string }
+        Returns: string
       }
       save_customer: {
         Args: { p_device_id: string; p_name: string; p_phone: string }
