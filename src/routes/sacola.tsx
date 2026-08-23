@@ -35,10 +35,22 @@ function SacolaPage() {
   const redeemed = useRedeemed();
   const profile = useProfile();
   const refreshCoupons = useCouponsRefresh();
+  const qc = useQueryClient();
+  const [useCoins, setUseCoins] = useState(true);
+
+  const coinBalance = useQuery({
+    queryKey: ["coins", "balance", profile.phone],
+    queryFn: () => fetchCoinBalance(profile.phone),
+    staleTime: 30 * 1000,
+  });
 
   const subtotal = cart.reduce((s, c) => s + priceValue(c.price) * c.qty, 0);
   const applied = activeCouponFor(coupons, redeemed, subtotal);
-  const total = Math.max(0, subtotal - (applied?.discount ?? 0));
+  const eligible = Math.max(0, subtotal - (applied?.discount ?? 0));
+  const balance = coinBalance.data ?? 0;
+  const coinsToUse = useCoins ? maxCoinsFor(eligible, balance) : 0;
+  const coinsDiscount = coinsToBRL(coinsToUse);
+  const total = Math.max(0, eligible - coinsDiscount);
 
   async function enviarWhatsApp() {
     if (cart.length === 0) return;
@@ -47,10 +59,15 @@ function SacolaPage() {
     );
     let texto = `Pedido SPERB\n\n${linhas.join("\n")}`;
     if (profile.name) texto = `Pedido SPERB\nCliente: ${profile.name}\n\n${linhas.join("\n")}`;
-    if (applied) {
+    if (applied || coinsToUse > 0) {
       texto += `\n\nSubtotal: ${formatPrice(subtotal)}`;
+    }
+    if (applied) {
       texto += `\nCUPOM SPERB ${applied.coupon.code}: -${formatPrice(applied.discount)}`;
       texto += `\n(O resgate não garante o uso, sujeito a confirmação)`;
+    }
+    if (coinsToUse > 0) {
+      texto += `\nMoedas SPERB (${coinsToUse}): -${formatPrice(coinsDiscount)}`;
     }
     texto += `\n\nTotal: ${formatPrice(total)}`;
 
@@ -72,7 +89,8 @@ function SacolaPage() {
       discount: applied?.discount ?? 0,
       total,
       couponCode: applied?.coupon.code ?? "",
-    });
+      coins: coinsToUse,
+    }).then(() => qc.invalidateQueries({ queryKey: ["coins"] }));
 
     if (applied) {
       await consumeCoupon(applied.coupon.id);
