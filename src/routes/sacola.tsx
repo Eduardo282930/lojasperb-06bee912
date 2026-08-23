@@ -220,6 +220,31 @@ function SacolaPage() {
                   <span>-{formatPrice(applied.discount)}</span>
                 </div>
               )}
+              {balance > 0 && (
+                <div className="mt-3 rounded-2xl bg-muted p-3">
+                  <label className="flex items-center justify-between gap-3">
+                    <span className="inline-flex items-center gap-2 text-lg font-black text-foreground">
+                      <Coins className="h-6 w-6 text-[oklch(0.72_0.17_75)]" />
+                      Usar minhas moedas
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={useCoins}
+                      onChange={(e) => setUseCoins(e.target.checked)}
+                      className="h-6 w-6 accent-[oklch(0.62_0.19_145)]"
+                    />
+                  </label>
+                  <p className="mt-1 text-base font-semibold text-muted-foreground">
+                    Saldo: {balance} moedas ({formatPrice(coinsToBRL(balance))}) · limite de{" "}
+                    {Math.round(COIN_MAX_RATIO * 100)}% do pedido
+                  </p>
+                  {coinsToUse > 0 && (
+                    <p className="mt-1 text-xl font-black text-[oklch(0.45_0.19_145)]">
+                      {coinsToUse} moedas · -{formatPrice(coinsDiscount)}
+                    </p>
+                  )}
+                </div>
+              )}
               <div className="mt-3 flex items-center justify-between border-t-2 border-border pt-3">
                 <span className="text-2xl font-bold text-foreground">Total</span>
                 <span className="text-4xl font-black text-foreground">
