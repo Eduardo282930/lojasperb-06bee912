@@ -79,6 +79,37 @@ export async function fetchCouponsForPhone(phone: string): Promise<Coupon[]> {
   return ((data ?? []) as CouponRow[]).map(toCoupon);
 }
 
+/** Cupons já resgatados por este cliente (vínculo permanente no banco). */
+export const CLAIMED_KEY = ["coupons", "claimed"] as const;
+
+export async function fetchClaimedCoupons(phone: string): Promise<Coupon[]> {
+  const { data, error } = await supabase.rpc("coupons_claimed_for_customer", {
+    p_device_id: deviceId(),
+    p_phone: phone || "",
+  });
+  if (error) return [];
+  return ((data ?? []) as CouponRow[]).map(toCoupon);
+}
+
+/** Vincula o cupom permanentemente ao cliente. */
+export async function claimCoupon(couponId: string, phone: string): Promise<boolean> {
+  const { data, error } = await supabase.rpc("claim_coupon", {
+    p_device_id: deviceId(),
+    p_phone: phone || "",
+    p_coupon_id: couponId,
+  });
+  if (error) return false;
+  return Boolean(data);
+}
+
+export function useClaimedCoupons(phone: string) {
+  return useQuery({
+    queryKey: [...CLAIMED_KEY, (phone || "").replace(/\D/g, "")],
+    queryFn: () => fetchClaimedCoupons(phone),
+    staleTime: 30 * 1000,
+  });
+}
+
 export function useCoupons(): Coupon[] {
   const phone = useProfile().phone;
   const { data } = useQuery({

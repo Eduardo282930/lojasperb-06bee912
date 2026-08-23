@@ -1,5 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeft, Minus, Plus, Trash2, Ticket } from "lucide-react";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { ArrowLeft, Minus, Plus, Trash2, Ticket, Coins } from "lucide-react";
 import { StoreLogoWithFallback } from "@/components/store-logo";
 import { useCart, updateQty, formatPrice, priceValue, clearCart } from "@/lib/cart";
 import {
@@ -11,6 +13,7 @@ import {
   consumeCoupon,
   unredeemCoupon,
 } from "@/lib/coupons";
+import { fetchCoinBalance, coinsToBRL, maxCoinsFor, COIN_MAX_RATIO } from "@/lib/coins";
 import { recordOrder } from "@/lib/orders";
 
 
@@ -32,10 +35,22 @@ function SacolaPage() {
   const redeemed = useRedeemed();
   const profile = useProfile();
   const refreshCoupons = useCouponsRefresh();
+  const qc = useQueryClient();
+  const [useCoins, setUseCoins] = useState(true);
+
+  const coinBalance = useQuery({
+    queryKey: ["coins", "balance", profile.phone],
+    queryFn: () => fetchCoinBalance(profile.phone),
+    staleTime: 30 * 1000,
+  });
 
   const subtotal = cart.reduce((s, c) => s + priceValue(c.price) * c.qty, 0);
   const applied = activeCouponFor(coupons, redeemed, subtotal);
-  const total = Math.max(0, subtotal - (applied?.discount ?? 0));
+  const eligible = Math.max(0, subtotal - (applied?.discount ?? 0));
+  const balance = coinBalance.data ?? 0;
+  const coinsToUse = useCoins ? maxCoinsFor(eligible, balance) : 0;
+  const coinsDiscount = coinsToBRL(coinsToUse);
+  const total = Math.max(0, eligible - coinsDiscount);
 
   async function enviarWhatsApp() {
     if (cart.length === 0) return;
@@ -44,10 +59,15 @@ function SacolaPage() {
     );
     let texto = `Pedido SPERB\n\n${linhas.join("\n")}`;
     if (profile.name) texto = `Pedido SPERB\nCliente: ${profile.name}\n\n${linhas.join("\n")}`;
-    if (applied) {
+    if (applied || coinsToUse > 0) {
       texto += `\n\nSubtotal: ${formatPrice(subtotal)}`;
+    }
+    if (applied) {
       texto += `\nCUPOM SPERB ${applied.coupon.code}: -${formatPrice(applied.discount)}`;
       texto += `\n(O resgate não garante o uso, sujeito a confirmação)`;
+    }
+    if (coinsToUse > 0) {
+      texto += `\nMoedas SPERB (${coinsToUse}): -${formatPrice(coinsDiscount)}`;
     }
     texto += `\n\nTotal: ${formatPrice(total)}`;
 
@@ -69,7 +89,8 @@ function SacolaPage() {
       discount: applied?.discount ?? 0,
       total,
       couponCode: applied?.coupon.code ?? "",
-    });
+      coins: coinsToUse,
+    }).then(() => qc.invalidateQueries({ queryKey: ["coins"] }));
 
     if (applied) {
       await consumeCoupon(applied.coupon.id);
@@ -197,6 +218,31 @@ function SacolaPage() {
                     <Ticket className="h-6 w-6" /> CUPOM SPERB {applied.coupon.code}
                   </span>
                   <span>-{formatPrice(applied.discount)}</span>
+                </div>
+              )}
+              {balance > 0 && (
+                <div className="mt-3 rounded-2xl bg-muted p-3">
+                  <label className="flex items-center justify-between gap-3">
+                    <span className="inline-flex items-center gap-2 text-lg font-black text-foreground">
+                      <Coins className="h-6 w-6 text-[oklch(0.72_0.17_75)]" />
+                      Usar minhas moedas
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={useCoins}
+                      onChange={(e) => setUseCoins(e.target.checked)}
+                      className="h-6 w-6 accent-[oklch(0.62_0.19_145)]"
+                    />
+                  </label>
+                  <p className="mt-1 text-base font-semibold text-muted-foreground">
+                    Saldo: {balance} moedas ({formatPrice(coinsToBRL(balance))}) · limite de{" "}
+                    {Math.round(COIN_MAX_RATIO * 100)}% do pedido
+                  </p>
+                  {coinsToUse > 0 && (
+                    <p className="mt-1 text-xl font-black text-[oklch(0.45_0.19_145)]">
+                      {coinsToUse} moedas · -{formatPrice(coinsDiscount)}
+                    </p>
+                  )}
                 </div>
               )}
               <div className="mt-3 flex items-center justify-between border-t-2 border-border pt-3">
