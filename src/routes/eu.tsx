@@ -58,6 +58,19 @@ function EuPage() {
   const [phone, setPhone] = useState(profile.phone);
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [claiming, setClaiming] = useState<string | null>(null);
+  const qc = useQueryClient();
+  const claimedQuery = useClaimedCoupons(profile.phone);
+  const coinBalance = useQuery({
+    queryKey: ["coins", "balance", profile.phone],
+    queryFn: () => fetchCoinBalance(profile.phone),
+    staleTime: 30 * 1000,
+  });
+  const coinHistory = useQuery({
+    queryKey: ["coins", "history", profile.phone],
+    queryFn: () => fetchCoinHistory(profile.phone),
+    staleTime: 30 * 1000,
+  });
   const [status, setStatus] = useState<"idle" | "checking" | "known" | "new">(
     profile.name ? "known" : "idle",
   );
