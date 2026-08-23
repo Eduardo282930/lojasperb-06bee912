@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { ArrowLeft, Ticket, Lock, Package } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { ArrowLeft, Ticket, Lock, Package, Coins } from "lucide-react";
 import {
   useCoupons,
   useProfile,
@@ -8,10 +9,18 @@ import {
   saveProfile,
   lookupCustomerName,
   redeemCoupon,
-  unredeemCoupon,
+  claimCoupon,
+  useClaimedCoupons,
+  CLAIMED_KEY,
   isAvailable,
   type Coupon,
 } from "@/lib/coupons";
+import {
+  fetchCoinBalance,
+  fetchCoinHistory,
+  coinsToBRL,
+  COIN_MAX_RATIO,
+} from "@/lib/coins";
 import { useAdmin } from "@/lib/admin";
 import { formatPrice } from "@/lib/cart";
 import { StoreLogoWithFallback } from "@/components/store-logo";
