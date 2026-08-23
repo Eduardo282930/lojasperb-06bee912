@@ -91,6 +91,10 @@ function EuPage() {
 
 
   const visible = coupons.filter(isAvailable);
+  const claimedList = claimedQuery.data ?? [];
+  const claimedIds = new Set(claimedList.map((c) => c.id));
+  const balance = coinBalance.data ?? 0;
+  const history = coinHistory.data ?? [];
 
   return (
     <div className="min-h-screen bg-background pb-16">
