@@ -151,6 +151,14 @@ function OrderCard({ order, phone }: { order: Order; phone: string }) {
   );
 }
 
+const SECTIONS = [
+  { value: "sent", label: "Recebido" },
+  { value: "preparing", label: "Preparando" },
+  { value: "shipping", label: "A caminho" },
+  { value: "delivered", label: "Entregue" },
+  { value: "canceled", label: "Cancelado" },
+] as const;
+
 function PedidosPage() {
   const profile = useProfile();
   const { data, isLoading } = useQuery({
@@ -158,6 +166,12 @@ function PedidosPage() {
     queryFn: () => fetchMyOrders(profile.phone),
     staleTime: 30 * 1000,
   });
+
+  const orders = data ?? [];
+  const groups = SECTIONS.map((s) => ({
+    ...s,
+    list: orders.filter((o) => (o.status || "sent") === s.value),
+  }));
 
   return (
     <div className="min-h-screen bg-background pb-16">
@@ -178,7 +192,7 @@ function PedidosPage() {
         {isLoading && (
           <p className="text-lg font-semibold text-muted-foreground">Carregando…</p>
         )}
-        {!isLoading && (data ?? []).length === 0 && (
+        {!isLoading && orders.length === 0 && (
           <div className="rounded-3xl border-2 border-dashed border-border p-8 text-center">
             <Package className="mx-auto h-12 w-12 text-muted-foreground" />
             <p className="mt-3 text-lg font-bold text-foreground">
@@ -193,11 +207,43 @@ function PedidosPage() {
             </Link>
           </div>
         )}
-        <ul className="flex flex-col gap-4">
-          {(data ?? []).map((o) => (
-            <OrderCard key={o.id} order={o} phone={profile.phone} />
+
+        {orders.length > 0 && (
+          <div className="mb-4 grid grid-cols-5 gap-1">
+            {groups.map((g) => (
+              <div
+                key={g.value}
+                className="rounded-2xl border-2 border-border bg-card px-1 py-2 text-center"
+              >
+                <p className="text-xl font-black text-foreground">{g.list.length}</p>
+                <p className="text-[11px] font-bold leading-tight text-muted-foreground">
+                  {g.label}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {groups
+          .filter((g) => g.list.length > 0)
+          .map((g) => (
+            <section key={g.value} className="mb-6">
+              <h2 className="mb-2 flex items-center gap-2 text-xl font-black text-foreground">
+                {g.label}
+                <span
+                  className="rounded-full px-2.5 py-0.5 text-sm font-black text-white"
+                  style={{ backgroundColor: g.value === "canceled" ? "var(--muted-foreground)" : BLUE }}
+                >
+                  {g.list.length}
+                </span>
+              </h2>
+              <ul className="flex flex-col gap-4">
+                {g.list.map((o) => (
+                  <OrderCard key={o.id} order={o} phone={profile.phone} />
+                ))}
+              </ul>
+            </section>
           ))}
-        </ul>
       </main>
     </div>
   );
