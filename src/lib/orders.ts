@@ -57,6 +57,7 @@ export async function recordOrder(input: {
   discount: number;
   total: number;
   couponCode: string;
+  coins?: number;
 }): Promise<void> {
   const { error } = await supabase.rpc("create_order", {
     p_device_id: deviceId(),
@@ -67,6 +68,7 @@ export async function recordOrder(input: {
     p_discount: input.discount,
     p_total: input.total,
     p_coupon_code: input.couponCode,
+    p_coins: Math.max(0, Math.trunc(input.coins ?? 0)),
   });
   if (error) console.warn("[recordOrder] falhou", error);
 }
