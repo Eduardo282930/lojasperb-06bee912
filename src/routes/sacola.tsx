@@ -1,5 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeft, Minus, Plus, Trash2, Ticket } from "lucide-react";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { ArrowLeft, Minus, Plus, Trash2, Ticket, Coins } from "lucide-react";
 import { StoreLogoWithFallback } from "@/components/store-logo";
 import { useCart, updateQty, formatPrice, priceValue, clearCart } from "@/lib/cart";
 import {
@@ -11,6 +13,7 @@ import {
   consumeCoupon,
   unredeemCoupon,
 } from "@/lib/coupons";
+import { fetchCoinBalance, coinsToBRL, maxCoinsFor, COIN_MAX_RATIO } from "@/lib/coins";
 import { recordOrder } from "@/lib/orders";
 
 
