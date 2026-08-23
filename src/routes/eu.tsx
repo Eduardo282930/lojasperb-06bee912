@@ -239,6 +239,22 @@ function EuPage() {
           <h2 className="flex items-center gap-2 text-xl font-black text-foreground">
             <Ticket className="h-6 w-6 text-[oklch(0.55_0.22_255)]" /> Cupons de desconto
           </h2>
+
+          {claimedList.length > 0 && (
+            <div className="mt-3 rounded-3xl border-2 border-[oklch(0.62_0.19_145)] bg-card p-4">
+              <p className="text-sm font-black uppercase tracking-wide text-muted-foreground">
+                Meus cupons resgatados ({claimedList.length})
+              </p>
+              <ul className="mt-2 flex flex-col gap-1">
+                {claimedList.map((c) => (
+                  <li key={c.id} className="text-base font-bold text-foreground">
+                    {c.code} · {couponLabel(c)}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           {visible.length === 0 ? (
             <p className="mt-3 rounded-2xl border-2 border-dashed border-border p-5 text-center text-lg text-muted-foreground">
               Nenhum cupom disponível no momento.
@@ -246,7 +262,8 @@ function EuPage() {
           ) : (
             <ul className="mt-3 flex flex-col gap-3">
               {visible.map((c) => {
-                const isRedeemed = redeemed.includes(c.id);
+                const isClaimed = claimedIds.has(c.id);
+                const isRedeemed = isClaimed || redeemed.includes(c.id);
                 return (
                   <li
                     key={c.id}
@@ -276,13 +293,19 @@ function EuPage() {
                       </p>
                     </div>
                     <button
-                      onClick={() =>
-                        isRedeemed ? unredeemCoupon(c.id) : redeemCoupon(c.id)
-                      }
-                      className={`shrink-0 rounded-2xl px-4 py-3 text-lg font-black active:scale-95 ${
+                      disabled={isRedeemed || claiming === c.id}
+                      onClick={async () => {
+                        if (isRedeemed) return;
+                        setClaiming(c.id);
+                        redeemCoupon(c.id);
+                        await claimCoupon(c.id, phone);
+                        await qc.invalidateQueries({ queryKey: CLAIMED_KEY });
+                        setClaiming(null);
+                      }}
+                      className={`shrink-0 rounded-2xl px-4 py-3 text-lg font-black text-white active:scale-95 disabled:opacity-80 ${
                         isRedeemed
-                          ? "bg-[oklch(0.62_0.19_145)] text-white"
-                          : "bg-[oklch(0.55_0.22_255)] text-white"
+                          ? "bg-[oklch(0.62_0.19_145)]"
+                          : "bg-[oklch(0.55_0.22_255)]"
                       }`}
                     >
                       {isRedeemed ? "Resgatado" : "Resgatar"}
@@ -293,9 +316,53 @@ function EuPage() {
             </ul>
           )}
           <p className="mt-2 text-sm text-muted-foreground">
-            O resgate não garante o uso: o desconto é confirmado ao finalizar o pedido
-            pelo WhatsApp, enquanto houver cupons disponíveis.
+            Cada cupom fica vinculado ao seu cadastro e só pode ser resgatado uma vez.
           </p>
+        </section>
+
+        <section className="mt-6 rounded-3xl border-2 border-border bg-card p-5 shadow-sm">
+          <h2 className="flex items-center gap-2 text-xl font-black text-foreground">
+            <Coins className="h-6 w-6 text-[oklch(0.72_0.17_75)]" /> Minhas moedas
+          </h2>
+          <div className="mt-3 flex items-end justify-between gap-3 rounded-2xl bg-muted px-4 py-3">
+            <div>
+              <p className="text-3xl font-black text-foreground">{balance}</p>
+              <p className="text-base font-semibold text-muted-foreground">
+                equivale a {formatPrice(coinsToBRL(balance))}
+              </p>
+            </div>
+            <p className="text-right text-sm font-bold text-muted-foreground">
+              Cada moeda vale R$ 0,01
+              <br />
+              Use até {Math.round(COIN_MAX_RATIO * 100)}% do pedido
+            </p>
+          </div>
+          {history.length > 0 && (
+            <ul className="mt-3 flex flex-col gap-1 border-t-2 border-border pt-3">
+              {history.slice(0, 10).map((h) => (
+                <li key={h.id} className="flex items-center justify-between gap-3 text-base">
+                  <span className="min-w-0 flex-1 truncate text-muted-foreground">
+                    {h.reason || "movimentação"} ·{" "}
+                    {new Date(h.createdAt).toLocaleDateString("pt-BR")}
+                  </span>
+                  <span
+                    className={`shrink-0 font-black ${
+                      h.delta >= 0
+                        ? "text-[oklch(0.62_0.19_145)]"
+                        : "text-[oklch(0.58_0.22_25)]"
+                    }`}
+                  >
+                    {h.delta > 0 ? `+${h.delta}` : h.delta}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {history.length === 0 && (
+            <p className="mt-3 text-base text-muted-foreground">
+              Você ainda não tem movimentações de moedas.
+            </p>
+          )}
         </section>
 
         {isAdmin && (
