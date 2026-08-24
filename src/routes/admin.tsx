@@ -706,6 +706,95 @@ function CustomersPanel() {
   );
 }
 
+function CoinsPanel({ phone }: { phone: string }) {
+  const [customerId, setCustomerId] = useState<string | null>(null);
+  const [balance, setBalance] = useState<number | null>(null);
+  const [amount, setAmount] = useState("");
+  const [reason, setReason] = useState("");
+  const [msg, setMsg] = useState("");
+
+  useEffect(() => {
+    let alive = true;
+    setBalance(null);
+    setCustomerId(null);
+    void (async () => {
+      const id = await findCustomerId(phone);
+      if (!alive) return;
+      setCustomerId(id);
+      if (id) setBalance(await adminCoinBalance(id));
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [phone]);
+
+  async function apply(sign: 1 | -1) {
+    if (!customerId) return;
+    const value = Math.abs(parseInt(amount, 10) || 0);
+    if (value <= 0) return;
+    const next = await adminAdjustCoins(customerId, sign * value, reason);
+    if (next === null) {
+      setMsg("Não foi possível ajustar as moedas.");
+      return;
+    }
+    setBalance(next);
+    setAmount("");
+    setReason("");
+    setMsg("Saldo atualizado.");
+    setTimeout(() => setMsg(""), 1500);
+  }
+
+  return (
+    <section className="mt-4 rounded-2xl border-2 border-border bg-background p-4">
+      <h3 className="flex items-center gap-2 text-lg font-black text-foreground">
+        <Coins className="h-5 w-5 text-[oklch(0.72_0.17_75)]" /> Moedas do cliente
+      </h3>
+      {!customerId ? (
+        <p className="mt-1 text-base text-muted-foreground">
+          Este cliente ainda não tem cadastro no banco central (precisa de telefone).
+        </p>
+      ) : (
+        <>
+          <p className="mt-1 text-2xl font-black text-foreground">
+            {balance ?? 0}{" "}
+            <span className="text-base font-semibold text-muted-foreground">
+              ({formatPrice(coinsToBRL(balance ?? 0))})
+            </span>
+          </p>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <input
+              value={amount}
+              inputMode="numeric"
+              onChange={(e) => setAmount(e.target.value.replace(/\D/g, ""))}
+              placeholder="Qtd. de moedas"
+              className="w-36 rounded-xl border-2 border-border bg-card px-3 py-2 text-base font-bold text-foreground"
+            />
+            <input
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="Motivo"
+              className="min-w-40 flex-1 rounded-xl border-2 border-border bg-card px-3 py-2 text-base font-bold text-foreground"
+            />
+            <button
+              onClick={() => void apply(1)}
+              className="rounded-xl bg-[oklch(0.62_0.19_145)] px-4 py-2 text-base font-black text-white active:scale-95"
+            >
+              Adicionar
+            </button>
+            <button
+              onClick={() => void apply(-1)}
+              className="rounded-xl bg-[oklch(0.58_0.22_25)] px-4 py-2 text-base font-black text-white active:scale-95"
+            >
+              Retirar
+            </button>
+          </div>
+          {msg && <p className="mt-2 text-base font-bold text-muted-foreground">{msg}</p>}
+        </>
+      )}
+    </section>
+  );
+}
+
 function CustomerDetail({
   customer,
   receipts,
