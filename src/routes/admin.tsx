@@ -12,7 +12,6 @@ import {
   Ticket,
   Trash2,
   Users,
-  Users,
   Coins,
 } from "lucide-react";
 import {
