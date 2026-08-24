@@ -12,7 +12,15 @@ import {
   Ticket,
   Trash2,
   Users,
+  Users,
+  Coins,
 } from "lucide-react";
+import {
+  findCustomerId,
+  adminCoinBalance,
+  adminAdjustCoins,
+  coinsToBRL,
+} from "@/lib/coins";
 import {
   fetchReceipts,
   fetchLoyverseCustomers,
