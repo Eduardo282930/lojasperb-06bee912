@@ -745,6 +745,9 @@ function CustomerDetail({
         {customer.phone || "sem telefone"} · total comprado {formatPrice(spent)}
       </p>
 
+      <CoinsPanel phone={customer.phone} />
+
+
       <h3 className="mt-5 text-lg font-black text-foreground">
         Pedidos enviados pelo app ({mineOrders.length})
       </h3>
