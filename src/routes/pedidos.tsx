@@ -12,8 +12,18 @@ import {
   type Order,
 } from "@/lib/orders";
 
+const STATUSES = ["sent", "preparing", "shipping", "delivered", "canceled"] as const;
+
 export const Route = createFileRoute("/pedidos")({
   ssr: false,
+  validateSearch: (search: Record<string, unknown>) => {
+    const raw = String(search["status"] ?? "sent");
+    const status = (STATUSES as readonly string[]).includes(raw)
+      ? (raw as (typeof STATUSES)[number])
+      : ("sent" as const);
+    return { status };
+  },
+
   head: () => ({
     meta: [
       { title: "Meus pedidos — SPERB" },
