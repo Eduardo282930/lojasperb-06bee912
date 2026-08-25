@@ -133,9 +133,15 @@ function Home() {
     return { results: [], suggestions: scored.slice(0, 20).map((r) => r.p) };
   }, [byCategory, query]);
 
+  // Preço/estoque da sacola sempre iguais ao catálogo (banco).
+  useEffect(() => {
+    syncCartPrices(data.products);
+  }, [data.products]);
+
   // Carrega 30 produtos por vez conforme o cliente rola a tela.
   const [visible, setVisible] = useState(PAGE_SIZE);
   const sentinelRef = useRef<HTMLDivElement>(null);
+
 
   useEffect(() => {
     setVisible(PAGE_SIZE);
