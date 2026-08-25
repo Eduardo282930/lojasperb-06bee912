@@ -1,7 +1,18 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Ticket, Lock, Package, Coins } from "lucide-react";
+import {
+  ArrowLeft,
+  Ticket,
+  Lock,
+  Package,
+  Coins,
+  ChevronRight,
+  Truck,
+  CheckCircle2,
+  ClipboardList,
+} from "lucide-react";
+
 import {
   useCoupons,
   useProfile,
