@@ -154,20 +154,65 @@ function EuPage() {
           </div>
         </section>
 
-        <Link
-          to="/pedidos"
-          className="mt-4 flex items-center gap-4 rounded-3xl border-2 border-border bg-card p-5 shadow-sm active:scale-[0.99]"
-        >
-          <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-[oklch(0.55_0.22_255)] text-white">
-            <Package className="h-7 w-7" strokeWidth={2.5} />
-          </span>
-          <span className="min-w-0">
-            <span className="block text-lg font-black text-foreground">Meus pedidos</span>
-            <span className="block text-base font-semibold text-muted-foreground">
-              Acompanhe pagamento e entrega
-            </span>
-          </span>
-        </Link>
+        <section className="mt-4 rounded-3xl border-2 border-border bg-card p-4 shadow-sm">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-xl font-black text-foreground">Minhas compras</h2>
+            <Link
+              to="/pedidos"
+              search={{ status: "sent" }}
+              className="flex items-center gap-1 text-base font-bold text-muted-foreground"
+            >
+              Histórico <ChevronRight className="h-5 w-5" />
+            </Link>
+          </div>
+          <div className="mt-3 grid grid-cols-4 gap-1">
+            {PURCHASE_TABS.map((t) => {
+              const count = ordersByStatus[t.status] ?? 0;
+              return (
+                <Link
+                  key={t.status}
+                  to="/pedidos"
+                  search={{ status: t.status }}
+                  className="relative flex flex-col items-center gap-1 rounded-2xl py-2 active:scale-95"
+                >
+                  <t.icon className="h-8 w-8 text-foreground" strokeWidth={2} />
+                  <span className="text-center text-sm font-bold leading-tight text-muted-foreground">
+                    {t.label}
+                  </span>
+                  {count > 0 && (
+                    <span className="absolute right-1 top-0 min-w-5 rounded-full bg-[oklch(0.58_0.22_25)] px-1.5 text-center text-xs font-black text-white">
+                      {count}
+                    </span>
+                  )}
+                </Link>
+              );
+            })}
+          </div>
+
+          <div className="mt-3 grid grid-cols-2 gap-2 border-t-2 border-border pt-3">
+            <Link
+              to="/moedas"
+              className="flex flex-col items-center gap-1 rounded-2xl bg-muted py-3 active:scale-95"
+            >
+              <Coins className="h-8 w-8 text-[oklch(0.72_0.17_75)]" strokeWidth={2.5} />
+              <span className="text-base font-black text-foreground">Moedas</span>
+              <span className="text-sm font-bold text-[oklch(0.72_0.17_75)]">
+                {balance} · {formatPrice(coinsToBRL(balance))}
+              </span>
+            </Link>
+            <a
+              href="#cupons"
+              className="flex flex-col items-center gap-1 rounded-2xl bg-muted py-3 active:scale-95"
+            >
+              <Ticket className="h-8 w-8 text-[oklch(0.55_0.22_255)]" strokeWidth={2.5} />
+              <span className="text-base font-black text-foreground">Cupons</span>
+              <span className="text-sm font-bold text-[oklch(0.55_0.22_255)]">
+                {claimedList.length} resgatados
+              </span>
+            </a>
+          </div>
+        </section>
+
 
 
 
