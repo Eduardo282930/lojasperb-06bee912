@@ -119,6 +119,20 @@ function EuPage() {
   const claimedIds = new Set(claimedList.map((c) => c.id));
   const balance = coinBalance.data ?? 0;
   const history = coinHistory.data ?? [];
+  const ordersQuery = useQuery({
+    queryKey: ["my-orders", profile.phone],
+    queryFn: () => fetchMyOrders(profile.phone),
+    staleTime: 30 * 1000,
+  });
+  const ordersByStatus = (ordersQuery.data ?? []).reduce<Record<string, number>>(
+    (acc, o) => {
+      const k = o.status || "sent";
+      acc[k] = (acc[k] ?? 0) + 1;
+      return acc;
+    },
+    {},
+  );
+
 
   return (
     <div className="min-h-screen bg-background pb-16">
