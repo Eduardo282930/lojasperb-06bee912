@@ -93,6 +93,46 @@ export function clearCart() {
   write([]);
 }
 
+/**
+ * Mantém preço/estoque/nome da sacola iguais ao catálogo (fonte: banco).
+ * Assim o preço nunca fica diferente do que aparece na tela inicial.
+ */
+export function syncCartPrices(
+  products: Array<{
+    id: string;
+    name: string;
+    price: number;
+    stock: number;
+    image?: string | null;
+    variants?: Array<{ id: string; label?: string; price: number; stock: number; image?: string | null }>;
+  }>,
+): void {
+  ensureInit();
+  if (cache.length === 0) return;
+  const map = new Map<string, { name?: string; price: number; stock: number; image?: string | null }>();
+  for (const p of products) {
+    map.set(p.id, { name: p.name, price: p.price, stock: p.stock, image: p.image ?? null });
+    for (const v of p.variants ?? []) {
+      map.set(v.id, { price: v.price, stock: v.stock, image: v.image ?? p.image ?? null });
+    }
+  }
+  let changed = false;
+  const next = cache.map((c) => {
+    const fresh = map.get(c.id);
+    if (!fresh) return c;
+    const price = Number.isFinite(fresh.price) ? fresh.price : c.price;
+    const stock = Number.isFinite(fresh.stock) ? fresh.stock : c.stock;
+    const qty = typeof stock === "number" && Number.isFinite(stock)
+      ? Math.max(0, Math.min(c.qty, Math.floor(stock)))
+      : c.qty;
+    if (price === c.price && stock === c.stock && qty === c.qty) return c;
+    changed = true;
+    return { ...c, price, stock, qty };
+  }).filter((c) => c.qty > 0);
+  if (changed || next.length !== cache.length) write(next);
+}
+
+
 const EMPTY: CartItem[] = [];
 
 export function useCart(): CartItem[] {

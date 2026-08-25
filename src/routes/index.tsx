@@ -15,7 +15,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { fetchCatalog, type CatalogProduct } from "@/lib/loyverse.functions";
-import { addToCart, useCart, formatPrice } from "@/lib/cart";
+import { addToCart, useCart, formatPrice, syncCartPrices } from "@/lib/cart";
 import { fuzzyScore, STRONG_MATCH } from "@/lib/search";
 import { flyToCart } from "@/lib/fly";
 import { shareProduct } from "@/lib/share";
@@ -133,9 +133,15 @@ function Home() {
     return { results: [], suggestions: scored.slice(0, 20).map((r) => r.p) };
   }, [byCategory, query]);
 
+  // Preço/estoque da sacola sempre iguais ao catálogo (banco).
+  useEffect(() => {
+    syncCartPrices(data.products);
+  }, [data.products]);
+
   // Carrega 30 produtos por vez conforme o cliente rola a tela.
   const [visible, setVisible] = useState(PAGE_SIZE);
   const sentinelRef = useRef<HTMLDivElement>(null);
+
 
   useEffect(() => {
     setVisible(PAGE_SIZE);

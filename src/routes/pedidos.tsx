@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Package, ChevronRight } from "lucide-react";
 import { useProfile } from "@/lib/coupons";
@@ -12,8 +12,18 @@ import {
   type Order,
 } from "@/lib/orders";
 
+const STATUSES = ["sent", "preparing", "shipping", "delivered", "canceled"] as const;
+
 export const Route = createFileRoute("/pedidos")({
   ssr: false,
+  validateSearch: (search: Record<string, unknown>) => {
+    const raw = String(search["status"] ?? "sent");
+    const status = (STATUSES as readonly string[]).includes(raw)
+      ? (raw as (typeof STATUSES)[number])
+      : ("sent" as const);
+    return { status };
+  },
+
   head: () => ({
     meta: [
       { title: "Meus pedidos — SPERB" },
@@ -159,8 +169,12 @@ const SECTIONS = [
   { value: "canceled", label: "Cancelado" },
 ] as const;
 
+type StatusValue = (typeof SECTIONS)[number]["value"];
+
 function PedidosPage() {
   const profile = useProfile();
+  const { status } = Route.useSearch();
+  const navigate = Route.useNavigate();
   const { data, isLoading } = useQuery({
     queryKey: ["my-orders", profile.phone],
     queryFn: () => fetchMyOrders(profile.phone),
@@ -172,6 +186,32 @@ function PedidosPage() {
     ...s,
     list: orders.filter((o) => (o.status || "sent") === s.value),
   }));
+
+  const activeIndex = Math.max(0, SECTIONS.findIndex((s) => s.value === status));
+  const trackRef = useRef<HTMLDivElement>(null);
+
+  // Mantém o painel visível igual à aba escolhida.
+  useEffect(() => {
+    const el = trackRef.current;
+    if (!el) return;
+    const target = activeIndex * el.clientWidth;
+    if (Math.abs(el.scrollLeft - target) > 4) {
+      el.scrollTo({ left: target, behavior: "smooth" });
+    }
+  }, [activeIndex]);
+
+  function setStatus(next: StatusValue) {
+    void navigate({ search: { status: next }, replace: true });
+  }
+
+  // Ao arrastar para o lado (estilo Shopee), troca a aba.
+  function onScroll() {
+    const el = trackRef.current;
+    if (!el || el.clientWidth === 0) return;
+    const idx = Math.round(el.scrollLeft / el.clientWidth);
+    const nextValue = SECTIONS[Math.min(SECTIONS.length - 1, Math.max(0, idx))]?.value;
+    if (nextValue && nextValue !== status) setStatus(nextValue);
+  }
 
   return (
     <div className="min-h-screen bg-background pb-16">
@@ -186,14 +226,36 @@ function PedidosPage() {
           </Link>
           <h1 className="text-2xl font-black text-foreground">Meus pedidos</h1>
         </div>
+
+        <div className="mx-auto flex max-w-3xl gap-2 overflow-x-auto px-4 pb-2">
+          {groups.map((g) => {
+            const active = g.value === status;
+            return (
+              <button
+                key={g.value}
+                onClick={() => setStatus(g.value)}
+                className={`shrink-0 rounded-full border-2 px-4 py-2 text-base font-black transition-colors active:scale-95 ${
+                  active
+                    ? "border-transparent text-white"
+                    : "border-border bg-card text-foreground"
+                }`}
+                style={active ? { backgroundColor: BLUE } : undefined}
+              >
+                {g.label}
+                {g.list.length > 0 && ` (${g.list.length})`}
+              </button>
+            );
+          })}
+        </div>
       </header>
 
-      <main className="mx-auto max-w-3xl px-4 pt-4">
+      <main className="mx-auto max-w-3xl pt-4">
         {isLoading && (
-          <p className="text-lg font-semibold text-muted-foreground">Carregando…</p>
+          <p className="px-4 text-lg font-semibold text-muted-foreground">Carregando…</p>
         )}
+
         {!isLoading && orders.length === 0 && (
-          <div className="rounded-3xl border-2 border-dashed border-border p-8 text-center">
+          <div className="mx-4 rounded-3xl border-2 border-dashed border-border p-8 text-center">
             <Package className="mx-auto h-12 w-12 text-muted-foreground" />
             <p className="mt-3 text-lg font-bold text-foreground">
               Você ainda não fez pedidos.
@@ -208,43 +270,45 @@ function PedidosPage() {
           </div>
         )}
 
-        {orders.length > 0 && (
-          <div className="mb-4 grid grid-cols-5 gap-1">
+        {!isLoading && orders.length > 0 && (
+          <div
+            ref={trackRef}
+            onScroll={onScroll}
+            className="flex snap-x snap-mandatory overflow-x-auto scroll-smooth"
+            style={{ scrollbarWidth: "none" }}
+          >
             {groups.map((g) => (
-              <div
-                key={g.value}
-                className="rounded-2xl border-2 border-border bg-card px-1 py-2 text-center"
-              >
-                <p className="text-xl font-black text-foreground">{g.list.length}</p>
-                <p className="text-[11px] font-bold leading-tight text-muted-foreground">
+              <section key={g.value} className="w-full shrink-0 snap-center px-4">
+                <h2 className="mb-2 flex items-center gap-2 text-xl font-black text-foreground">
                   {g.label}
-                </p>
-              </div>
+                  <span
+                    className="rounded-full px-2.5 py-0.5 text-sm font-black text-white"
+                    style={{
+                      backgroundColor:
+                        g.value === "canceled" ? "var(--muted-foreground)" : BLUE,
+                    }}
+                  >
+                    {g.list.length}
+                  </span>
+                </h2>
+                {g.list.length === 0 ? (
+                  <p className="rounded-3xl border-2 border-dashed border-border p-6 text-center text-base font-semibold text-muted-foreground">
+                    Nenhum pedido em “{g.label}”. Arraste para o lado para ver outras
+                    seções.
+                  </p>
+                ) : (
+                  <ul className="flex flex-col gap-4">
+                    {g.list.map((o) => (
+                      <OrderCard key={o.id} order={o} phone={profile.phone} />
+                    ))}
+                  </ul>
+                )}
+              </section>
             ))}
           </div>
         )}
-
-        {groups
-          .filter((g) => g.list.length > 0)
-          .map((g) => (
-            <section key={g.value} className="mb-6">
-              <h2 className="mb-2 flex items-center gap-2 text-xl font-black text-foreground">
-                {g.label}
-                <span
-                  className="rounded-full px-2.5 py-0.5 text-sm font-black text-white"
-                  style={{ backgroundColor: g.value === "canceled" ? "var(--muted-foreground)" : BLUE }}
-                >
-                  {g.list.length}
-                </span>
-              </h2>
-              <ul className="flex flex-col gap-4">
-                {g.list.map((o) => (
-                  <OrderCard key={o.id} order={o} phone={profile.phone} />
-                ))}
-              </ul>
-            </section>
-          ))}
       </main>
     </div>
   );
 }
+

@@ -1,7 +1,18 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Ticket, Lock, Package, Coins } from "lucide-react";
+import {
+  ArrowLeft,
+  Ticket,
+  Lock,
+  Package,
+  Coins,
+  ChevronRight,
+  Truck,
+  CheckCircle2,
+  ClipboardList,
+} from "lucide-react";
+
 import {
   useCoupons,
   useProfile,
@@ -22,7 +33,16 @@ import {
   COIN_MAX_RATIO,
 } from "@/lib/coins";
 import { useAdmin } from "@/lib/admin";
+import { fetchMyOrders } from "@/lib/orders";
 import { formatPrice } from "@/lib/cart";
+
+const PURCHASE_TABS = [
+  { status: "sent", label: "Recebido", icon: ClipboardList },
+  { status: "preparing", label: "Preparando", icon: Package },
+  { status: "shipping", label: "A caminho", icon: Truck },
+  { status: "delivered", label: "Entregue", icon: CheckCircle2 },
+] as const;
+
 import { StoreLogoWithFallback } from "@/components/store-logo";
 
 export const Route = createFileRoute("/eu")({
@@ -108,6 +128,20 @@ function EuPage() {
   const claimedIds = new Set(claimedList.map((c) => c.id));
   const balance = coinBalance.data ?? 0;
   const history = coinHistory.data ?? [];
+  const ordersQuery = useQuery({
+    queryKey: ["my-orders", profile.phone],
+    queryFn: () => fetchMyOrders(profile.phone),
+    staleTime: 30 * 1000,
+  });
+  const ordersByStatus = (ordersQuery.data ?? []).reduce<Record<string, number>>(
+    (acc, o) => {
+      const k = o.status || "sent";
+      acc[k] = (acc[k] ?? 0) + 1;
+      return acc;
+    },
+    {},
+  );
+
 
   return (
     <div className="min-h-screen bg-background pb-16">
@@ -154,20 +188,65 @@ function EuPage() {
           </div>
         </section>
 
-        <Link
-          to="/pedidos"
-          className="mt-4 flex items-center gap-4 rounded-3xl border-2 border-border bg-card p-5 shadow-sm active:scale-[0.99]"
-        >
-          <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-[oklch(0.55_0.22_255)] text-white">
-            <Package className="h-7 w-7" strokeWidth={2.5} />
-          </span>
-          <span className="min-w-0">
-            <span className="block text-lg font-black text-foreground">Meus pedidos</span>
-            <span className="block text-base font-semibold text-muted-foreground">
-              Acompanhe pagamento e entrega
-            </span>
-          </span>
-        </Link>
+        <section className="mt-4 rounded-3xl border-2 border-border bg-card p-4 shadow-sm">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-xl font-black text-foreground">Minhas compras</h2>
+            <Link
+              to="/pedidos"
+              search={{ status: "sent" }}
+              className="flex items-center gap-1 text-base font-bold text-muted-foreground"
+            >
+              Histórico <ChevronRight className="h-5 w-5" />
+            </Link>
+          </div>
+          <div className="mt-3 grid grid-cols-4 gap-1">
+            {PURCHASE_TABS.map((t) => {
+              const count = ordersByStatus[t.status] ?? 0;
+              return (
+                <Link
+                  key={t.status}
+                  to="/pedidos"
+                  search={{ status: t.status }}
+                  className="relative flex flex-col items-center gap-1 rounded-2xl py-2 active:scale-95"
+                >
+                  <t.icon className="h-8 w-8 text-foreground" strokeWidth={2} />
+                  <span className="text-center text-sm font-bold leading-tight text-muted-foreground">
+                    {t.label}
+                  </span>
+                  {count > 0 && (
+                    <span className="absolute right-1 top-0 min-w-5 rounded-full bg-[oklch(0.58_0.22_25)] px-1.5 text-center text-xs font-black text-white">
+                      {count}
+                    </span>
+                  )}
+                </Link>
+              );
+            })}
+          </div>
+
+          <div className="mt-3 grid grid-cols-2 gap-2 border-t-2 border-border pt-3">
+            <Link
+              to="/moedas"
+              className="flex flex-col items-center gap-1 rounded-2xl bg-muted py-3 active:scale-95"
+            >
+              <Coins className="h-8 w-8 text-[oklch(0.72_0.17_75)]" strokeWidth={2.5} />
+              <span className="text-base font-black text-foreground">Moedas</span>
+              <span className="text-sm font-bold text-[oklch(0.72_0.17_75)]">
+                {balance} · {formatPrice(coinsToBRL(balance))}
+              </span>
+            </Link>
+            <a
+              href="#cupons"
+              className="flex flex-col items-center gap-1 rounded-2xl bg-muted py-3 active:scale-95"
+            >
+              <Ticket className="h-8 w-8 text-[oklch(0.55_0.22_255)]" strokeWidth={2.5} />
+              <span className="text-base font-black text-foreground">Cupons</span>
+              <span className="text-sm font-bold text-[oklch(0.55_0.22_255)]">
+                {claimedList.length} resgatados
+              </span>
+            </a>
+          </div>
+        </section>
+
 
 
 
@@ -252,7 +331,7 @@ function EuPage() {
         </section>
 
 
-        <section className="mt-6">
+        <section id="cupons" className="mt-6 scroll-mt-24">
           <h2 className="flex items-center gap-2 text-xl font-black text-foreground">
             <Ticket className="h-6 w-6 text-[oklch(0.55_0.22_255)]" /> Cupons de desconto
           </h2>
@@ -337,50 +416,34 @@ function EuPage() {
           </p>
         </section>
 
-        <section className="mt-6 rounded-3xl border-2 border-border bg-card p-5 shadow-sm">
-          <h2 className="flex items-center gap-2 text-xl font-black text-foreground">
-            <Coins className="h-6 w-6 text-[oklch(0.72_0.17_75)]" /> Minhas moedas
-          </h2>
-          <div className="mt-3 flex items-end justify-between gap-3 rounded-2xl bg-muted px-4 py-3">
-            <div>
-              <p className="text-3xl font-black text-foreground">{balance}</p>
-              <p className="text-base font-semibold text-muted-foreground">
-                equivale a {formatPrice(coinsToBRL(balance))}
-              </p>
-            </div>
-            <p className="text-right text-sm font-bold text-muted-foreground">
-              Cada moeda vale R$ 0,01
-              <br />
-              Use até {Math.round(COIN_MAX_RATIO * 100)}% do pedido
-            </p>
-          </div>
-          {history.length > 0 && (
-            <ul className="mt-3 flex flex-col gap-1 border-t-2 border-border pt-3">
-              {history.slice(0, 10).map((h) => (
-                <li key={h.id} className="flex items-center justify-between gap-3 text-base">
-                  <span className="min-w-0 flex-1 truncate text-muted-foreground">
-                    {h.reason || "movimentação"} ·{" "}
-                    {new Date(h.createdAt).toLocaleDateString("pt-BR")}
-                  </span>
-                  <span
-                    className={`shrink-0 font-black ${
-                      h.delta >= 0
-                        ? "text-[oklch(0.62_0.19_145)]"
-                        : "text-[oklch(0.58_0.22_25)]"
-                    }`}
-                  >
-                    {h.delta > 0 ? `+${h.delta}` : h.delta}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-          {history.length === 0 && (
-            <p className="mt-3 text-base text-muted-foreground">
-              Você ainda não tem movimentações de moedas.
-            </p>
-          )}
-        </section>
+        <Link
+          to="/moedas"
+          className="mt-6 flex items-center gap-4 rounded-3xl p-5 text-white shadow-lg active:scale-[0.99]"
+          style={{
+            background:
+              "linear-gradient(160deg, oklch(0.78 0.16 78) 0%, oklch(0.72 0.17 62) 100%)",
+          }}
+        >
+          <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-white/25">
+            <Coins className="h-8 w-8" strokeWidth={2.5} />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-xl font-black">Minhas moedas</span>
+            <span className="block text-base font-bold text-white/90">
+              {balance} moedas · {formatPrice(coinsToBRL(balance))} · até{" "}
+              {Math.round(COIN_MAX_RATIO * 100)}% do pedido
+            </span>
+            {history.length > 0 && (
+              <span className="block text-sm font-semibold text-white/80">
+                Última: {history[0]?.reason || "movimentação"} (
+                {(history[0]?.delta ?? 0) > 0 ? "+" : ""}
+                {history[0]?.delta})
+              </span>
+            )}
+          </span>
+          <ChevronRight className="h-7 w-7 shrink-0" />
+        </Link>
+
 
         {isAdmin && (
           <Link
