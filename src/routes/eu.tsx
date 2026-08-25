@@ -331,7 +331,7 @@ function EuPage() {
         </section>
 
 
-        <section className="mt-6">
+        <section id="cupons" className="mt-6 scroll-mt-24">
           <h2 className="flex items-center gap-2 text-xl font-black text-foreground">
             <Ticket className="h-6 w-6 text-[oklch(0.55_0.22_255)]" /> Cupons de desconto
           </h2>
