@@ -416,50 +416,34 @@ function EuPage() {
           </p>
         </section>
 
-        <section className="mt-6 rounded-3xl border-2 border-border bg-card p-5 shadow-sm">
-          <h2 className="flex items-center gap-2 text-xl font-black text-foreground">
-            <Coins className="h-6 w-6 text-[oklch(0.72_0.17_75)]" /> Minhas moedas
-          </h2>
-          <div className="mt-3 flex items-end justify-between gap-3 rounded-2xl bg-muted px-4 py-3">
-            <div>
-              <p className="text-3xl font-black text-foreground">{balance}</p>
-              <p className="text-base font-semibold text-muted-foreground">
-                equivale a {formatPrice(coinsToBRL(balance))}
-              </p>
-            </div>
-            <p className="text-right text-sm font-bold text-muted-foreground">
-              Cada moeda vale R$ 0,01
-              <br />
-              Use até {Math.round(COIN_MAX_RATIO * 100)}% do pedido
-            </p>
-          </div>
-          {history.length > 0 && (
-            <ul className="mt-3 flex flex-col gap-1 border-t-2 border-border pt-3">
-              {history.slice(0, 10).map((h) => (
-                <li key={h.id} className="flex items-center justify-between gap-3 text-base">
-                  <span className="min-w-0 flex-1 truncate text-muted-foreground">
-                    {h.reason || "movimentação"} ·{" "}
-                    {new Date(h.createdAt).toLocaleDateString("pt-BR")}
-                  </span>
-                  <span
-                    className={`shrink-0 font-black ${
-                      h.delta >= 0
-                        ? "text-[oklch(0.62_0.19_145)]"
-                        : "text-[oklch(0.58_0.22_25)]"
-                    }`}
-                  >
-                    {h.delta > 0 ? `+${h.delta}` : h.delta}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-          {history.length === 0 && (
-            <p className="mt-3 text-base text-muted-foreground">
-              Você ainda não tem movimentações de moedas.
-            </p>
-          )}
-        </section>
+        <Link
+          to="/moedas"
+          className="mt-6 flex items-center gap-4 rounded-3xl p-5 text-white shadow-lg active:scale-[0.99]"
+          style={{
+            background:
+              "linear-gradient(160deg, oklch(0.78 0.16 78) 0%, oklch(0.72 0.17 62) 100%)",
+          }}
+        >
+          <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-white/25">
+            <Coins className="h-8 w-8" strokeWidth={2.5} />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-xl font-black">Minhas moedas</span>
+            <span className="block text-base font-bold text-white/90">
+              {balance} moedas · {formatPrice(coinsToBRL(balance))} · até{" "}
+              {Math.round(COIN_MAX_RATIO * 100)}% do pedido
+            </span>
+            {history.length > 0 && (
+              <span className="block text-sm font-semibold text-white/80">
+                Última: {history[0]?.reason || "movimentação"} (
+                {(history[0]?.delta ?? 0) > 0 ? "+" : ""}
+                {history[0]?.delta})
+              </span>
+            )}
+          </span>
+          <ChevronRight className="h-7 w-7 shrink-0" />
+        </Link>
+
 
         {isAdmin && (
           <Link
