@@ -33,7 +33,16 @@ import {
   COIN_MAX_RATIO,
 } from "@/lib/coins";
 import { useAdmin } from "@/lib/admin";
+import { fetchMyOrders } from "@/lib/orders";
 import { formatPrice } from "@/lib/cart";
+
+const PURCHASE_TABS = [
+  { status: "sent", label: "Recebido", icon: ClipboardList },
+  { status: "preparing", label: "Preparando", icon: Package },
+  { status: "shipping", label: "A caminho", icon: Truck },
+  { status: "delivered", label: "Entregue", icon: CheckCircle2 },
+] as const;
+
 import { StoreLogoWithFallback } from "@/components/store-logo";
 
 export const Route = createFileRoute("/eu")({
