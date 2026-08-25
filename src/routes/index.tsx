@@ -15,7 +15,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { fetchCatalog, type CatalogProduct } from "@/lib/loyverse.functions";
-import { addToCart, useCart, formatPrice } from "@/lib/cart";
+import { addToCart, useCart, formatPrice, syncCartPrices } from "@/lib/cart";
 import { fuzzyScore, STRONG_MATCH } from "@/lib/search";
 import { flyToCart } from "@/lib/fly";
 import { shareProduct } from "@/lib/share";
