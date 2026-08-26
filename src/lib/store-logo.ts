@@ -1,47 +1,17 @@
 /**
- * Store logo — single source of truth.
- *
- * The logo is the image of the Loyverse item named exactly "LOGO DA LOJA".
- * That item is never shown as a product to customers.
+ * Logo da loja — vem da configuração do Medusa (campo "Logo" na tela de
+ * Administração). Sem banco de dados nem sincronização externa.
  */
 
 import { useEffect, useState } from "react";
-import { useQuery, useQueryClient, queryOptions } from "@tanstack/react-query";
-import { createServerFn } from "@tanstack/react-start";
+import { queryOptions, useQueryClient } from "@tanstack/react-query";
+import { getMedusaConfig, useMedusaConfig } from "@/lib/medusa";
 
 export const STORE_LOGO_KEY = ["store_logo"] as const;
 
-/**
- * Fetches the store logo. Loyverse continues to be the origin; the URL is
- * mirrored into Supabase (store_settings) and served from there whenever the
- * Loyverse integration is temporarily unavailable.
- */
-export const fetchStoreLogo = createServerFn({ method: "GET" }).handler(
-  async (): Promise<string | null> => {
-    const cache = await import("./catalog-cache.server");
-    try {
-      const { fetchStoreLogoUrl } = await import("./store-logo.server");
-      const url = await fetchStoreLogoUrl();
-      if (url) {
-        try {
-          await cache.persistStoreLogo(url);
-        } catch (err) {
-          console.error("[Store Logo] Falha ao salvar no Supabase:", err);
-        }
-        return url;
-      }
-    } catch (err) {
-      console.error("[Store Logo] Falha ao buscar logo no Loyverse:", err);
-    }
-    try {
-      return await cache.loadStoreLogoFromSupabase();
-    } catch {
-      return null;
-    }
-  },
-);
-
-
+export async function fetchStoreLogo(): Promise<string | null> {
+  return getMedusaConfig().logoUrl || null;
+}
 
 export const storeLogoQuery = queryOptions({
   queryKey: STORE_LOGO_KEY,
@@ -50,17 +20,15 @@ export const storeLogoQuery = queryOptions({
   gcTime: 30 * 60 * 1000,
 });
 
-/** Hook returning the store logo URL (null when the item has no image). */
+/** URL do logo (null quando não configurado). */
 export function useStoreLogo(): string | null {
-  const { data } = useQuery(storeLogoQuery);
-  // Only render the logo after hydration: the server markup has no logo yet,
-  // so painting it during hydration would mismatch the SSR output.
+  const cfg = useMedusaConfig();
+  // Só depois da hidratação: o HTML do servidor não conhece a configuração.
   const [hydrated, setHydrated] = useState(false);
   useEffect(() => setHydrated(true), []);
-  return hydrated ? (data ?? null) : null;
+  return hydrated ? cfg.logoUrl || null : null;
 }
 
-/** Invalidates the cached logo. */
 export function useStoreLogoRefresh() {
   const qc = useQueryClient();
   return () => qc.invalidateQueries({ queryKey: STORE_LOGO_KEY });
