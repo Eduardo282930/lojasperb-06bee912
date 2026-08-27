@@ -1,55 +1,61 @@
-import { useCallback, useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+/**
+ * Acesso administrativo — autenticação da Admin API do Medusa.js.
+ */
 
-/** Tracks whether the current session belongs to an admin (store owner). */
+import { useCallback, useEffect, useState } from "react";
+import { adminToken, isMedusaConfigured, medusaFetch } from "@/lib/medusa";
+
 export function useAdmin() {
   const [checking, setChecking] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
 
   const check = useCallback(async () => {
-    const { data } = await supabase.auth.getSession();
-    const userId = data.session?.user.id;
-    if (!userId) {
+    const token = adminToken.get();
+    if (!token || !isMedusaConfigured()) {
       setIsAdmin(false);
       setChecking(false);
       return false;
     }
-    // Bootstrap: the first signed-in owner becomes admin while none exists.
-    const { data: claimed } = await supabase.rpc("claim_admin");
-    if (claimed === true) {
+    try {
+      await medusaFetch("/admin/users/me", { admin: true, token });
       setIsAdmin(true);
       setChecking(false);
       return true;
+    } catch {
+      adminToken.set(null);
+      setIsAdmin(false);
+      setChecking(false);
+      return false;
     }
-    const { data: roles } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", userId)
-      .eq("role", "admin")
-      .maybeSingle();
-    const ok = Boolean(roles);
-    setIsAdmin(ok);
-    setChecking(false);
-    return ok;
   }, []);
 
   useEffect(() => {
     void check();
-    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "SIGNED_IN" || event === "SIGNED_OUT" || event === "USER_UPDATED") {
-        void check();
-      }
-    });
-    return () => sub.subscription.unsubscribe();
   }, [check]);
 
   return { isAdmin, checking, recheck: check };
 }
 
-export async function adminSignIn(email: string, password: string) {
-  return supabase.auth.signInWithPassword({ email: email.trim(), password });
+export async function adminSignIn(
+  email: string,
+  password: string,
+): Promise<{ error: { message: string } | null }> {
+  if (!isMedusaConfigured()) {
+    return { error: { message: "Configure a URL e a chave do Medusa primeiro." } };
+  }
+  try {
+    const res = await medusaFetch<{ token: string }>("/auth/user/emailpass", {
+      method: "POST",
+      admin: true,
+      body: { email: email.trim(), password },
+    });
+    adminToken.set(res.token);
+    return { error: null };
+  } catch (err) {
+    return { error: { message: (err as Error).message || "Login inválido" } };
+  }
 }
 
 export async function adminSignOut() {
-  await supabase.auth.signOut();
+  adminToken.set(null);
 }
