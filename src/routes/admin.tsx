@@ -22,10 +22,10 @@ import {
 } from "@/lib/coins";
 import {
   fetchReceipts,
-  fetchLoyverseCustomers,
+  fetchCustomers,
   type SimpleReceipt,
   type SimpleCustomer,
-} from "@/lib/loyverse-customers.functions";
+} from "@/lib/medusa-customers";
 import {
   useCoupons,
   useCouponsRefresh,
@@ -622,7 +622,7 @@ function ReceiptsPanel() {
 function CustomersPanel() {
   const customers = useQuery({
     queryKey: ["loyverse-customers"],
-    queryFn: () => fetchLoyverseCustomers(),
+    queryFn: () => fetchCustomers(),
     staleTime: 60 * 1000,
   });
   const receipts = useReceipts();
