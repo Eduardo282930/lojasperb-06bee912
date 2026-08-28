@@ -13,6 +13,7 @@ import { Route as SacolaRouteImport } from './routes/sacola'
 import { Route as PedidosRouteImport } from './routes/pedidos'
 import { Route as MoedasRouteImport } from './routes/moedas'
 import { Route as EuRouteImport } from './routes/eu'
+import { Route as CuponsRouteImport } from './routes/cupons'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ProdutoIdRouteImport } from './routes/produto.$id'
@@ -37,6 +38,11 @@ const MoedasRoute = MoedasRouteImport.update({
 const EuRoute = EuRouteImport.update({
   id: '/eu',
   path: '/eu',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CuponsRoute = CuponsRouteImport.update({
+  id: '/cupons',
+  path: '/cupons',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminRoute = AdminRouteImport.update({
@@ -68,6 +74,7 @@ const ApiPublicManifestRoute = ApiPublicManifestRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/cupons': typeof CuponsRoute
   '/eu': typeof EuRoute
   '/moedas': typeof MoedasRoute
   '/pedidos': typeof PedidosRoute
@@ -79,6 +86,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/cupons': typeof CuponsRoute
   '/eu': typeof EuRoute
   '/moedas': typeof MoedasRoute
   '/pedidos': typeof PedidosRoute
@@ -91,6 +99,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/cupons': typeof CuponsRoute
   '/eu': typeof EuRoute
   '/moedas': typeof MoedasRoute
   '/pedidos': typeof PedidosRoute
@@ -104,6 +113,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/admin'
+    | '/cupons'
     | '/eu'
     | '/moedas'
     | '/pedidos'
@@ -115,6 +125,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/admin'
+    | '/cupons'
     | '/eu'
     | '/moedas'
     | '/pedidos'
@@ -126,6 +137,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/admin'
+    | '/cupons'
     | '/eu'
     | '/moedas'
     | '/pedidos'
@@ -138,6 +150,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
+  CuponsRoute: typeof CuponsRoute
   EuRoute: typeof EuRoute
   MoedasRoute: typeof MoedasRoute
   PedidosRoute: typeof PedidosRoute
@@ -175,6 +188,13 @@ declare module '@tanstack/react-router' {
       path: '/eu'
       fullPath: '/eu'
       preLoaderRoute: typeof EuRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cupons': {
+      id: '/cupons'
+      path: '/cupons'
+      fullPath: '/cupons'
+      preLoaderRoute: typeof CuponsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin': {
@@ -218,6 +238,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
+  CuponsRoute: CuponsRoute,
   EuRoute: EuRoute,
   MoedasRoute: MoedasRoute,
   PedidosRoute: PedidosRoute,
