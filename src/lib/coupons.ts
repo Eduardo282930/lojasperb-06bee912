@@ -1,22 +1,7 @@
-/**
- * Cupons e perfil do cliente — 100% Medusa.js.
- *
- * Os cupons são as "promotions" do Medusa. O cliente valida o código no
- * próprio Medusa e o app apenas guarda no aparelho quais códigos ele já
- * resgatou (não existe banco de dados local).
- */
-
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSyncExternalStore } from "react";
-import {
-  adminToken,
-  customerToken,
-  ensureCustomerSession,
-  isMedusaConfigured,
-  medusaFetch,
-  onlyDigits,
-  phoneEmail,
-} from "@/lib/medusa";
+import { supabase } from "@/integrations/supabase/client";
+import { syncLoyverseCustomer } from "@/lib/loyverse-customers.functions";
 
 export type Coupon = {
   id: string;
@@ -24,130 +9,164 @@ export type Coupon = {
   description: string;
   type: "percent" | "fixed";
   value: number;
+  /** Only for percent coupons: caps the discount in R$. null = no cap. */
   maxDiscount: number | null;
   minOrder: number;
   maxUses: number | null;
   uses: number;
   active: boolean;
+  /** When set, the coupon is exclusive to this customer's phone. */
   customerPhone: string | null;
 };
 
-export type Profile = { name: string; phone: string };
-
-/* --------------------------- Promotions (Medusa) ------------------------ */
-
-type MedusaPromotion = {
-  id: string;
-  code: string;
-  is_automatic?: boolean | null;
-  status?: string | null;
-  application_method?: {
-    type?: string | null;
-    value?: number | string | null;
-    max_quantity?: number | null;
-    currency_code?: string | null;
-  } | null;
+export type Profile = {
+  name: string;
+  phone: string;
 };
 
-function toCoupon(p: MedusaPromotion): Coupon {
-  const method = p.application_method ?? {};
-  const value = Number(method.value ?? 0) || 0;
+type CouponRow = {
+  id: string;
+  code: string;
+  description: string | null;
+  type: string;
+  value: number | string | null;
+  max_discount: number | string | null;
+  min_order: number | string | null;
+  max_uses: number | null;
+  uses: number | null;
+  active: boolean;
+  customer_phone?: string | null;
+};
+
+function num(v: number | string | null | undefined, fallback = 0): number {
+  const n = typeof v === "string" ? Number(v) : v;
+  return typeof n === "number" && Number.isFinite(n) ? n : fallback;
+}
+
+function toCoupon(r: CouponRow): Coupon {
   return {
-    id: p.id,
-    code: p.code,
-    description: method.type === "percentage" ? `${value}% de desconto` : "Desconto",
-    type: method.type === "percentage" ? "percent" : "fixed",
-    value,
-    maxDiscount: null,
-    minOrder: 0,
-    maxUses: null,
-    uses: 0,
-    active: (p.status ?? "active") === "active",
-    customerPhone: null,
+    id: r.id,
+    code: r.code,
+    description: r.description ?? "",
+    type: r.type === "fixed" ? "fixed" : "percent",
+    value: num(r.value),
+    maxDiscount: r.max_discount === null ? null : num(r.max_discount),
+    minOrder: num(r.min_order),
+    maxUses: r.max_uses ?? null,
+    uses: r.uses ?? 0,
+    active: r.active,
+    customerPhone: r.customer_phone ?? null,
   };
 }
 
 export const COUPONS_KEY = ["coupons"] as const;
+
+async function fetchCoupons(): Promise<Coupon[]> {
+  const { data, error } = await supabase
+    .from("coupons")
+    .select("*")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data as CouponRow[]).map(toCoupon);
+}
+
+/** Coupons that belong exclusively to one phone number. */
+export async function fetchCouponsForPhone(phone: string): Promise<Coupon[]> {
+  const digits = (phone || "").replace(/\D/g, "");
+  if (digits.length < 8) return [];
+  const { data, error } = await supabase.rpc("coupons_for_phone", { p_phone: digits });
+  if (error) return [];
+  return ((data ?? []) as CouponRow[]).map(toCoupon);
+}
+
+/** Cupons já resgatados por este cliente (vínculo permanente no banco). */
 export const CLAIMED_KEY = ["coupons", "claimed"] as const;
 
-/** Lista de promoções do Medusa (somente com sessão de administrador). */
-export async function fetchCoupons(): Promise<Coupon[]> {
-  const token = adminToken.get();
-  if (!token || !isMedusaConfigured()) return readClaimed();
-  const res = await medusaFetch<{ promotions: MedusaPromotion[] }>("/admin/promotions", {
-    admin: true,
-    token,
-    query: { limit: 100 },
+export async function fetchClaimedCoupons(phone: string): Promise<Coupon[]> {
+  const { data, error } = await supabase.rpc("coupons_claimed_for_customer", {
+    p_device_id: deviceId(),
+    p_phone: phone || "",
   });
-  return (res.promotions ?? []).filter((p) => p.code).map(toCoupon);
+  if (error) return [];
+  return ((data ?? []) as CouponRow[]).map(toCoupon);
 }
 
-/** Cupons exclusivos por telefone não existem no Medusa: lista vazia. */
-export async function fetchCouponsForPhone(_phone: string): Promise<Coupon[]> {
-  return [];
-}
-
-export async function fetchClaimedCoupons(_phone: string): Promise<Coupon[]> {
-  return readClaimed();
+/** Vincula o cupom permanentemente ao cliente. */
+export async function claimCoupon(couponId: string, phone: string): Promise<boolean> {
+  const { data, error } = await supabase.rpc("claim_coupon", {
+    p_device_id: deviceId(),
+    p_phone: phone || "",
+    p_coupon_id: couponId,
+  });
+  if (error) return false;
+  return Boolean(data);
 }
 
 export function useClaimedCoupons(phone: string) {
   return useQuery({
-    queryKey: [...CLAIMED_KEY, onlyDigits(phone)],
+    queryKey: [...CLAIMED_KEY, (phone || "").replace(/\D/g, "")],
     queryFn: () => fetchClaimedCoupons(phone),
     staleTime: 30 * 1000,
   });
 }
 
 export function useCoupons(): Coupon[] {
+  const phone = useProfile().phone;
   const { data } = useQuery({
     queryKey: COUPONS_KEY,
     queryFn: fetchCoupons,
     staleTime: 60 * 1000,
   });
-  return data ?? [];
+  const { data: mine } = useQuery({
+    queryKey: [...COUPONS_KEY, "phone", (phone || "").replace(/\D/g, "")],
+    queryFn: () => fetchCouponsForPhone(phone),
+    staleTime: 60 * 1000,
+    enabled: (phone || "").replace(/\D/g, "").length >= 8,
+  });
+  const all = [...(data ?? []), ...(mine ?? [])];
+  const seen = new Set<string>();
+  return all.filter((c) => (seen.has(c.id) ? false : (seen.add(c.id), true)));
 }
 
 export function useCouponsRefresh() {
   const qc = useQueryClient();
-  return () => {
-    void qc.invalidateQueries({ queryKey: COUPONS_KEY });
-    void qc.invalidateQueries({ queryKey: CLAIMED_KEY });
-  };
+  return () => qc.invalidateQueries({ queryKey: COUPONS_KEY });
 }
 
-/** Cria/atualiza a promoção no Medusa (administrador). */
 export async function saveCoupon(coupon: Coupon): Promise<void> {
-  const token = adminToken.get();
-  if (!token) throw new Error("Entre como administrador no Medusa.");
-  const body = {
-    code: coupon.code.trim().toUpperCase(),
-    type: "standard",
-    status: coupon.active ? "active" : "draft",
-    application_method: {
-      type: coupon.type === "percent" ? "percentage" : "fixed",
-      target_type: "order",
-      allocation: "across",
-      value: coupon.value,
-      ...(coupon.type === "fixed" ? { currency_code: "brl" } : {}),
-    },
+  const payload = {
+    code: coupon.code,
+    description: coupon.description,
+    type: coupon.type,
+    value: coupon.value,
+    max_discount: coupon.type === "percent" ? coupon.maxDiscount : null,
+    min_order: coupon.minOrder,
+    max_uses: coupon.maxUses,
+    active: coupon.active,
+    customer_phone: coupon.customerPhone
+      ? coupon.customerPhone.replace(/\D/g, "")
+      : null,
   };
+
   if (coupon.id) {
-    await medusaFetch(`/admin/promotions/${coupon.id}`, {
-      method: "POST",
-      admin: true,
-      token,
-      body: { status: body.status, application_method: body.application_method },
-    });
+    const { error } = await supabase.from("coupons").update(payload).eq("id", coupon.id);
+    if (error) {
+      console.error("[Supabase] saveCoupon update failed", error);
+      throw error;
+    }
     return;
   }
-  await medusaFetch("/admin/promotions", { method: "POST", admin: true, token, body });
+
+  const { error } = await supabase.from("coupons").insert(payload);
+  if (error) {
+    console.error("[Supabase] saveCoupon insert failed", error);
+    throw error;
+  }
 }
 
 export async function deleteCoupon(id: string): Promise<void> {
-  const token = adminToken.get();
-  if (!token) throw new Error("Entre como administrador no Medusa.");
-  await medusaFetch(`/admin/promotions/${id}`, { method: "DELETE", admin: true, token });
+  const { error } = await supabase.from("coupons").delete().eq("id", id);
+  if (error) throw error;
 }
 
 export function isExhausted(c: Coupon): boolean {
@@ -158,9 +177,11 @@ export function isAvailable(c: Coupon): boolean {
   return c.active && !isExhausted(c);
 }
 
-/** O Medusa controla o uso das promoções; nada a fazer aqui. */
-export async function consumeCoupon(_id: string): Promise<boolean> {
-  return true;
+/** Marks one use of the coupon (called when the order is sent). Global. */
+export async function consumeCoupon(id: string): Promise<boolean> {
+  const { data, error } = await supabase.rpc("consume_coupon", { p_coupon_id: id });
+  if (error) return false;
+  return Boolean(data);
 }
 
 export function discountFor(coupon: Coupon, subtotal: number): number {
@@ -172,6 +193,7 @@ export function discountFor(coupon: Coupon, subtotal: number): number {
   return Math.min(subtotal, Math.max(0, Math.round(raw * 100) / 100));
 }
 
+/** Best redeemed + usable coupon for the given subtotal. */
 export function activeCouponFor(
   coupons: Coupon[],
   redeemed: string[],
@@ -181,16 +203,20 @@ export function activeCouponFor(
   for (const c of coupons) {
     if (!redeemed.includes(c.id) || !isAvailable(c)) continue;
     const discount = discountFor(c, subtotal);
-    if (discount > 0 && (!best || discount > best.discount)) best = { coupon: c, discount };
+    if (discount > 0 && (!best || discount > best.discount)) {
+      best = { coupon: c, discount };
+    }
   }
   return best;
 }
 
-/* ------------------- Estado do aparelho (sem banco) --------------------- */
+/* ---------------------------------------------------------------------- */
+/* Local-only state: which coupons this device redeemed + cached profile.  */
+/* The profile itself is persisted in the database via save_customer().    */
+/* ---------------------------------------------------------------------- */
 
 const PROFILE_KEY = "sperb-profile-v1";
 const REDEEMED_KEY = "sperb-redeemed-v1";
-const CLAIMED_LIST_KEY = "sperb-claimed-coupons-v1";
 const DEVICE_KEY = "sperb-device-v1";
 
 const listeners = new Set<() => void>();
@@ -206,7 +232,8 @@ function readJSON<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;
   try {
     const raw = window.localStorage.getItem(key);
-    return raw ? (JSON.parse(raw) as T) : fallback;
+    if (!raw) return fallback;
+    return JSON.parse(raw) as T;
   } catch {
     return fallback;
   }
@@ -225,16 +252,6 @@ function ensureInit() {
 
 const EMPTY_REDEEMED: string[] = [];
 const EMPTY_PROFILE: Profile = { name: "", phone: "" };
-
-function readClaimed(): Coupon[] {
-  return readJSON<Coupon[]>(CLAIMED_LIST_KEY, []);
-}
-
-function writeClaimed(list: Coupon[]) {
-  if (typeof window !== "undefined") {
-    window.localStorage.setItem(CLAIMED_LIST_KEY, JSON.stringify(list));
-  }
-}
 
 export function deviceId(): string {
   if (typeof window === "undefined") return "";
@@ -271,73 +288,37 @@ export function useProfile(): Profile {
   );
 }
 
-/** Nome já cadastrado no Medusa para este telefone. */
+/** Saves the customer in the database, Loyverse, and keeps a local copy. */
+/** Name already registered for a phone number (locked by the store). */
 export async function lookupCustomerName(phone: string): Promise<string> {
-  const digits = onlyDigits(phone);
-  if (digits.length < 8 || !isMedusaConfigured()) return "";
-  try {
-    const login = await medusaFetch<{ token: string }>("/auth/customer/emailpass", {
-      method: "POST",
-      body: { email: phoneEmail(digits), password: `sperb-${digits}` },
-    });
-    customerToken.set(login.token);
-    const me = await medusaFetch<{ customer: { first_name?: string | null } }>(
-      "/store/customers/me",
-      { token: login.token },
-    );
-    return me.customer.first_name?.trim() ?? "";
-  } catch {
-    return "";
-  }
+  const digits = (phone || "").replace(/\D/g, "");
+  if (digits.length < 8) return "";
+  const { data, error } = await supabase.rpc("lookup_customer_name", { p_phone: digits });
+  if (error) return "";
+  return (data as string | null) ?? "";
 }
 
-/** Salva o cliente no Medusa (conta criada a partir do telefone). */
 export async function saveProfile(profile: Profile): Promise<void> {
   ensureInit();
-  const registered = await lookupCustomerName(profile.phone);
-  const finalProfile: Profile = registered ? { ...profile, name: registered } : profile;
-  profileCache = finalProfile;
+  const locked = await lookupCustomerName(profile.phone);
+  if (locked) profile = { ...profile, name: locked };
+  profileCache = profile;
   if (typeof window !== "undefined") {
-    window.localStorage.setItem(PROFILE_KEY, JSON.stringify(finalProfile));
+    window.localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
   }
   emit();
-  const customer = await ensureCustomerSession(finalProfile.phone, finalProfile.name);
-  if (!customer && isMedusaConfigured()) {
-    throw new Error("Não foi possível salvar seu cadastro no Medusa.");
-  }
-}
-
-/** Valida o código no Medusa e guarda o cupom neste aparelho. */
-export async function redeemCouponCode(code: string): Promise<Coupon | null> {
-  const clean = code.trim().toUpperCase();
-  if (!clean || !isMedusaConfigured()) return null;
+  const { error } = await supabase.rpc("save_customer", {
+    p_device_id: deviceId(),
+    p_name: profile.name,
+    p_phone: profile.phone,
+  });
+  if (error) throw error;
+  // Mirror the customer into the Loyverse "Clientes" tab (never blocks saving).
   try {
-    const res = await medusaFetch<{ promotions: MedusaPromotion[] }>("/store/promotions", {
-      query: { code: clean },
-    });
-    const found = (res.promotions ?? []).find(
-      (p) => p.code?.toUpperCase() === clean,
-    );
-    if (!found) return null;
-    const coupon = toCoupon(found);
-    const list = readClaimed().filter((c) => c.code !== coupon.code);
-    writeClaimed([coupon, ...list]);
-    redeemCoupon(coupon.id);
-    return coupon;
-  } catch {
-    return null;
+    await syncLoyverseCustomer({ data: { name: profile.name, phone: profile.phone } });
+  } catch (err) {
+    console.warn("[saveProfile] Loyverse sync falhou", err);
   }
-}
-
-/** Vincula o cupom a este cliente/aparelho. */
-export async function claimCoupon(couponId: string, _phone: string): Promise<boolean> {
-  const all = await fetchCoupons();
-  const coupon = all.find((c) => c.id === couponId);
-  if (!coupon) return false;
-  const list = readClaimed().filter((c) => c.id !== coupon.id);
-  writeClaimed([coupon, ...list]);
-  redeemCoupon(coupon.id);
-  return true;
 }
 
 export function redeemCoupon(id: string) {

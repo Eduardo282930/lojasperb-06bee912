@@ -3,18 +3,7 @@
  * Ensures system/internal products don't appear in commercial product listings
  */
 
-import type { CatalogProduct } from "./catalog";
-
-function isStoreLogoName(name: string): boolean {
-  return (
-    (name || "")
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/\p{Diacritic}/gu, "")
-      .replace(/\s+/g, " ")
-      .trim() === "logo da loja"
-  );
-}
+import { isStoreLogoName, type CatalogProduct } from "./loyverse.functions";
 
 /**
  * Check if a product is a commercial product (for sale)

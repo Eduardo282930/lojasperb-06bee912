@@ -1,13 +1,29 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 /**
- * Manifesto PWA do app SPERB. O ícone padrão é local; o logo da loja
- * configurado no Medusa é usado dentro do app.
+ * Dynamic PWA manifest: the app icon is the official store logo
+ * coming from the Loyverse item "LOGO DA LOJA".
  */
 export const Route = createFileRoute("/api/public/manifest")({
   server: {
     handlers: {
       GET: async () => {
+        let logo: string | null = null;
+        try {
+          const { fetchStoreLogoUrl } = await import("@/lib/store-logo.server");
+          logo = await fetchStoreLogoUrl();
+        } catch {
+          logo = null;
+        }
+
+        const icons = logo
+          ? [
+              { src: logo, sizes: "192x192", type: "image/png", purpose: "any" },
+              { src: logo, sizes: "512x512", type: "image/png", purpose: "any" },
+              { src: logo, sizes: "512x512", type: "image/png", purpose: "maskable" },
+            ]
+          : [{ src: "/favicon.svg", sizes: "any", type: "image/svg+xml", purpose: "any" }];
+
         return new Response(
           JSON.stringify({
             name: "SPERB",
@@ -18,9 +34,7 @@ export const Route = createFileRoute("/api/public/manifest")({
             display: "standalone",
             background_color: "#ffffff",
             theme_color: "#1a53ff",
-            icons: [
-              { src: "/favicon.svg", sizes: "any", type: "image/svg+xml", purpose: "any" },
-            ],
+            icons,
           }),
           {
             headers: {

@@ -2,7 +2,7 @@ import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { queryOptions, useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { ArrowLeft, ImageOff, Minus, Plus, ShoppingCart, Check, Share2 } from "lucide-react";
-import { fetchProduct } from "@/lib/catalog";
+import { fetchProduct } from "@/lib/loyverse.functions";
 import { addToCart, useCart, formatPrice, cartQtyOf } from "@/lib/cart";
 import { shareProduct } from "@/lib/share";
 
