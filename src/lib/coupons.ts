@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useSyncExternalStore } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { syncLoyverseCustomer } from "@/lib/loyverse-customers.functions";
 
@@ -267,26 +267,25 @@ export function deviceId(): string {
 }
 
 export function useRedeemed(): string[] {
-  return useSyncExternalStore(
-    subscribe,
-    () => {
-      ensureInit();
-      return redeemedCache;
-    },
-    () => EMPTY_REDEEMED,
-  );
+  const [state, setState] = useState<string[]>(EMPTY_REDEEMED);
+  useEffect(() => {
+    ensureInit();
+    setState(redeemedCache);
+    return subscribe(() => setState(redeemedCache));
+  }, []);
+  return state;
 }
 
 export function useProfile(): Profile {
-  return useSyncExternalStore(
-    subscribe,
-    () => {
-      ensureInit();
-      return profileCache;
-    },
-    () => EMPTY_PROFILE,
-  );
+  const [state, setState] = useState<Profile>(EMPTY_PROFILE);
+  useEffect(() => {
+    ensureInit();
+    setState(profileCache);
+    return subscribe(() => setState(profileCache));
+  }, []);
+  return state;
 }
+
 
 /** Saves the customer in the database, Loyverse, and keeps a local copy. */
 /** Name already registered for a phone number (locked by the store). */
