@@ -11,37 +11,18 @@ import { createServerFn } from "@tanstack/react-start";
 
 export const STORE_LOGO_KEY = ["store_logo"] as const;
 
-/**
- * Fetches the store logo. Loyverse continues to be the origin; the URL is
- * mirrored into Supabase (store_settings) and served from there whenever the
- * Loyverse integration is temporarily unavailable.
- */
+/** Busca o logo da loja diretamente no Loyverse (item "LOGO DA LOJA"). */
 export const fetchStoreLogo = createServerFn({ method: "GET" }).handler(
   async (): Promise<string | null> => {
-    const cache = await import("./catalog-cache.server");
     try {
       const { fetchStoreLogoUrl } = await import("./store-logo.server");
-      const url = await fetchStoreLogoUrl();
-      if (url) {
-        try {
-          await cache.persistStoreLogo(url);
-        } catch (err) {
-          console.error("[Store Logo] Falha ao salvar no Supabase:", err);
-        }
-        return url;
-      }
+      return (await fetchStoreLogoUrl()) ?? null;
     } catch (err) {
       console.error("[Store Logo] Falha ao buscar logo no Loyverse:", err);
-    }
-    try {
-      return await cache.loadStoreLogoFromSupabase();
-    } catch {
       return null;
     }
   },
 );
-
-
 
 export const storeLogoQuery = queryOptions({
   queryKey: STORE_LOGO_KEY,
