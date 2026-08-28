@@ -224,6 +224,7 @@ export type Database = {
           id: string
           max_discount: number | null
           max_uses: number | null
+          max_uses_per_customer: number | null
           min_order: number
           store_key: string
           type: string
@@ -241,6 +242,7 @@ export type Database = {
           id?: string
           max_discount?: number | null
           max_uses?: number | null
+          max_uses_per_customer?: number | null
           min_order?: number
           store_key?: string
           type?: string
@@ -258,6 +260,7 @@ export type Database = {
           id?: string
           max_discount?: number | null
           max_uses?: number | null
+          max_uses_per_customer?: number | null
           min_order?: number
           store_key?: string
           type?: string
@@ -787,6 +790,13 @@ export type Database = {
         }[]
       }
       consume_coupon: { Args: { p_coupon_id: string }; Returns: boolean }
+      coupon_uses_for_customer: {
+        Args: { p_device_id: string; p_phone: string }
+        Returns: {
+          coupon_id: string
+          uses: number
+        }[]
+      }
       coupons_claimed_for_customer: {
         Args: { p_device_id: string; p_phone: string }
         Returns: {
@@ -799,6 +809,7 @@ export type Database = {
           id: string
           max_discount: number | null
           max_uses: number | null
+          max_uses_per_customer: number | null
           min_order: number
           store_key: string
           type: string
@@ -825,6 +836,7 @@ export type Database = {
           id: string
           max_discount: number | null
           max_uses: number | null
+          max_uses_per_customer: number | null
           min_order: number
           store_key: string
           type: string
