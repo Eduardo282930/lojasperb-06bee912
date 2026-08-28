@@ -291,6 +291,7 @@ const emptyCoupon: Coupon = {
   maxDiscount: null,
   minOrder: 0,
   maxUses: null,
+  maxUsesPerCustomer: null,
   uses: 0,
   active: true,
   customerPhone: null,
@@ -308,6 +309,7 @@ function CouponForm({
   const [draft, setDraft] = useState<Coupon>({ ...emptyCoupon, ...initial });
   const [capped, setCapped] = useState(Boolean(initial?.maxDiscount));
   const [limited, setLimited] = useState(initial?.maxUses != null);
+  const [perCustomer, setPerCustomer] = useState(initial?.maxUsesPerCustomer != null);
   const [error, setError] = useState("");
   const [ok, setOk] = useState(false);
 
@@ -324,6 +326,7 @@ function CouponForm({
         code,
         maxDiscount: draft.type === "percent" && capped ? draft.maxDiscount ?? 0 : null,
         maxUses: limited ? draft.maxUses ?? 1 : null,
+        maxUsesPerCustomer: perCustomer ? draft.maxUsesPerCustomer ?? 1 : null,
       });
       setOk(true);
       setTimeout(() => setOk(false), 1500);
@@ -428,6 +431,28 @@ function CouponForm({
         />
       )}
 
+      <label className="flex items-center gap-3 text-lg font-bold text-foreground">
+        <input
+          type="checkbox"
+          checked={perCustomer}
+          onChange={(e) => setPerCustomer(e.target.checked)}
+          className="h-6 w-6"
+        />
+        Limitar usos por cliente
+      </label>
+      {perCustomer && (
+        <input
+          type="number"
+          min={1}
+          value={draft.maxUsesPerCustomer ?? 1}
+          onChange={(e) =>
+            setDraft({ ...draft, maxUsesPerCustomer: Number(e.target.value) })
+          }
+          placeholder="Usos por cliente (ex: 1)"
+          className={input}
+        />
+      )}
+
       <button
         onClick={() => void submit()}
         className="inline-flex items-center justify-center gap-2 rounded-2xl py-4 text-xl font-black text-white active:scale-[0.98]"
@@ -467,6 +492,8 @@ function CouponList({ coupons, onChanged }: { coupons: Coupon[]; onChanged: () =
                 ` · máx. ${formatPrice(c.maxDiscount)}`}{" "}
               ·{" "}
               {c.maxUses === null ? "usos ilimitados" : `${c.uses}/${c.maxUses} usos`}
+              {c.maxUsesPerCustomer !== null &&
+                ` · ${c.maxUsesPerCustomer} por cliente`}
               {isExhausted(c) && " · esgotado"}
             </p>
           </div>
