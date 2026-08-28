@@ -444,45 +444,34 @@ async function buildCatalog(token: string): Promise<Catalog> {
   return { products, categories, storeLogo };
 }
 
-/** Janela de frescor: acima disso o Supabase é ressincronizado com o Loyverse. */
+/** Janela de cache em memória do servidor (evita estourar a API do Loyverse). */
 const FRESH_MS = 5_000;
 
-/**
- * Sincroniza Loyverse -> Supabase (upsert, sem duplicar) e devolve o catálogo.
- * Usado pelo endpoint de sincronização e pela revalidação automática.
- */
+let memoryCatalog: { at: number; catalog: Catalog } | null = null;
+
+/** Reconstrói o catálogo direto do Loyverse (fonte única de verdade). */
 export async function syncCatalogFromLoyverse(): Promise<Catalog> {
   const token = process.env.LOYVERSE_TOKEN;
   if (!token) throw new Error("LOYVERSE_TOKEN ausente");
   const catalog = await buildCatalog(token);
-  const { persistCatalog } = await import("./catalog-cache.server");
-  await persistCatalog(catalog);
+  memoryCatalog = { at: Date.now(), catalog };
   return catalog;
 }
 
-/**
- * Catálogo e ERP leem SOMENTE do Supabase. O Loyverse alimenta o Supabase
- * por upsert (sem duplicados) sempre que a cópia está velha ou vazia.
- */
+/** O catálogo vem SOMENTE do Loyverse, com cache curto em memória. */
 async function getCatalog(): Promise<Catalog> {
-  const { loadCatalogFromSupabase, getCatalogSyncedAt } = await import(
-    "./catalog-cache.server"
-  );
-
-  const syncedAt = await getCatalogSyncedAt();
-  const stale = !syncedAt || Date.now() - syncedAt > FRESH_MS;
-
-  if (stale) {
-    try {
-      await syncCatalogFromLoyverse();
-    } catch (err) {
-      console.error("[Catalog] falha ao sincronizar com o Loyverse:", err);
-    }
+  if (memoryCatalog && Date.now() - memoryCatalog.at < FRESH_MS) {
+    return memoryCatalog.catalog;
   }
-
-  const cached = await loadCatalogFromSupabase();
-  if (cached) return cached;
-  throw new Error("Catálogo indisponível no momento");
+  try {
+    return await syncCatalogFromLoyverse();
+  } catch (err) {
+    if (memoryCatalog) {
+      console.error("[Catalog] falha no Loyverse, usando cópia recente:", err);
+      return memoryCatalog.catalog;
+    }
+    throw err;
+  }
 }
 
 export const fetchCatalog = createServerFn({ method: "GET" }).handler(
