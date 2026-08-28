@@ -9,6 +9,9 @@ import {
   useRedeemed,
   useProfile,
   useCouponsRefresh,
+  useClaimedCoupons,
+  useMyCouponUses,
+  isAvailableForCustomer,
   activeCouponFor,
   consumeCoupon,
   unredeemCoupon,
@@ -44,8 +47,16 @@ function SacolaPage() {
     staleTime: 30 * 1000,
   });
 
+  const claimed = useClaimedCoupons(profile.phone).data ?? [];
+  const myUses = useMyCouponUses(profile.phone).data ?? {};
+
   const subtotal = cart.reduce((s, c) => s + priceValue(c.price) * c.qty, 0);
-  const applied = activeCouponFor(coupons, redeemed, subtotal);
+  // Cupons resgatados ficam salvos para o cliente; o limite pessoal é respeitado.
+  const usable = [...coupons, ...claimed]
+    .filter((c, i, arr) => arr.findIndex((x) => x.id === c.id) === i)
+    .filter((c) => isAvailableForCustomer(c, myUses[c.id] ?? 0));
+  const owned = [...redeemed, ...claimed.map((c) => c.id)];
+  const applied = activeCouponFor(usable, owned, subtotal);
   const eligible = Math.max(0, subtotal - (applied?.discount ?? 0));
   const balance = coinBalance.data ?? 0;
   const coinsToUse = useCoins ? maxCoinsFor(eligible, balance) : 0;
