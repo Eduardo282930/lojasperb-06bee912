@@ -225,7 +225,9 @@ function emit() {
 }
 function subscribe(cb: () => void) {
   listeners.add(cb);
-  return () => listeners.delete(cb);
+  return () => {
+    listeners.delete(cb);
+  };
 }
 
 function readJSON<T>(key: string, fallback: T): T {
