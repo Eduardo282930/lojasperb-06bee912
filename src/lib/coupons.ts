@@ -13,6 +13,8 @@ export type Coupon = {
   maxDiscount: number | null;
   minOrder: number;
   maxUses: number | null;
+  /** Limite de usos por cliente (null = sem limite pessoal). */
+  maxUsesPerCustomer: number | null;
   uses: number;
   active: boolean;
   /** When set, the coupon is exclusive to this customer's phone. */
@@ -33,6 +35,7 @@ type CouponRow = {
   max_discount: number | string | null;
   min_order: number | string | null;
   max_uses: number | null;
+  max_uses_per_customer?: number | null;
   uses: number | null;
   active: boolean;
   customer_phone?: string | null;
@@ -53,6 +56,7 @@ function toCoupon(r: CouponRow): Coupon {
     maxDiscount: r.max_discount === null ? null : num(r.max_discount),
     minOrder: num(r.min_order),
     maxUses: r.max_uses ?? null,
+    maxUsesPerCustomer: r.max_uses_per_customer ?? null,
     uses: r.uses ?? 0,
     active: r.active,
     customerPhone: r.customer_phone ?? null,
@@ -142,6 +146,7 @@ export async function saveCoupon(coupon: Coupon): Promise<void> {
     max_discount: coupon.type === "percent" ? coupon.maxDiscount : null,
     min_order: coupon.minOrder,
     max_uses: coupon.maxUses,
+    max_uses_per_customer: coupon.maxUsesPerCustomer,
     active: coupon.active,
     customer_phone: coupon.customerPhone
       ? coupon.customerPhone.replace(/\D/g, "")
@@ -167,6 +172,35 @@ export async function saveCoupon(coupon: Coupon): Promise<void> {
 export async function deleteCoupon(id: string): Promise<void> {
   const { error } = await supabase.from("coupons").delete().eq("id", id);
   if (error) throw error;
+}
+
+/** Quantas vezes este cliente já usou cada cupom. */
+export async function fetchMyCouponUses(phone: string): Promise<Record<string, number>> {
+  const { data, error } = await supabase.rpc("coupon_uses_for_customer", {
+    p_device_id: deviceId(),
+    p_phone: phone || "",
+  });
+  if (error || !data) return {};
+  const out: Record<string, number> = {};
+  for (const row of data as Array<{ coupon_id: string; uses: number }>) {
+    out[row.coupon_id] = Number(row.uses ?? 0);
+  }
+  return out;
+}
+
+export function useMyCouponUses(phone: string) {
+  return useQuery({
+    queryKey: ["coupon-uses", (phone || "").replace(/\D/g, "")],
+    queryFn: () => fetchMyCouponUses(phone),
+    staleTime: 30 * 1000,
+  });
+}
+
+/** Cupom ainda disponível para este cliente (respeita o limite pessoal). */
+export function isAvailableForCustomer(c: Coupon, myUses: number): boolean {
+  if (!isAvailable(c)) return false;
+  if (c.maxUsesPerCustomer === null) return true;
+  return myUses < c.maxUsesPerCustomer;
 }
 
 export function isExhausted(c: Coupon): boolean {
