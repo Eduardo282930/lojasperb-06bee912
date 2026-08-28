@@ -1,2 +1,0 @@
-REVOKE EXECUTE ON FUNCTION public.upsert_customer_from_loyverse(text, text, text, text) FROM anon, authenticated, public;
-GRANT EXECUTE ON FUNCTION public.upsert_customer_from_loyverse(text, text, text, text) TO service_role;

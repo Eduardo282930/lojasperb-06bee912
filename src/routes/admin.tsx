@@ -13,6 +13,7 @@ import {
   Trash2,
   Users,
   Coins,
+  Settings,
 } from "lucide-react";
 import {
   findCustomerId,
@@ -48,6 +49,7 @@ import {
 } from "@/lib/orders";
 import { useAdmin, adminSignIn, adminSignOut } from "@/lib/admin";
 import { formatPrice } from "@/lib/cart";
+import { useMedusaConfig, saveMedusaConfig, type MedusaConfig } from "@/lib/medusa";
 
 export const Route = createFileRoute("/admin")({
   ssr: false,
@@ -56,7 +58,7 @@ export const Route = createFileRoute("/admin")({
       { title: "Administração — SPERB" },
       {
         name: "description",
-        content: "Painel do proprietário SPERB: cupons, recibos do Loyverse e clientes.",
+        content: "Painel do proprietário SPERB: cupons, recibos e clientes do Medusa.",
       },
       { property: "og:title", content: "Administração — SPERB" },
       {
@@ -79,7 +81,14 @@ function couponLabel(c: Coupon): string {
   return c.type === "percent" ? `${c.value}% OFF` : `${formatPrice(c.value)} OFF`;
 }
 
-type Section = "home" | "pedidos" | "cupons" | "recibos" | "clientes" | "duplicidades";
+type Section =
+  | "home"
+  | "pedidos"
+  | "cupons"
+  | "recibos"
+  | "clientes"
+  | "duplicidades"
+  | "medusa";
 
 const SECTIONS: {
   id: Exclude<Section, "home">;
@@ -107,9 +116,15 @@ const SECTIONS: {
   },
   {
     id: "recibos",
-    label: "Recibos Loyverse",
+    label: "Recibos do Medusa",
     hint: "Vendas registradas na loja",
     icon: <Receipt className="h-7 w-7" />,
+  },
+  {
+    id: "medusa",
+    label: "Configuração Medusa",
+    hint: "URL, chaves e logo da loja",
+    icon: <Settings className="h-7 w-7" />,
   },
   {
     id: "duplicidades",
@@ -201,6 +216,7 @@ function AdminPage() {
         {section === "recibos" && <ReceiptsPanel />}
         {section === "clientes" && <CustomersPanel />}
         {section === "duplicidades" && <DuplicatesPanel />}
+        {section === "medusa" && <MedusaPanel />}
       </main>
     </div>
   );
@@ -534,7 +550,7 @@ function whatsappLink(r: SimpleReceipt): string | null {
 
 function useReceipts() {
   return useQuery({
-    queryKey: ["loyverse-receipts"],
+    queryKey: ["medusa-receipts"],
     queryFn: () => fetchReceipts(),
     staleTime: 60 * 1000,
   });
@@ -574,7 +590,7 @@ function ReceiptCard({ r }: { r: SimpleReceipt }) {
         </a>
       ) : (
         <p className="mt-2 text-xs font-bold text-muted-foreground">
-          Cliente sem telefone cadastrado no Loyverse.
+          Cliente sem telefone cadastrado no Medusa.
         </p>
       )}
     </li>
@@ -587,7 +603,7 @@ function ReceiptsPanel() {
   return (
     <section className="rounded-3xl border-2 border-border bg-card p-4">
       <div className="flex items-center justify-between gap-2">
-        <h2 className="text-xl font-black text-foreground">Recibos do Loyverse</h2>
+        <h2 className="text-xl font-black text-foreground">Recibos do Medusa</h2>
         <button
           onClick={() => void refetch()}
           className="rounded-xl bg-muted px-3 py-2 text-sm font-black text-foreground active:scale-95"
@@ -599,7 +615,7 @@ function ReceiptsPanel() {
       {isLoading && <p className="mt-3 text-base text-muted-foreground">Carregando vendas…</p>}
       {error && (
         <p className="mt-3 text-base font-bold" style={{ color: RED }}>
-          Não foi possível carregar os recibos do Loyverse.
+          Não foi possível carregar os recibos do Medusa.
         </p>
       )}
       {data && (
@@ -621,7 +637,7 @@ function ReceiptsPanel() {
 
 function CustomersPanel() {
   const customers = useQuery({
-    queryKey: ["loyverse-customers"],
+    queryKey: ["medusa-customers"],
     queryFn: () => fetchCustomers(),
     staleTime: 60 * 1000,
   });
@@ -657,7 +673,7 @@ function CustomersPanel() {
   return (
     <section className="rounded-3xl border-2 border-border bg-card p-4">
       <div className="flex items-center justify-between gap-2">
-        <h2 className="text-xl font-black text-foreground">Clientes do Loyverse</h2>
+        <h2 className="text-xl font-black text-foreground">Clientes do Medusa</h2>
         <button
           onClick={() => void customers.refetch()}
           className="rounded-xl bg-muted px-3 py-2 text-sm font-black text-foreground"
@@ -678,7 +694,7 @@ function CustomersPanel() {
       )}
       {customers.error && (
         <p className="mt-3 font-bold" style={{ color: RED }}>
-          Não foi possível carregar os clientes do Loyverse.
+          Não foi possível carregar os clientes do Medusa.
         </p>
       )}
 
@@ -875,7 +891,7 @@ function CustomerDetail({
         Recibos de venda ({mineReceipts.length})
       </h3>
       {mineReceipts.length === 0 ? (
-        <p className="text-muted-foreground">Nenhuma venda no Loyverse para este cliente.</p>
+        <p className="text-muted-foreground">Nenhuma venda registrada no Medusa para este cliente.</p>
       ) : (
         <ul className="mt-2 flex flex-col gap-2">
           {mineReceipts.map((r) => (
@@ -905,7 +921,7 @@ function CustomerDetail({
         />
       ) : (
         <p className="text-muted-foreground">
-          Cadastre um telefone para este cliente no Loyverse para criar cupons exclusivos.
+          Cadastre um telefone para este cliente no Medusa para criar cupons exclusivos.
         </p>
       )}
     </section>
@@ -1074,5 +1090,64 @@ function DuplicatesPanel() {
         </li>
       ))}
     </ul>
+  );
+}
+
+/* --------------------------- Configuração Medusa ------------------------ */
+
+const MEDUSA_FIELDS: { key: keyof MedusaConfig; label: string; hint: string }[] = [
+  { key: "backendUrl", label: "URL do Medusa", hint: "https://sua-loja.medusajs.app" },
+  { key: "publishableKey", label: "Publishable key", hint: "pk_..." },
+  { key: "regionId", label: "Região (opcional)", hint: "reg_..." },
+  { key: "salesChannelId", label: "Canal de vendas (opcional)", hint: "sc_..." },
+  { key: "logoUrl", label: "Logo da loja (URL)", hint: "https://.../logo.png" },
+];
+
+function MedusaPanel() {
+  const config = useMedusaConfig();
+  const [draft, setDraft] = useState<MedusaConfig>(config);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => setDraft(config), [config]);
+
+  return (
+    <section className="space-y-4">
+      <h2 className="text-xl font-black text-foreground">Configuração do Medusa.js</h2>
+      <p className="text-base font-semibold text-muted-foreground">
+        Todos os dados do aplicativo (produtos, clientes, pedidos, cupons e moedas)
+        vêm destas informações.
+      </p>
+      <div className="space-y-3 rounded-3xl border-2 border-border bg-card p-5">
+        {MEDUSA_FIELDS.map((f) => (
+          <label key={f.key} className="block">
+            <span className="block text-sm font-black text-foreground">{f.label}</span>
+            <input
+              value={draft[f.key]}
+              onChange={(e) => {
+                setSaved(false);
+                setDraft({ ...draft, [f.key]: e.target.value });
+              }}
+              placeholder={f.hint}
+              className="mt-1 w-full rounded-2xl border-2 border-border bg-background px-4 py-3 text-base font-semibold text-foreground outline-none"
+            />
+          </label>
+        ))}
+        <button
+          onClick={() => {
+            saveMedusaConfig(draft);
+            setSaved(true);
+          }}
+          className="w-full rounded-2xl py-4 text-lg font-black text-white"
+          style={{ backgroundColor: GREEN }}
+        >
+          Salvar configuração
+        </button>
+        {saved && (
+          <p className="text-base font-bold" style={{ color: GREEN }}>
+            Configuração salva neste aparelho.
+          </p>
+        )}
+      </div>
+    </section>
   );
 }
