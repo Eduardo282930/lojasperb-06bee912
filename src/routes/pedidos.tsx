@@ -200,6 +200,14 @@ function PedidosPage() {
     }
   }, [activeIndex]);
 
+  useEffect(() => {
+    activeTabRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+      inline: "center",
+    });
+  }, [status]);
+
   function setStatus(next: StatusValue) {
     void navigate({ search: { status: next }, replace: true });
   }
@@ -227,22 +235,27 @@ function PedidosPage() {
           <h1 className="text-2xl font-black text-foreground">Meus pedidos</h1>
         </div>
 
-        <div className="mx-auto flex max-w-3xl gap-2 overflow-x-auto px-4 pb-2">
+        {/* Abas estilo Shopee: toque para trocar, ou arraste o conteúdo. */}
+        <div
+          className="mx-auto flex max-w-3xl gap-1 overflow-x-auto px-2 pb-1"
+          style={{ scrollbarWidth: "none" }}
+        >
           {groups.map((g) => {
             const active = g.value === status;
             return (
               <button
                 key={g.value}
+                ref={active ? activeTabRef : undefined}
                 onClick={() => setStatus(g.value)}
-                className={`shrink-0 rounded-full border-2 px-4 py-2 text-base font-black transition-colors active:scale-95 ${
-                  active
-                    ? "border-transparent text-white"
-                    : "border-border bg-card text-foreground"
-                }`}
-                style={active ? { backgroundColor: BLUE } : undefined}
+                className="relative shrink-0 px-3 pb-2 pt-1 text-base font-black transition-colors active:scale-95"
+                style={{ color: active ? BLUE : "var(--muted-foreground)" }}
               >
                 {g.label}
                 {g.list.length > 0 && ` (${g.list.length})`}
+                <span
+                  className="absolute inset-x-2 bottom-0 h-1 rounded-full transition-opacity"
+                  style={{ backgroundColor: BLUE, opacity: active ? 1 : 0 }}
+                />
               </button>
             );
           })}
