@@ -189,6 +189,7 @@ function PedidosPage() {
 
   const activeIndex = Math.max(0, SECTIONS.findIndex((s) => s.value === status));
   const trackRef = useRef<HTMLDivElement>(null);
+  const activeTabRef = useRef<HTMLButtonElement>(null);
 
   // Mantém o painel visível igual à aba escolhida.
   useEffect(() => {
