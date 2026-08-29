@@ -278,6 +278,50 @@ export type Database = {
           },
         ]
       }
+      customer_checkins: {
+        Row: {
+          bonus: number
+          coins: number
+          created_at: string
+          customer_id: string
+          day: string
+          global_seq: number
+          id: string
+          store_key: string
+          streak_day: number
+        }
+        Insert: {
+          bonus?: number
+          coins?: number
+          created_at?: string
+          customer_id: string
+          day?: string
+          global_seq?: number
+          id?: string
+          store_key?: string
+          streak_day?: number
+        }
+        Update: {
+          bonus?: number
+          coins?: number
+          created_at?: string
+          customer_id?: string
+          day?: string
+          global_seq?: number
+          id?: string
+          store_key?: string
+          streak_day?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_checkins_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customer_coin_ledger: {
         Row: {
           created_at: string
@@ -770,6 +814,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      checkin_status: {
+        Args: { p_device_id: string; p_phone: string }
+        Returns: Json
+      }
       claim_admin: { Args: never; Returns: boolean }
       claim_coupon: {
         Args: { p_coupon_id: string; p_device_id: string; p_phone: string }
@@ -864,6 +912,10 @@ export type Database = {
           p_total: number
         }
         Returns: string
+      }
+      daily_checkin: {
+        Args: { p_device_id: string; p_phone: string }
+        Returns: Json
       }
       has_role: {
         Args: {
