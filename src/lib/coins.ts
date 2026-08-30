@@ -84,3 +84,62 @@ export async function adminAdjustCoins(
   if (error) return null;
   return data === null ? null : Number(data);
 }
+
+/* ------------------------- Check-in diário --------------------------- */
+
+export type CheckinStatus = {
+  streak: number;
+  checkedToday: boolean;
+  nextDay: number;
+  globalTotal: number;
+};
+
+export type CheckinResult = {
+  ok: boolean;
+  reason?: string;
+  day?: number;
+  coins?: number;
+  bonus?: number;
+  globalSeq?: number;
+  balance?: number;
+};
+
+/** Recompensa do dia N da sequência (1 a 7). */
+export const CHECKIN_REWARDS = [1, 2, 3, 4, 5, 6, 7];
+
+/** Prêmio para quem fizer o check-in de número 100, 200, 300… */
+export const CHECKIN_JACKPOT = 1000;
+export const CHECKIN_JACKPOT_EVERY = 100;
+
+export async function fetchCheckinStatus(phone: string): Promise<CheckinStatus> {
+  const { data, error } = await supabase.rpc("checkin_status", {
+    p_device_id: deviceId(),
+    p_phone: phone || "",
+  });
+  const raw = (data ?? {}) as Record<string, unknown>;
+  if (error) return { streak: 0, checkedToday: false, nextDay: 1, globalTotal: 0 };
+  return {
+    streak: Number(raw["streak"] ?? 0),
+    checkedToday: Boolean(raw["checked_today"]),
+    nextDay: Number(raw["next_day"] ?? 1),
+    globalTotal: Number(raw["global_total"] ?? 0),
+  };
+}
+
+export async function doCheckin(phone: string): Promise<CheckinResult> {
+  const { data, error } = await supabase.rpc("daily_checkin", {
+    p_device_id: deviceId(),
+    p_phone: phone || "",
+  });
+  if (error) return { ok: false, reason: "error" };
+  const raw = (data ?? {}) as Record<string, unknown>;
+  return {
+    ok: Boolean(raw["ok"]),
+    reason: (raw["reason"] as string | undefined) ?? undefined,
+    day: raw["day"] === undefined ? undefined : Number(raw["day"]),
+    coins: raw["coins"] === undefined ? undefined : Number(raw["coins"]),
+    bonus: raw["bonus"] === undefined ? undefined : Number(raw["bonus"]),
+    globalSeq: raw["global_seq"] === undefined ? undefined : Number(raw["global_seq"]),
+    balance: raw["balance"] === undefined ? undefined : Number(raw["balance"]),
+  };
+}
