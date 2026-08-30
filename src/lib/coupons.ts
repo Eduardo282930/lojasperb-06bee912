@@ -17,8 +17,15 @@ export type Coupon = {
   maxUsesPerCustomer: number | null;
   /** Moedas que o cliente ganha quando o pedido com este cupom é concluído. */
   rewardCoins: number;
-  uses: number;
-  active: boolean;
+  /** Como a recompensa é calculada: valor fixo em moedas ou % da compra. */
+  rewardType: "fixed" | "percent";
+  /** Percentual do valor da compra convertido em moedas (ex.: 50 = 50%). */
+  rewardPercent: number;
+  /** Valor mínimo da compra (R$) para receber as moedas. */
+  rewardMinOrder: number;
+  /** Limite máximo de moedas concedidas (null = sem limite). */
+  rewardMaxCoins: number | null;
+
   /** When set, the coupon is exclusive to this customer's phone. */
   customerPhone: string | null;
 };
