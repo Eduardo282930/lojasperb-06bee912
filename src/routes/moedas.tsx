@@ -173,7 +173,7 @@ function MoedasPage() {
           )}
         </section>
 
-        <section className="mt-4 className="rounded-3xl border-2 border-border bg-card p-5 shadow-lg">
+        <section className="mt-4 rounded-3xl border-2 border-border bg-card p-5 shadow-lg">
           <h2 className="text-xl font-black text-foreground">Como usar</h2>
           <ul className="mt-2 flex flex-col gap-1 text-base font-semibold text-muted-foreground">
             <li>• Cada moeda vale R$ 0,01 de desconto.</li>
