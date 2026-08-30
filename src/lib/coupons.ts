@@ -170,7 +170,20 @@ export async function saveCoupon(coupon: Coupon): Promise<void> {
     min_order: coupon.minOrder,
     max_uses: coupon.maxUses,
     max_uses_per_customer: coupon.maxUsesPerCustomer,
-    reward_coins: Math.max(0, Math.trunc(coupon.rewardCoins || 0)),
+    reward_coins:
+      coupon.rewardType === "percent"
+        ? 0
+        : Math.max(0, Math.trunc(coupon.rewardCoins || 0)),
+    reward_type: coupon.rewardType === "percent" ? "percent" : "fixed",
+    reward_percent:
+      coupon.rewardType === "percent" ? Math.max(0, coupon.rewardPercent || 0) : 0,
+    reward_min_order:
+      coupon.rewardType === "percent" ? Math.max(0, coupon.rewardMinOrder || 0) : 0,
+    reward_max_coins:
+      coupon.rewardType === "percent" && coupon.rewardMaxCoins !== null
+        ? Math.max(0, Math.trunc(coupon.rewardMaxCoins))
+        : null,
+
     active: coupon.active,
     customer_phone: coupon.customerPhone
       ? coupon.customerPhone.replace(/\D/g, "")
