@@ -279,7 +279,7 @@ function PedidosPage() {
               <button
                 key={g.value}
                 ref={active ? activeTabRef : undefined}
-                onClick={() => setStatus(g.value)}
+                onClick={() => goTo(g.value)}
                 className="relative shrink-0 px-3 pb-2 pt-1 text-base font-black transition-colors active:scale-95"
                 style={{ color: active ? BLUE : "var(--muted-foreground)" }}
               >
@@ -320,7 +320,7 @@ function PedidosPage() {
           <div
             ref={trackRef}
             onScroll={onScroll}
-            className="flex snap-x snap-mandatory overflow-x-auto scroll-smooth"
+            className="flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             style={{ scrollbarWidth: "none" }}
           >
             {groups.map((g) => (
