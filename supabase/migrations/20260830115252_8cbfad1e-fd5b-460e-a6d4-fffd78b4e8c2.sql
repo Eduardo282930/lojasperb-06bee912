@@ -1,0 +1,13 @@
+REVOKE ALL ON FUNCTION public.notify_new_exclusive_coupon() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.log_coupon_change() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.touch_updated_at() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.admin_adjust_coins(uuid, integer, text) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.admin_coin_balance(uuid) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.admin_resolve_duplicate(uuid, text) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.admin_set_order_status(uuid, text, text, text) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.claim_admin() FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.admin_adjust_coins(uuid, integer, text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.admin_coin_balance(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.admin_resolve_duplicate(uuid, text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.admin_set_order_status(uuid, text, text, text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.claim_admin() TO authenticated;
