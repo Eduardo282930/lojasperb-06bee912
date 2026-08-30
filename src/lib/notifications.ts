@@ -147,3 +147,18 @@ export function useNotificationPermission() {
     },
   };
 }
+
+/** Admin: cria um aviso para todos os clientes cadastrados (sem repetir). */
+export async function broadcastNotification(
+  kind: string,
+  title: string,
+  body: string,
+): Promise<number> {
+  const { data, error } = await supabase.rpc("admin_broadcast_notification", {
+    p_kind: kind,
+    p_title: title,
+    p_body: body,
+  });
+  if (error) return 0;
+  return Number(data ?? 0);
+}

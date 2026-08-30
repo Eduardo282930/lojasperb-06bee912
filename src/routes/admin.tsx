@@ -48,6 +48,7 @@ import {
 } from "@/lib/orders";
 import { useAdmin, adminSignIn, adminSignOut } from "@/lib/admin";
 import { formatPrice } from "@/lib/cart";
+import { broadcastNotification } from "@/lib/notifications";
 
 export const Route = createFileRoute("/admin")({
   ssr: false,
@@ -502,6 +503,16 @@ function CouponForm({
           className={input}
         />
       )}
+
+      <label className="flex items-center gap-3 text-lg font-bold text-foreground">
+        <input
+          type="checkbox"
+          checked={notifyClients}
+          onChange={(e) => setNotifyClients(e.target.checked)}
+          className="h-6 w-6"
+        />
+        Enviar notificação aos clientes
+      </label>
 
       <label className="text-base font-bold text-foreground">
         Moedas de volta ao concluir o pedido
