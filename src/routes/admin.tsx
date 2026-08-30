@@ -318,6 +318,11 @@ const emptyCoupon: Coupon = {
   maxUses: null,
   maxUsesPerCustomer: null,
   rewardCoins: 0,
+  rewardType: "fixed",
+  rewardPercent: 0,
+  rewardMinOrder: 0,
+  rewardMaxCoins: null,
+
   uses: 0,
   active: true,
   customerPhone: null,
