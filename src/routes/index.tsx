@@ -28,6 +28,7 @@ import {
   fetchReservedStock,
   applyReservations,
   merchandiseOrder,
+  badgeFor,
 } from "@/lib/merchandising";
 
 const PAGE_SIZE = 30;
@@ -192,6 +193,9 @@ function Home() {
 
   const shownResults = results.slice(0, visible);
 
+  const badgeOf = (id: string) =>
+    merch.data ? badgeFor(id, merch.data.featured, merch.data.top) : null;
+
   const categoryChips = showAllCategories
     ? data.categories
     : data.categories.slice(0, 8);
@@ -292,7 +296,7 @@ function Home() {
             {results.length > 0 && (
               <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                 {shownResults.map((p) => (
-                  <ProductCard key={p.id} product={p} />
+                  <ProductCard key={p.id} product={p} badge={badgeOf(p.id)} />
                 ))}
               </ul>
             )}
@@ -356,7 +360,13 @@ function CategoryChip({
   );
 }
 
-function ProductCard({ product }: { product: CatalogProduct }) {
+function ProductCard({
+  product,
+  badge,
+}: {
+  product: CatalogProduct;
+  badge?: { label: string; tone: "featured" | "top" | "offer" } | null;
+}) {
   const navigate = useNavigate();
   const hasVariants = product.variants.length > 1;
   const outOfStock = product.stock <= 0;
@@ -412,6 +422,21 @@ function ProductCard({ product }: { product: CatalogProduct }) {
             <div className="grid h-full w-full place-items-center">
               <ImageOff className="h-10 w-10 text-muted-foreground" />
             </div>
+          )}
+          {badge && (
+            <span
+              className="absolute left-1.5 top-1.5 z-10 rounded-full px-2 py-0.5 text-[11px] font-black text-white shadow"
+              style={{
+                backgroundColor:
+                  badge.tone === "offer"
+                    ? "oklch(0.58 0.22 25)"
+                    : badge.tone === "top"
+                      ? "oklch(0.62 0.19 145)"
+                      : "oklch(0.55 0.22 255)",
+              }}
+            >
+              {badge.label}
+            </span>
           )}
           {outOfStock && (
             <div className="absolute inset-0 grid place-items-center bg-background/70">

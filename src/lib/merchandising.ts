@@ -133,6 +133,38 @@ export function merchandiseOrder(
     const ca = score(a);
     const cb = score(b);
     if (ca !== cb) return cb - ca;
-    return a.name.localeCompare(b.name, "pt-BR");
+    // Sem ordem alfabética: a vitrine varia ao longo do dia.
+    return rotationValue(a.id) - rotationValue(b.id);
   });
+}
+
+/** Chave de rotação que muda a cada 6 horas (mesma ordem para todos no período). */
+function rotationBucket(): number {
+  return Math.floor(Date.now() / (6 * 60 * 60 * 1000));
+}
+
+function rotationValue(id: string): number {
+  const seed = `${id}:${rotationBucket()}`;
+  let h = 2166136261;
+  for (let i = 0; i < seed.length; i++) {
+    h ^= seed.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0) / 4294967295;
+}
+
+/** Selo comercial do produto na vitrine. */
+export function badgeFor(
+  productId: string,
+  featured: FeaturedItem[],
+  topSelling: Map<string, number>,
+): { label: string; tone: "featured" | "top" | "offer" } | null {
+  const manual = featured.find((f) => f.productKey === productId);
+  if (manual) {
+    if (manual.section === "offers") return { label: "Oferta", tone: "offer" };
+    if (manual.section === "bestsellers") return { label: "Mais vendido", tone: "top" };
+    return { label: "Destaque", tone: "featured" };
+  }
+  if ((topSelling.get(productId) ?? 0) > 0) return { label: "Mais vendido", tone: "top" };
+  return null;
 }

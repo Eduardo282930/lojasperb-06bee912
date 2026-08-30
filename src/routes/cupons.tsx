@@ -43,6 +43,7 @@ const GREEN = "oklch(0.62 0.19 145)";
 const GOLD = "oklch(0.72 0.17 62)";
 
 function couponLabel(c: Coupon): string {
+  if (!(c.value > 0)) return "Moedas de volta";
   return c.type === "percent" ? `${c.value}% OFF` : `${formatPrice(c.value)} OFF`;
 }
 
