@@ -343,6 +343,9 @@ function CouponForm({
   const [capped, setCapped] = useState(Boolean(initial?.maxDiscount));
   const [limited, setLimited] = useState(initial?.maxUses != null);
   const [perCustomer, setPerCustomer] = useState(initial?.maxUsesPerCustomer != null);
+  const [hasMinOrder, setHasMinOrder] = useState((initial?.minOrder ?? 0) > 0);
+  const [rewardCapped, setRewardCapped] = useState(initial?.rewardMaxCoins != null);
+
   const [benefit, setBenefit] = useState<"percent" | "fixed" | "coins">(
     initial?.type === "fixed"
       ? "fixed"
