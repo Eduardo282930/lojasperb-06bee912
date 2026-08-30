@@ -483,14 +483,29 @@ function CouponForm({
       )}
 
 
-      <input
-        type="number"
-        min={0}
-        value={draft.minOrder}
-        onChange={(e) => setDraft({ ...draft, minOrder: Number(e.target.value) })}
-        placeholder="Valor mínimo do pedido (R$)"
-        className={input}
-      />
+      <label className="flex items-center gap-3 text-lg font-bold text-foreground">
+        <input
+          type="checkbox"
+          checked={hasMinOrder}
+          onChange={(e) => {
+            setHasMinOrder(e.target.checked);
+            if (!e.target.checked) setDraft({ ...draft, minOrder: 0 });
+          }}
+          className="h-6 w-6"
+        />
+        Exigir valor mínimo do pedido (R$)
+      </label>
+      {hasMinOrder && (
+        <input
+          type="number"
+          min={0}
+          value={draft.minOrder}
+          onChange={(e) => setDraft({ ...draft, minOrder: Number(e.target.value) })}
+          placeholder="Valor mínimo do pedido (R$)"
+          className={input}
+        />
+      )}
+
       <label className="flex items-center gap-3 text-lg font-bold text-foreground">
         <input
           type="checkbox"
