@@ -40,6 +40,7 @@ export const Route = createFileRoute("/cupons")({
 
 const BLUE = "oklch(0.55 0.22 255)";
 const GREEN = "oklch(0.62 0.19 145)";
+const GOLD = "oklch(0.72 0.17 62)";
 
 function couponLabel(c: Coupon): string {
   return c.type === "percent" ? `${c.value}% OFF` : `${formatPrice(c.value)} OFF`;
@@ -112,6 +113,11 @@ function CuponsPage() {
                       {c.maxUsesPerCustomer !== null &&
                         ` · ${used}/${c.maxUsesPerCustomer} usos seus`}
                     </p>
+                    {c.rewardCoins > 0 && (
+                      <p className="mt-1 text-sm font-black" style={{ color: GOLD }}>
+                        🪙 Devolve {c.rewardCoins} moedas quando o pedido for concluído
+                      </p>
+                    )}
                     <p className="mt-1 text-sm font-bold text-foreground">
                       {finished
                         ? "Limite de uso atingido"
@@ -155,6 +161,11 @@ function CuponsPage() {
                       {c.maxUsesPerCustomer !== null &&
                         ` · ${c.maxUsesPerCustomer} uso(s) por cliente`}
                     </p>
+                    {c.rewardCoins > 0 && (
+                      <p className="text-sm font-black" style={{ color: GOLD }}>
+                        🪙 Ganhe {c.rewardCoins} moedas para a próxima compra
+                      </p>
+                    )}
                   </div>
                   <button
                     disabled={claiming === c.id || redeemed.includes(c.id)}
