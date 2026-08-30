@@ -13,6 +13,7 @@ import {
   Trash2,
   Users,
   Coins,
+  Star,
 } from "lucide-react";
 import {
   findCustomerId,
@@ -49,6 +50,15 @@ import {
 import { useAdmin, adminSignIn, adminSignOut } from "@/lib/admin";
 import { formatPrice } from "@/lib/cart";
 import { broadcastNotification } from "@/lib/notifications";
+import { fetchCatalog, type CatalogProduct } from "@/lib/loyverse.functions";
+import {
+  FEATURED_SECTIONS,
+  fetchFeatured,
+  addFeatured,
+  removeFeatured,
+  sectionLabel,
+  type FeaturedSection,
+} from "@/lib/merchandising";
 
 export const Route = createFileRoute("/admin")({
   ssr: false,
@@ -80,7 +90,14 @@ function couponLabel(c: Coupon): string {
   return c.type === "percent" ? `${c.value}% OFF` : `${formatPrice(c.value)} OFF`;
 }
 
-type Section = "home" | "pedidos" | "cupons" | "recibos" | "clientes" | "duplicidades";
+type Section =
+  | "home"
+  | "pedidos"
+  | "cupons"
+  | "recibos"
+  | "clientes"
+  | "destaques"
+  | "duplicidades";
 
 const SECTIONS: {
   id: Exclude<Section, "home">;
@@ -111,6 +128,12 @@ const SECTIONS: {
     label: "Recibos Loyverse",
     hint: "Vendas registradas na loja",
     icon: <Receipt className="h-7 w-7" />,
+  },
+  {
+    id: "destaques",
+    label: "Destaques da vitrine",
+    hint: "Produtos que aparecem primeiro",
+    icon: <Star className="h-7 w-7" />,
   },
   {
     id: "duplicidades",
@@ -201,6 +224,7 @@ function AdminPage() {
         {section === "cupons" && <CouponsPanel />}
         {section === "recibos" && <ReceiptsPanel />}
         {section === "clientes" && <CustomersPanel />}
+        {section === "destaques" && <FeaturedPanel />}
         {section === "duplicidades" && <DuplicatesPanel />}
       </main>
     </div>
@@ -1219,5 +1243,139 @@ function DuplicatesPanel() {
         </li>
       ))}
     </ul>
+  );
+}
+
+
+function FeaturedPanel() {
+  const [section, setSection] = useState<FeaturedSection>("featured");
+  const [search, setSearch] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const catalog = useQuery({
+    queryKey: ["admin", "catalog"],
+    queryFn: () => fetchCatalog(),
+    staleTime: 5 * 60 * 1000,
+  });
+  const featured = useQuery({
+    queryKey: ["admin", "featured"],
+    queryFn: fetchFeatured,
+    staleTime: 30 * 1000,
+  });
+
+  const products: CatalogProduct[] = catalog.data?.products ?? [];
+  const chosen = (featured.data ?? []).filter((f) => f.section === section);
+  const chosenKeys = new Set(chosen.map((f) => f.productKey));
+
+  const term = search.trim().toLowerCase();
+  const results = term
+    ? products.filter((p) => p.name.toLowerCase().includes(term)).slice(0, 20)
+    : [];
+
+  async function add(p: CatalogProduct) {
+    setBusy(true);
+    await addFeatured(p.id, section, chosen.length);
+    await featured.refetch();
+    setBusy(false);
+    setSearch("");
+  }
+
+  async function remove(id: string) {
+    setBusy(true);
+    await removeFeatured(id);
+    await featured.refetch();
+    setBusy(false);
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="grid grid-cols-3 gap-2">
+        {FEATURED_SECTIONS.map((s) => {
+          const active = s.value === section;
+          return (
+            <button
+              key={s.value}
+              onClick={() => setSection(s.value)}
+              className="rounded-2xl border-2 px-2 py-3 text-sm font-black active:scale-95"
+              style={{
+                borderColor: active ? BLUE : "var(--border)",
+                backgroundColor: active ? BLUE : "var(--card)",
+                color: active ? "#fff" : "var(--foreground)",
+              }}
+            >
+              {s.label}
+            </button>
+          );
+        })}
+      </div>
+
+      <p className="text-base font-semibold text-muted-foreground">
+        Sem escolha manual, a vitrine mostra automaticamente os produtos mais vendidos.
+      </p>
+
+      <input
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder="Procurar produto para destacar"
+        className="w-full rounded-2xl border-2 border-border bg-background px-4 py-3 text-lg font-semibold text-foreground outline-none"
+      />
+
+      {results.length > 0 && (
+        <ul className="flex flex-col gap-2">
+          {results.map((p) => (
+            <li
+              key={p.id}
+              className="flex items-center gap-3 rounded-2xl border-2 border-border bg-card p-3"
+            >
+              <span className="min-w-0 flex-1 text-base font-bold text-foreground">
+                {p.name}
+              </span>
+              <button
+                disabled={busy || chosenKeys.has(p.id)}
+                onClick={() => void add(p)}
+                className="rounded-xl px-3 py-2 text-sm font-black text-white disabled:opacity-50"
+                style={{ backgroundColor: GREEN }}
+              >
+                {chosenKeys.has(p.id) ? "Já está" : "Destacar"}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <h2 className="text-xl font-black text-foreground">
+        {sectionLabel(section)} · {chosen.length}
+      </h2>
+      {chosen.length === 0 ? (
+        <p className="rounded-2xl border-2 border-dashed border-border p-5 text-center text-base font-semibold text-muted-foreground">
+          Nenhum produto escolhido nesta seção.
+        </p>
+      ) : (
+        <ul className="flex flex-col gap-2">
+          {chosen.map((f) => {
+            const p = products.find((x) => x.id === f.productKey);
+            return (
+              <li
+                key={f.id}
+                className="flex items-center gap-3 rounded-2xl border-2 border-border bg-card p-3"
+              >
+                <span className="min-w-0 flex-1 text-base font-bold text-foreground">
+                  {p?.name ?? f.productKey}
+                </span>
+                <button
+                  disabled={busy}
+                  onClick={() => void remove(f.id)}
+                  className="grid h-10 w-10 place-items-center rounded-xl text-white disabled:opacity-50"
+                  style={{ backgroundColor: RED }}
+                  aria-label="Remover destaque"
+                >
+                  <Trash2 className="h-5 w-5" />
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
   );
 }
