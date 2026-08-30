@@ -17,8 +17,17 @@ export type Coupon = {
   maxUsesPerCustomer: number | null;
   /** Moedas que o cliente ganha quando o pedido com este cupom é concluído. */
   rewardCoins: number;
+  /** Como a recompensa é calculada: valor fixo em moedas ou % da compra. */
+  rewardType: "fixed" | "percent";
+  /** Percentual do valor da compra convertido em moedas (ex.: 50 = 50%). */
+  rewardPercent: number;
+  /** Valor mínimo da compra (R$) para receber as moedas. */
+  rewardMinOrder: number;
+  /** Limite máximo de moedas concedidas (null = sem limite). */
+  rewardMaxCoins: number | null;
   uses: number;
   active: boolean;
+
   /** When set, the coupon is exclusive to this customer's phone. */
   customerPhone: string | null;
 };
@@ -39,6 +48,11 @@ type CouponRow = {
   max_uses: number | null;
   max_uses_per_customer?: number | null;
   reward_coins?: number | null;
+  reward_type?: string | null;
+  reward_percent?: number | string | null;
+  reward_min_order?: number | string | null;
+  reward_max_coins?: number | null;
+
   uses: number | null;
   active: boolean;
   customer_phone?: string | null;
@@ -61,6 +75,11 @@ function toCoupon(r: CouponRow): Coupon {
     maxUses: r.max_uses ?? null,
     maxUsesPerCustomer: r.max_uses_per_customer ?? null,
     rewardCoins: num(r.reward_coins, 0),
+    rewardType: r.reward_type === "percent" ? "percent" : "fixed",
+    rewardPercent: num(r.reward_percent, 0),
+    rewardMinOrder: num(r.reward_min_order, 0),
+    rewardMaxCoins: r.reward_max_coins ?? null,
+
     uses: r.uses ?? 0,
     active: r.active,
     customerPhone: r.customer_phone ?? null,
@@ -151,7 +170,20 @@ export async function saveCoupon(coupon: Coupon): Promise<void> {
     min_order: coupon.minOrder,
     max_uses: coupon.maxUses,
     max_uses_per_customer: coupon.maxUsesPerCustomer,
-    reward_coins: Math.max(0, Math.trunc(coupon.rewardCoins || 0)),
+    reward_coins:
+      coupon.rewardType === "percent"
+        ? 0
+        : Math.max(0, Math.trunc(coupon.rewardCoins || 0)),
+    reward_type: coupon.rewardType === "percent" ? "percent" : "fixed",
+    reward_percent:
+      coupon.rewardType === "percent" ? Math.max(0, coupon.rewardPercent || 0) : 0,
+    reward_min_order:
+      coupon.rewardType === "percent" ? Math.max(0, coupon.rewardMinOrder || 0) : 0,
+    reward_max_coins:
+      coupon.rewardType === "percent" && coupon.rewardMaxCoins !== null
+        ? Math.max(0, Math.trunc(coupon.rewardMaxCoins))
+        : null,
+
     active: coupon.active,
     customer_phone: coupon.customerPhone
       ? coupon.customerPhone.replace(/\D/g, "")
