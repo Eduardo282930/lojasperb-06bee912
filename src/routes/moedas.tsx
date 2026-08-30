@@ -128,9 +128,8 @@ function MoedasPage() {
         <section className="rounded-3xl border-2 border-border bg-card p-5 shadow-lg">
           <h2 className="text-xl font-black text-foreground">Check-in diário</h2>
           <p className="mt-1 text-base font-semibold text-muted-foreground">
-            Faça o check-in todo dia e ganhe de 1 até 7 moedas. A cada{" "}
-            {CHECKIN_JACKPOT_EVERY} check-ins da loja, quem apertar o botão leva{" "}
-            {CHECKIN_JACKPOT} moedas. Faltam {toJackpot}!
+            Faça o check-in todo dia e ganhe de 1 até 7 moedas. No 7º dia você pode
+            ganhar até {CHECKIN_JACKPOT.toLocaleString("pt-BR")} moedas!
           </p>
 
           <div className="mt-4 grid grid-cols-7 gap-1.5">
