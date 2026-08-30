@@ -2,19 +2,13 @@ import { createFileRoute } from "@tanstack/react-router";
 
 /**
  * Webhook de pagamento aprovado da InfinitePay.
- * Segurança: chave secreta na URL + reconfirmação server-to-server antes de
- * marcar o pedido como pago. Idempotente por `transaction_nsu`.
+ * Segurança: reconfirmação server-to-server (payment_check) antes de marcar o
+ * pedido como pago. Idempotente por `transaction_nsu`.
  */
 export const Route = createFileRoute("/api/public/infinitepay-webhook")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const secret = (process.env["INFINITEPAY_WEBHOOK_SECRET"] ?? "").trim();
-        const key = new URL(request.url).searchParams.get("key") ?? "";
-        if (!secret || key.length !== secret.length || key !== secret) {
-          return new Response("unauthorized", { status: 401 });
-        }
-
         let payload: Record<string, unknown>;
         try {
           payload = (await request.json()) as Record<string, unknown>;
