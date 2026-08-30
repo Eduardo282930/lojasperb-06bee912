@@ -25,6 +25,8 @@ export type Coupon = {
   rewardMinOrder: number;
   /** Limite máximo de moedas concedidas (null = sem limite). */
   rewardMaxCoins: number | null;
+  uses: number;
+  active: boolean;
 
   /** When set, the coupon is exclusive to this customer's phone. */
   customerPhone: string | null;
