@@ -3,6 +3,8 @@ import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Package, ChevronRight } from "lucide-react";
 import { useProfile } from "@/lib/coupons";
+import { useServerFn } from "@tanstack/react-start";
+import { createOrderCheckout } from "@/lib/payments.functions";
 import { formatPrice } from "@/lib/cart";
 import {
   fetchMyOrders,
@@ -12,15 +14,15 @@ import {
   type Order,
 } from "@/lib/orders";
 
-const STATUSES = ["sent", "preparing", "shipping", "delivered", "canceled"] as const;
+const STATUSES = ["topay", "preparing", "shipping", "delivered", "canceled"] as const;
 
 export const Route = createFileRoute("/pedidos")({
   ssr: false,
   validateSearch: (search: Record<string, unknown>) => {
-    const raw = String(search["status"] ?? "sent");
+    const raw = String(search["status"] ?? "topay");
     const status = (STATUSES as readonly string[]).includes(raw)
       ? (raw as (typeof STATUSES)[number])
-      : ("sent" as const);
+      : ("topay" as const);
     return { status };
   },
 
@@ -78,6 +80,21 @@ function Progress({ status }: { status: string }) {
 
 function OrderCard({ order, phone }: { order: Order; phone: string }) {
   const [open, setOpen] = useState(false);
+  const [paying, setPaying] = useState(false);
+  const startCheckout = useServerFn(createOrderCheckout);
+  const unpaid = order.paymentStatus !== "paid" && order.status !== "canceled";
+
+  async function pagar() {
+    if (paying) return;
+    setPaying(true);
+    try {
+      const res = await startCheckout({ data: { orderId: order.id } });
+      if (res.url) window.location.href = res.url;
+    } finally {
+      setPaying(false);
+    }
+  }
+
   const timeline = useQuery({
     queryKey: ["order-timeline", order.id],
     queryFn: () => fetchOrderTimeline(order.id, phone),
@@ -135,6 +152,17 @@ function OrderCard({ order, phone }: { order: Order; phone: string }) {
         </p>
       )}
 
+      {unpaid && (
+        <button
+          onClick={() => void pagar()}
+          disabled={paying}
+          className="mt-3 w-full rounded-2xl px-4 py-3 text-lg font-black text-white disabled:opacity-60 active:scale-[0.98]"
+          style={{ backgroundColor: BLUE }}
+        >
+          {paying ? "Abrindo pagamento…" : `Pagar ${formatPrice(order.total)} · Pix ou cartão`}
+        </button>
+      )}
+
       <button
         onClick={() => setOpen((v) => !v)}
         className="mt-3 inline-flex items-center gap-1 rounded-xl bg-muted px-3 py-2 text-base font-black text-foreground"
@@ -162,7 +190,7 @@ function OrderCard({ order, phone }: { order: Order; phone: string }) {
 }
 
 const SECTIONS = [
-  { value: "sent", label: "Recebido" },
+  { value: "topay", label: "A pagar" },
   { value: "preparing", label: "Preparando" },
   { value: "shipping", label: "A caminho" },
   { value: "delivered", label: "Entregue" },
@@ -182,9 +210,16 @@ function PedidosPage() {
   });
 
   const orders = data ?? [];
+  function bucket(o: Order): StatusValue {
+    if (o.status === "canceled") return "canceled";
+    if (o.status === "delivered") return "delivered";
+    if (o.paymentStatus !== "paid") return "topay";
+    if (o.status === "shipping") return "shipping";
+    return "preparing";
+  }
   const groups = SECTIONS.map((s) => ({
     ...s,
-    list: orders.filter((o) => (o.status || "sent") === s.value),
+    list: orders.filter((o) => bucket(o) === s.value),
   }));
 
   const activeIndex = Math.max(0, SECTIONS.findIndex((s) => s.value === status));

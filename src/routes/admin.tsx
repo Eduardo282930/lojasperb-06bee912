@@ -14,6 +14,7 @@ import {
   Users,
   Coins,
   Star,
+  CreditCard,
 } from "lucide-react";
 import {
   findCustomerId,
@@ -48,6 +49,7 @@ import {
   type Order,
 } from "@/lib/orders";
 import { useAdmin, adminSignIn, adminSignOut } from "@/lib/admin";
+import { paymentsStatus } from "@/lib/payments.functions";
 import { formatPrice } from "@/lib/cart";
 import { broadcastNotification } from "@/lib/notifications";
 import { fetchCatalog, type CatalogProduct } from "@/lib/loyverse.functions";
@@ -87,6 +89,7 @@ const GREEN = "oklch(0.62 0.19 145)";
 const RED = "oklch(0.58 0.22 25)";
 
 function couponLabel(c: Coupon): string {
+  if (!(c.value > 0)) return "Moedas de volta";
   return c.type === "percent" ? `${c.value}% OFF` : `${formatPrice(c.value)} OFF`;
 }
 
@@ -97,6 +100,7 @@ type Section =
   | "recibos"
   | "clientes"
   | "destaques"
+  | "pagamentos"
   | "duplicidades";
 
 const SECTIONS: {
@@ -134,6 +138,12 @@ const SECTIONS: {
     label: "Destaques da vitrine",
     hint: "Produtos que aparecem primeiro",
     icon: <Star className="h-7 w-7" />,
+  },
+  {
+    id: "pagamentos",
+    label: "Configurações · Pagamentos",
+    hint: "InfinitePay: Pix e cartão",
+    icon: <CreditCard className="h-7 w-7" />,
   },
   {
     id: "duplicidades",
@@ -225,6 +235,7 @@ function AdminPage() {
         {section === "recibos" && <ReceiptsPanel />}
         {section === "clientes" && <CustomersPanel />}
         {section === "destaques" && <FeaturedPanel />}
+        {section === "pagamentos" && <PaymentsPanel />}
         {section === "duplicidades" && <DuplicatesPanel />}
       </main>
     </div>
@@ -1223,27 +1234,6 @@ function OrdersPanel() {
             </p>
           )}
 
-          <div className="mt-3 flex flex-wrap gap-2">
-            {ORDER_STATUSES.map((st) => {
-              const activeStep = o.status === st.value;
-              return (
-                <button
-                  key={st.value}
-                  disabled={busy === o.id || activeStep}
-                  onClick={() => void change(o, st.value, o.paymentStatus)}
-                  className={`rounded-xl border-2 px-3 py-2 text-sm font-black active:scale-95 disabled:opacity-100 ${
-                    activeStep
-                      ? "border-transparent text-white"
-                      : "border-border bg-background text-foreground"
-                  }`}
-                  style={activeStep ? { backgroundColor: BLUE } : undefined}
-                >
-                  {st.label}
-                </button>
-              );
-            })}
-          </div>
-
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <select
               value={o.status}
@@ -1273,7 +1263,19 @@ function OrdersPanel() {
             </select>
             <span className="text-sm font-bold text-muted-foreground">
               {statusLabel(o.status)} · {paymentLabel(o.paymentStatus)}
+              {o.paymentMethod ? ` · ${o.paymentMethod === "pix" ? "Pix" : "Cartão"}` : ""}
             </span>
+            {o.receiptUrl && (
+              <a
+                href={o.receiptUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="text-sm font-black underline"
+                style={{ color: BLUE }}
+              >
+                Comprovante
+              </a>
+            )}
           </div>
         </li>
       ))}
@@ -1483,6 +1485,51 @@ function FeaturedPanel() {
           })}
         </ul>
       )}
+    </div>
+  );
+}
+
+/* --------------------- Configurações · Pagamentos ---------------------- */
+
+function PaymentsPanel() {
+  const status = useQuery({
+    queryKey: ["payments-status"],
+    queryFn: () => paymentsStatus(),
+    staleTime: 60 * 1000,
+  });
+
+  const ok = status.data?.configured ?? false;
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="rounded-3xl border-2 border-border bg-card p-5">
+        <h2 className="text-xl font-black text-foreground">InfinitePay · Checkout</h2>
+        <p className="mt-1 text-base font-semibold text-muted-foreground">
+          Pagamento no app por Pix ou cartão. O pedido só vira venda depois da
+          confirmação real do pagamento.
+        </p>
+        <p
+          className="mt-3 inline-block rounded-2xl px-4 py-2 text-base font-black text-white"
+          style={{ backgroundColor: ok ? GREEN : RED }}
+        >
+          {status.isLoading
+            ? "Verificando…"
+            : ok
+              ? "Credenciais configuradas"
+              : "Credenciais pendentes"}
+        </p>
+        {ok && status.data?.handlePreview && (
+          <p className="mt-2 text-base font-bold text-muted-foreground">
+            InfiniteTag: {status.data.handlePreview}
+          </p>
+        )}
+        <ul className="mt-4 flex flex-col gap-1 text-base font-semibold text-muted-foreground">
+          <li>• As chaves ficam guardadas apenas no servidor (Secrets).</li>
+          <li>• Cada pedido usa um identificador único no InfinitePay.</li>
+          <li>• O aviso de pagamento é reconferido antes de liberar o pedido.</li>
+          <li>• Pago automaticamente muda o pedido para “Em preparação”.</li>
+        </ul>
+      </div>
     </div>
   );
 }

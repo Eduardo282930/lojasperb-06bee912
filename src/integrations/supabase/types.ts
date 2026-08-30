@@ -800,7 +800,13 @@ export type Database = {
           items: Json
           loyverse_receipt_id: string | null
           notes: string
+          paid_at: string | null
+          payment_id: string | null
+          payment_method: string
+          payment_provider: string
+          payment_receipt_url: string | null
           payment_status: string
+          payment_url: string | null
           status: string
           store_key: string
           subtotal: number
@@ -824,7 +830,13 @@ export type Database = {
           items?: Json
           loyverse_receipt_id?: string | null
           notes?: string
+          paid_at?: string | null
+          payment_id?: string | null
+          payment_method?: string
+          payment_provider?: string
+          payment_receipt_url?: string | null
           payment_status?: string
+          payment_url?: string | null
           status?: string
           store_key?: string
           subtotal?: number
@@ -848,7 +860,13 @@ export type Database = {
           items?: Json
           loyverse_receipt_id?: string | null
           notes?: string
+          paid_at?: string | null
+          payment_id?: string | null
+          payment_method?: string
+          payment_provider?: string
+          payment_receipt_url?: string | null
           payment_status?: string
+          payment_url?: string | null
           status?: string
           store_key?: string
           subtotal?: number
@@ -869,6 +887,50 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payment_events: {
+        Row: {
+          amount: number
+          created_at: string
+          external_id: string
+          id: string
+          order_id: string | null
+          provider: string
+          raw: Json
+          status: string
+          store_key: string
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          external_id: string
+          id?: string
+          order_id?: string | null
+          provider?: string
+          raw?: Json
+          status?: string
+          store_key?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          external_id?: string
+          id?: string
+          order_id?: string | null
+          provider?: string
+          raw?: Json
+          status?: string
+          store_key?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_events_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
             referencedColumns: ["id"]
           },
         ]
@@ -988,6 +1050,18 @@ export type Database = {
           reason: string
         }[]
       }
+      confirm_order_payment: {
+        Args: {
+          p_amount: number
+          p_external_id: string
+          p_method: string
+          p_order_id: string
+          p_provider: string
+          p_raw: Json
+          p_receipt_url: string
+        }
+        Returns: boolean
+      }
       consume_coupon: { Args: { p_coupon_id: string }; Returns: boolean }
       coupon_uses_for_customer: {
         Args: { p_device_id: string; p_phone: string }
@@ -1074,6 +1148,7 @@ export type Database = {
         }
         Returns: string
       }
+      customer_exists: { Args: { p_phone: string }; Returns: boolean }
       daily_checkin: {
         Args: { p_device_id: string; p_phone: string }
         Returns: Json
@@ -1141,6 +1216,10 @@ export type Database = {
       save_customer: {
         Args: { p_device_id: string; p_name: string; p_phone: string }
         Returns: string
+      }
+      set_order_payment_link: {
+        Args: { p_order_id: string; p_provider: string; p_url: string }
+        Returns: boolean
       }
       top_selling_products: {
         Args: never

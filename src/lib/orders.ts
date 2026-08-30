@@ -22,6 +22,9 @@ export type Order = {
   total: number;
   status: string;
   paymentStatus: string;
+  paymentMethod?: string;
+  paymentUrl?: string | null;
+  receiptUrl?: string | null;
 };
 
 /* ------------------------- Status do pedido ---------------------------- */
@@ -58,8 +61,8 @@ export async function recordOrder(input: {
   total: number;
   couponCode: string;
   coins?: number;
-}): Promise<void> {
-  const { error } = await supabase.rpc("create_order", {
+}): Promise<string | null> {
+  const { data, error } = await supabase.rpc("create_order", {
     p_device_id: deviceId(),
     p_name: input.name,
     p_phone: input.phone,
@@ -70,7 +73,11 @@ export async function recordOrder(input: {
     p_coupon_code: input.couponCode,
     p_coins: Math.max(0, Math.trunc(input.coins ?? 0)),
   });
-  if (error) console.warn("[recordOrder] falhou", error);
+  if (error) {
+    console.warn("[recordOrder] falhou", error);
+    return null;
+  }
+  return (data as string | null) ?? null;
 }
 
 function num(v: unknown): number {
@@ -102,6 +109,9 @@ export async function fetchOrders(): Promise<Order[]> {
     total: num(r.total),
     status: r.status,
     paymentStatus: (r as { payment_status?: string }).payment_status ?? "pending",
+    paymentMethod: (r as { payment_method?: string }).payment_method ?? "",
+    paymentUrl: (r as { payment_url?: string | null }).payment_url ?? null,
+    receiptUrl: (r as { payment_receipt_url?: string | null }).payment_receipt_url ?? null,
   }));
 }
 
