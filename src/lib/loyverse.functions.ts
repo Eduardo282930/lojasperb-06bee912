@@ -445,22 +445,41 @@ async function buildCatalog(token: string): Promise<Catalog> {
 }
 
 /** Janela de cache em memória do servidor (evita estourar a API do Loyverse). */
-const FRESH_MS = 5_000;
+const FRESH_MS = 20_000;
+/** Até este limite servimos a cópia em memória e atualizamos em segundo plano. */
+const STALE_MS = 5 * 60_000;
 
 let memoryCatalog: { at: number; catalog: Catalog } | null = null;
+let refreshing: Promise<Catalog> | null = null;
 
 /** Reconstrói o catálogo direto do Loyverse (fonte única de verdade). */
 export async function syncCatalogFromLoyverse(): Promise<Catalog> {
-  const token = process.env.LOYVERSE_TOKEN;
-  if (!token) throw new Error("LOYVERSE_TOKEN ausente");
-  const catalog = await buildCatalog(token);
-  memoryCatalog = { at: Date.now(), catalog };
-  return catalog;
+  if (refreshing) return refreshing;
+  refreshing = (async () => {
+    const token = process.env.LOYVERSE_TOKEN;
+    if (!token) throw new Error("LOYVERSE_TOKEN ausente");
+    const catalog = await buildCatalog(token);
+    memoryCatalog = { at: Date.now(), catalog };
+    return catalog;
+  })();
+  try {
+    return await refreshing;
+  } finally {
+    refreshing = null;
+  }
 }
 
 /** O catálogo vem SOMENTE do Loyverse, com cache curto em memória. */
 async function getCatalog(): Promise<Catalog> {
-  if (memoryCatalog && Date.now() - memoryCatalog.at < FRESH_MS) {
+  const age = memoryCatalog ? Date.now() - memoryCatalog.at : Infinity;
+  if (memoryCatalog && age < FRESH_MS) {
+    return memoryCatalog.catalog;
+  }
+  // Resposta imediata com a cópia recente enquanto atualiza em segundo plano.
+  if (memoryCatalog && age < STALE_MS) {
+    void syncCatalogFromLoyverse().catch((err) =>
+      console.error("[Catalog] atualização em segundo plano falhou:", err),
+    );
     return memoryCatalog.catalog;
   }
   try {
