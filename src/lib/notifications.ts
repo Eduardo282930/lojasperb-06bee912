@@ -121,14 +121,28 @@ export function useNotificationWatcher(phone: string) {
 /** Estado da permissão para uso na interface. */
 export function useNotificationPermission() {
   const [state, setState] = useState<NotificationPermission | "unsupported">("default");
+  const [justEnabled, setJustEnabled] = useState(false);
   useEffect(() => {
     setState(notificationPermission());
   }, []);
   return {
     state,
+    justEnabled,
     async request() {
       const next = await askNotificationPermission();
       setState(next);
+      if (next === "granted") {
+        setJustEnabled(true);
+        try {
+          new Notification("🔔 Notificações ativadas!", {
+            body: "Muito obrigado por ativar os avisos da SPERB. Você receberá novidades, cupons, ofertas e benefícios por aqui.",
+            icon: "/favicon.svg",
+            tag: "sperb-welcome",
+          });
+        } catch {
+          /* navegador bloqueou — a confirmação na tela já aparece */
+        }
+      }
       return next;
     },
   };
