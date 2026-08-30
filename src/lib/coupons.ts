@@ -15,6 +15,8 @@ export type Coupon = {
   maxUses: number | null;
   /** Limite de usos por cliente (null = sem limite pessoal). */
   maxUsesPerCustomer: number | null;
+  /** Moedas que o cliente ganha quando o pedido com este cupom é concluído. */
+  rewardCoins: number;
   uses: number;
   active: boolean;
   /** When set, the coupon is exclusive to this customer's phone. */
@@ -36,6 +38,7 @@ type CouponRow = {
   min_order: number | string | null;
   max_uses: number | null;
   max_uses_per_customer?: number | null;
+  reward_coins?: number | null;
   uses: number | null;
   active: boolean;
   customer_phone?: string | null;
@@ -57,6 +60,7 @@ function toCoupon(r: CouponRow): Coupon {
     minOrder: num(r.min_order),
     maxUses: r.max_uses ?? null,
     maxUsesPerCustomer: r.max_uses_per_customer ?? null,
+    rewardCoins: num(r.reward_coins, 0),
     uses: r.uses ?? 0,
     active: r.active,
     customerPhone: r.customer_phone ?? null,
@@ -147,6 +151,7 @@ export async function saveCoupon(coupon: Coupon): Promise<void> {
     min_order: coupon.minOrder,
     max_uses: coupon.maxUses,
     max_uses_per_customer: coupon.maxUsesPerCustomer,
+    reward_coins: Math.max(0, Math.trunc(coupon.rewardCoins || 0)),
     active: coupon.active,
     customer_phone: coupon.customerPhone
       ? coupon.customerPhone.replace(/\D/g, "")
