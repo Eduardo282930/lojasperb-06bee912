@@ -14,6 +14,7 @@ import {
   UserRound,
   Sparkles,
 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { fetchCatalog, type CatalogProduct } from "@/lib/loyverse.functions";
 import { addToCart, useCart, formatPrice, syncCartPrices } from "@/lib/cart";
 import { fuzzyScore, STRONG_MATCH } from "@/lib/search";
@@ -21,6 +22,13 @@ import { flyToCart } from "@/lib/fly";
 import { shareProduct } from "@/lib/share";
 import { filterCommercialProducts } from "@/lib/product-filters";
 import { StoreLogoWithFallback } from "@/components/store-logo";
+import {
+  fetchFeatured,
+  fetchTopSelling,
+  fetchReservedStock,
+  applyReservations,
+  merchandiseOrder,
+} from "@/lib/merchandising";
 
 const PAGE_SIZE = 30;
 
