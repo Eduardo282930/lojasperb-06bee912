@@ -1127,6 +1127,7 @@ export type Database = {
         Returns: {
           product_key: string
           qty: number
+          variant_id: string
         }[]
       }
       upsert_customer_from_loyverse: {
