@@ -227,6 +227,10 @@ export type Database = {
           max_uses_per_customer: number | null
           min_order: number
           reward_coins: number
+          reward_max_coins: number | null
+          reward_min_order: number
+          reward_percent: number
+          reward_type: string
           store_key: string
           type: string
           updated_at: string
@@ -246,6 +250,10 @@ export type Database = {
           max_uses_per_customer?: number | null
           min_order?: number
           reward_coins?: number
+          reward_max_coins?: number | null
+          reward_min_order?: number
+          reward_percent?: number
+          reward_type?: string
           store_key?: string
           type?: string
           updated_at?: string
@@ -265,6 +273,10 @@ export type Database = {
           max_uses_per_customer?: number | null
           min_order?: number
           reward_coins?: number
+          reward_max_coins?: number | null
+          reward_min_order?: number
+          reward_percent?: number
+          reward_type?: string
           store_key?: string
           type?: string
           updated_at?: string
@@ -999,6 +1011,10 @@ export type Database = {
           max_uses_per_customer: number | null
           min_order: number
           reward_coins: number
+          reward_max_coins: number | null
+          reward_min_order: number
+          reward_percent: number
+          reward_type: string
           store_key: string
           type: string
           updated_at: string
@@ -1027,6 +1043,10 @@ export type Database = {
           max_uses_per_customer: number | null
           min_order: number
           reward_coins: number
+          reward_max_coins: number | null
+          reward_min_order: number
+          reward_percent: number
+          reward_type: string
           store_key: string
           type: string
           updated_at: string
