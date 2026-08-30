@@ -12,7 +12,6 @@ import {
   doCheckin,
   CHECKIN_REWARDS,
   CHECKIN_JACKPOT,
-  CHECKIN_JACKPOT_EVERY,
 } from "@/lib/coins";
 import { formatPrice } from "@/lib/cart";
 
@@ -145,9 +144,15 @@ function MoedasPage() {
                   style={done ? { backgroundColor: GOLD_DARK } : undefined}
                 >
                   <span className="block text-base font-black">
-                    {done ? <Check className="mx-auto h-5 w-5" strokeWidth={3} /> : `+${reward}`}
+                    {done ? (
+                      <Check className="mx-auto h-5 w-5" strokeWidth={3} />
+                    ) : (
+                      `+${reward}`
+                    )}
                   </span>
-                  <span className="block text-[11px] font-bold opacity-80">Dia {day}</span>
+                  <span className="block text-[11px] font-bold opacity-80">
+                    {day === 7 ? "Dia 7 🎁" : `Dia ${day}`}
+                  </span>
                 </div>
               );
             })}
