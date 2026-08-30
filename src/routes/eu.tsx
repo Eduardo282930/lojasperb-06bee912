@@ -52,7 +52,7 @@ function initials(name: string): string {
 }
 
 const PURCHASE_TABS = [
-  { status: "sent", label: "Recebido", icon: ClipboardList },
+  { status: "topay", label: "A pagar", icon: ClipboardList },
   { status: "preparing", label: "Preparando", icon: Package },
   { status: "shipping", label: "A caminho", icon: Truck },
   { status: "delivered", label: "Entregue", icon: CheckCircle2 },
@@ -106,7 +106,14 @@ function EuPage() {
   });
   const ordersByStatus = (ordersQuery.data ?? []).reduce<Record<string, number>>(
     (acc, o) => {
-      const k = o.status || "sent";
+      const k =
+        o.status === "canceled" || o.status === "delivered"
+          ? o.status
+          : o.paymentStatus !== "paid"
+            ? "topay"
+            : o.status === "shipping"
+              ? "shipping"
+              : "preparing";
       acc[k] = (acc[k] ?? 0) + 1;
       return acc;
     },
@@ -223,7 +230,7 @@ function EuPage() {
             <h2 className="text-xl font-black text-foreground">Minhas compras</h2>
             <Link
               to="/pedidos"
-              search={{ status: "sent" }}
+              search={{ status: "topay" }}
               className="flex items-center gap-1 text-base font-bold text-muted-foreground"
             >
               Histórico <ChevronRight className="h-5 w-5" />
