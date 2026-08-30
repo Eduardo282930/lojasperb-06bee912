@@ -561,17 +561,95 @@ function CouponForm({
         Enviar notificação aos clientes
       </label>
 
-      <label className="text-base font-bold text-foreground">
+      <p className="text-base font-black text-muted-foreground">
         Moedas de volta ao concluir o pedido
+      </p>
+      <div className="grid grid-cols-2 gap-2">
+        {(
+          [
+            { id: "fixed" as const, label: "Valor fixo" },
+            { id: "percent" as const, label: "% da compra" },
+          ]
+        ).map((r) => {
+          const active = draft.rewardType === r.id;
+          return (
+            <button
+              key={r.id}
+              type="button"
+              onClick={() => setDraft({ ...draft, rewardType: r.id })}
+              className="rounded-2xl border-2 py-3 text-base font-black active:scale-95"
+              style={{
+                borderColor: active ? BLUE : "var(--border)",
+                backgroundColor: active ? BLUE : "var(--card)",
+                color: active ? "#fff" : "var(--foreground)",
+              }}
+            >
+              {r.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {draft.rewardType === "fixed" ? (
         <input
           type="number"
           min={0}
           value={draft.rewardCoins}
           onChange={(e) => setDraft({ ...draft, rewardCoins: Number(e.target.value) })}
-          placeholder="0"
+          placeholder="Moedas (ex: 500)"
           className={input}
         />
-      </label>
+      ) : (
+        <>
+          <input
+            type="number"
+            min={0}
+            max={100}
+            value={draft.rewardPercent}
+            onChange={(e) =>
+              setDraft({ ...draft, rewardPercent: Number(e.target.value) })
+            }
+            placeholder="% da compra em moedas (ex: 50)"
+            className={input}
+          />
+          <input
+            type="number"
+            min={0}
+            value={draft.rewardMinOrder}
+            onChange={(e) =>
+              setDraft({ ...draft, rewardMinOrder: Number(e.target.value) })
+            }
+            placeholder="Compra mínima para ganhar moedas (R$)"
+            className={input}
+          />
+          <label className="flex items-center gap-3 text-lg font-bold text-foreground">
+            <input
+              type="checkbox"
+              checked={rewardCapped}
+              onChange={(e) => setRewardCapped(e.target.checked)}
+              className="h-6 w-6"
+            />
+            Limitar moedas máximas
+          </label>
+          {rewardCapped && (
+            <input
+              type="number"
+              min={0}
+              value={draft.rewardMaxCoins ?? 0}
+              onChange={(e) =>
+                setDraft({ ...draft, rewardMaxCoins: Number(e.target.value) })
+              }
+              placeholder="Máximo de moedas (1.000 moedas = R$ 10,00)"
+              className={input}
+            />
+          )}
+          <p className="text-sm text-muted-foreground">
+            Ex.: 50% em uma compra de R$ 10,00 gera R$ 5,00 em moedas (500 moedas),
+            respeitando o limite máximo.
+          </p>
+        </>
+      )}
+
 
       <button
         onClick={() => void submit()}
