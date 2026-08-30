@@ -14,6 +14,7 @@ import {
   UserRound,
   Sparkles,
 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { fetchCatalog, type CatalogProduct } from "@/lib/loyverse.functions";
 import { addToCart, useCart, formatPrice, syncCartPrices } from "@/lib/cart";
 import { fuzzyScore, STRONG_MATCH } from "@/lib/search";
@@ -21,6 +22,13 @@ import { flyToCart } from "@/lib/fly";
 import { shareProduct } from "@/lib/share";
 import { filterCommercialProducts } from "@/lib/product-filters";
 import { StoreLogoWithFallback } from "@/components/store-logo";
+import {
+  fetchFeatured,
+  fetchTopSelling,
+  fetchReservedStock,
+  applyReservations,
+  merchandiseOrder,
+} from "@/lib/merchandising";
 
 const PAGE_SIZE = 30;
 
@@ -91,11 +99,31 @@ function Home() {
   const [category, setCategory] = useState<string>("todos");
   const [showAllCategories, setShowAllCategories] = useState(false);
 
+  // Vitrine comercial: destaques do admin, mais vendidos e estoque reservado.
+  const merch = useQuery({
+    queryKey: ["merchandising"],
+    queryFn: async () => {
+      const [featured, top, reserved] = await Promise.all([
+        fetchFeatured(),
+        fetchTopSelling(),
+        fetchReservedStock(),
+      ]);
+      return { featured, top, reserved };
+    },
+    staleTime: 60 * 1000,
+    retry: 0,
+  });
+
   // Filter out system products (e.g., store logo)
-  const commercialProducts = useMemo(
-    () => filterCommercialProducts(data.products),
-    [data.products]
-  );
+  const commercialProducts = useMemo(() => {
+    const base = filterCommercialProducts(data.products);
+    const withStock = merch.data
+      ? applyReservations(base, merch.data.reserved)
+      : base;
+    return merch.data
+      ? merchandiseOrder(withStock, merch.data.featured, merch.data.top)
+      : withStock;
+  }, [data.products, merch.data]);
 
   const byCategory = useMemo(() => {
     if (category === "todos") return commercialProducts;

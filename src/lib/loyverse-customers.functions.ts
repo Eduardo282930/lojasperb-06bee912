@@ -123,14 +123,21 @@ export const fetchReceipts = createServerFn({ method: "GET" }).handler(
     const token = process.env["LOYVERSE_TOKEN"];
     if (!token) throw new Error("LOYVERSE_TOKEN não configurado");
 
-    // O plano atual do Loyverse só libera recibos dos últimos 31 dias.
-    const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-    const path = `receipts?limit=250&created_at_min=${encodeURIComponent(since)}`;
+    // Alvo: 90 dias. Planos sem histórico ilimitado só liberam 31 dias,
+    // então caímos automaticamente para 30 dias em vez de quebrar a tela.
+    const day = 24 * 60 * 60 * 1000;
+    async function receiptsSince(days: number) {
+      const since = new Date(Date.now() - days * day).toISOString();
+      return loyverse<{ receipts?: LoyverseReceipt[] }>(
+        `receipts?limit=250&created_at_min=${encodeURIComponent(since)}`,
+        token!,
+      );
+    }
 
     const [receiptsRes, customersRes] = await Promise.all([
-      loyverse<{ receipts?: LoyverseReceipt[] }>(path, token).catch(() => ({
-        receipts: [] as LoyverseReceipt[],
-      })),
+      receiptsSince(90)
+        .catch(() => receiptsSince(30))
+        .catch(() => ({ receipts: [] as LoyverseReceipt[] })),
       loyverse<{ customers?: LoyverseCustomer[] }>("customers?limit=250", token).catch(
         () => ({ customers: [] as LoyverseCustomer[] }),
       ),
