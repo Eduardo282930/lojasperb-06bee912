@@ -564,6 +564,36 @@ export type Database = {
         }
         Relationships: []
       }
+      featured_products: {
+        Row: {
+          created_at: string
+          id: string
+          position: number
+          product_key: string
+          section: string
+          store_key: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          position?: number
+          product_key: string
+          section?: string
+          store_key?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          position?: number
+          product_key?: string
+          section?: string
+          store_key?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       inventory_movements: {
         Row: {
           created_at: string
@@ -697,6 +727,50 @@ export type Database = {
           },
         ]
       }
+      order_stock_reservations: {
+        Row: {
+          active: boolean
+          created_at: string
+          external_variant_id: string | null
+          id: string
+          order_id: string
+          product_key: string
+          qty: number
+          store_key: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          external_variant_id?: string | null
+          id?: string
+          order_id: string
+          product_key?: string
+          qty?: number
+          store_key?: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          external_variant_id?: string | null
+          id?: string
+          order_id?: string
+          product_key?: string
+          qty?: number
+          store_key?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_stock_reservations_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       orders: {
         Row: {
           coins_discount: number
@@ -709,13 +783,16 @@ export type Database = {
           customer_phone: string
           device_id: string
           discount: number
+          flow_state: string
           id: string
           items: Json
+          loyverse_receipt_id: string | null
           notes: string
           payment_status: string
           status: string
           store_key: string
           subtotal: number
+          sync_error: string | null
           total: number
           updated_at: string
         }
@@ -730,13 +807,16 @@ export type Database = {
           customer_phone?: string
           device_id?: string
           discount?: number
+          flow_state?: string
           id?: string
           items?: Json
+          loyverse_receipt_id?: string | null
           notes?: string
           payment_status?: string
           status?: string
           store_key?: string
           subtotal?: number
+          sync_error?: string | null
           total?: number
           updated_at?: string
         }
@@ -751,13 +831,16 @@ export type Database = {
           customer_phone?: string
           device_id?: string
           discount?: number
+          flow_state?: string
           id?: string
           items?: Json
+          loyverse_receipt_id?: string | null
           notes?: string
           payment_status?: string
           status?: string
           store_key?: string
           subtotal?: number
+          sync_error?: string | null
           total?: number
           updated_at?: string
         }
@@ -844,7 +927,19 @@ export type Database = {
         Args: { p_customer_id: string; p_delta: number; p_reason: string }
         Returns: number
       }
+      admin_broadcast_notification: {
+        Args: { p_body: string; p_kind: string; p_title: string }
+        Returns: number
+      }
       admin_coin_balance: { Args: { p_customer_id: string }; Returns: number }
+      admin_mark_receipt_synced: {
+        Args: { p_order_id: string; p_receipt_id: string }
+        Returns: boolean
+      }
+      admin_mark_sync_error: {
+        Args: { p_error: string; p_order_id: string }
+        Returns: boolean
+      }
       admin_resolve_duplicate: {
         Args: { p_action: string; p_id: string }
         Returns: boolean
@@ -1011,6 +1106,14 @@ export type Database = {
           total: number
         }[]
       }
+      reserved_stock: {
+        Args: never
+        Returns: {
+          external_variant_id: string
+          product_key: string
+          qty: number
+        }[]
+      }
       resolve_customer: {
         Args: { p_device_id: string; p_phone: string }
         Returns: string
@@ -1018,6 +1121,13 @@ export type Database = {
       save_customer: {
         Args: { p_device_id: string; p_name: string; p_phone: string }
         Returns: string
+      }
+      top_selling_products: {
+        Args: never
+        Returns: {
+          product_key: string
+          qty: number
+        }[]
       }
       upsert_customer_from_loyverse: {
         Args: {
