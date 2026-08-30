@@ -75,6 +75,11 @@ function toCoupon(r: CouponRow): Coupon {
     maxUses: r.max_uses ?? null,
     maxUsesPerCustomer: r.max_uses_per_customer ?? null,
     rewardCoins: num(r.reward_coins, 0),
+    rewardType: r.reward_type === "percent" ? "percent" : "fixed",
+    rewardPercent: num(r.reward_percent, 0),
+    rewardMinOrder: num(r.reward_min_order, 0),
+    rewardMaxCoins: r.reward_max_coins ?? null,
+
     uses: r.uses ?? 0,
     active: r.active,
     customerPhone: r.customer_phone ?? null,
