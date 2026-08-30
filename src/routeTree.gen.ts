@@ -19,6 +19,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as ProdutoIdRouteImport } from './routes/produto.$id'
 import { Route as ApiPublicSyncCatalogRouteImport } from './routes/api/public/sync-catalog'
 import { Route as ApiPublicManifestRouteImport } from './routes/api/public/manifest'
+import { Route as ApiPublicInfinitepayWebhookRouteImport } from './routes/api/public/infinitepay-webhook'
 
 const SacolaRoute = SacolaRouteImport.update({
   id: '/sacola',
@@ -70,6 +71,12 @@ const ApiPublicManifestRoute = ApiPublicManifestRouteImport.update({
   path: '/api/public/manifest',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicInfinitepayWebhookRoute =
+  ApiPublicInfinitepayWebhookRouteImport.update({
+    id: '/api/public/infinitepay-webhook',
+    path: '/api/public/infinitepay-webhook',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -80,6 +87,7 @@ export interface FileRoutesByFullPath {
   '/pedidos': typeof PedidosRoute
   '/sacola': typeof SacolaRoute
   '/produto/$id': typeof ProdutoIdRoute
+  '/api/public/infinitepay-webhook': typeof ApiPublicInfinitepayWebhookRoute
   '/api/public/manifest': typeof ApiPublicManifestRoute
   '/api/public/sync-catalog': typeof ApiPublicSyncCatalogRoute
 }
@@ -92,6 +100,7 @@ export interface FileRoutesByTo {
   '/pedidos': typeof PedidosRoute
   '/sacola': typeof SacolaRoute
   '/produto/$id': typeof ProdutoIdRoute
+  '/api/public/infinitepay-webhook': typeof ApiPublicInfinitepayWebhookRoute
   '/api/public/manifest': typeof ApiPublicManifestRoute
   '/api/public/sync-catalog': typeof ApiPublicSyncCatalogRoute
 }
@@ -105,6 +114,7 @@ export interface FileRoutesById {
   '/pedidos': typeof PedidosRoute
   '/sacola': typeof SacolaRoute
   '/produto/$id': typeof ProdutoIdRoute
+  '/api/public/infinitepay-webhook': typeof ApiPublicInfinitepayWebhookRoute
   '/api/public/manifest': typeof ApiPublicManifestRoute
   '/api/public/sync-catalog': typeof ApiPublicSyncCatalogRoute
 }
@@ -119,6 +129,7 @@ export interface FileRouteTypes {
     | '/pedidos'
     | '/sacola'
     | '/produto/$id'
+    | '/api/public/infinitepay-webhook'
     | '/api/public/manifest'
     | '/api/public/sync-catalog'
   fileRoutesByTo: FileRoutesByTo
@@ -131,6 +142,7 @@ export interface FileRouteTypes {
     | '/pedidos'
     | '/sacola'
     | '/produto/$id'
+    | '/api/public/infinitepay-webhook'
     | '/api/public/manifest'
     | '/api/public/sync-catalog'
   id:
@@ -143,6 +155,7 @@ export interface FileRouteTypes {
     | '/pedidos'
     | '/sacola'
     | '/produto/$id'
+    | '/api/public/infinitepay-webhook'
     | '/api/public/manifest'
     | '/api/public/sync-catalog'
   fileRoutesById: FileRoutesById
@@ -156,6 +169,7 @@ export interface RootRouteChildren {
   PedidosRoute: typeof PedidosRoute
   SacolaRoute: typeof SacolaRoute
   ProdutoIdRoute: typeof ProdutoIdRoute
+  ApiPublicInfinitepayWebhookRoute: typeof ApiPublicInfinitepayWebhookRoute
   ApiPublicManifestRoute: typeof ApiPublicManifestRoute
   ApiPublicSyncCatalogRoute: typeof ApiPublicSyncCatalogRoute
 }
@@ -232,6 +246,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicManifestRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/infinitepay-webhook': {
+      id: '/api/public/infinitepay-webhook'
+      path: '/api/public/infinitepay-webhook'
+      fullPath: '/api/public/infinitepay-webhook'
+      preLoaderRoute: typeof ApiPublicInfinitepayWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -244,6 +265,7 @@ const rootRouteChildren: RootRouteChildren = {
   PedidosRoute: PedidosRoute,
   SacolaRoute: SacolaRoute,
   ProdutoIdRoute: ProdutoIdRoute,
+  ApiPublicInfinitepayWebhookRoute: ApiPublicInfinitepayWebhookRoute,
   ApiPublicManifestRoute: ApiPublicManifestRoute,
   ApiPublicSyncCatalogRoute: ApiPublicSyncCatalogRoute,
 }
