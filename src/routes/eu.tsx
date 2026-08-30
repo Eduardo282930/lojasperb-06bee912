@@ -144,7 +144,7 @@ function EuPage() {
               <p className="text-xs font-black uppercase tracking-widest text-white/70">
                 {registered ? "Cliente SPERB" : "Bem-vindo"}
               </p>
-              <p className="truncate text-2xl font-black leading-tight">
+              <p className="line-clamp-2 text-2xl font-black leading-tight">
                 {profile.name.trim() || "Faça seu cadastro"}
               </p>
               <p className="mt-1 flex items-center gap-1.5 text-base font-bold text-white/85">
