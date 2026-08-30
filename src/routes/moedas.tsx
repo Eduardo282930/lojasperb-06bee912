@@ -1,8 +1,19 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Ticket, Coins } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import { ArrowLeft, Ticket, Coins, Check } from "lucide-react";
 import { useProfile } from "@/lib/coupons";
-import { fetchCoinBalance, fetchCoinHistory, coinsToBRL, COIN_MAX_RATIO } from "@/lib/coins";
+import {
+  fetchCoinBalance,
+  fetchCoinHistory,
+  coinsToBRL,
+  COIN_MAX_RATIO,
+  fetchCheckinStatus,
+  doCheckin,
+  CHECKIN_REWARDS,
+  CHECKIN_JACKPOT,
+  CHECKIN_JACKPOT_EVERY,
+} from "@/lib/coins";
 import { formatPrice } from "@/lib/cart";
 
 export const Route = createFileRoute("/moedas")({
@@ -42,8 +53,41 @@ function MoedasPage() {
     staleTime: 30 * 1000,
   });
 
+  const checkinQuery = useQuery({
+    queryKey: ["coins", "checkin", profile.phone],
+    queryFn: () => fetchCheckinStatus(profile.phone),
+    staleTime: 30 * 1000,
+  });
+  const qc = useQueryClient();
+  const [message, setMessage] = useState("");
+  const checkin = useMutation({
+    mutationFn: () => doCheckin(profile.phone),
+    onSuccess: (res) => {
+      if (res.ok) {
+        setMessage(
+          res.bonus && res.bonus > 0
+            ? `Parabéns! Você fez o check-in nº ${res.globalSeq} e ganhou ${res.coins} + ${res.bonus} moedas!`
+            : `+${res.coins} moeda(s)! Volte amanhã para ganhar mais.`,
+        );
+      } else if (res.reason === "no_customer") {
+        setMessage("Cadastre seu nome e telefone em “Eu” para fazer o check-in.");
+      } else if (res.reason === "already") {
+        setMessage("Você já fez o check-in de hoje. Volte amanhã!");
+      } else {
+        setMessage("Não foi possível fazer o check-in agora.");
+      }
+      void qc.invalidateQueries({ queryKey: ["coins"] });
+    },
+  });
+
   const balance = balanceQuery.data ?? 0;
   const history = historyQuery.data ?? [];
+  const status = checkinQuery.data;
+  const nextDay = status?.nextDay ?? 1;
+  const checkedToday = status?.checkedToday ?? false;
+  const doneDays = checkedToday ? nextDay : nextDay - 1;
+  const toJackpot =
+    CHECKIN_JACKPOT_EVERY - ((status?.globalTotal ?? 0) % CHECKIN_JACKPOT_EVERY);
 
   return (
     <div className="min-h-screen bg-muted pb-16">
@@ -84,6 +128,52 @@ function MoedasPage() {
 
       <main className="mx-auto -mt-10 max-w-3xl px-4">
         <section className="rounded-3xl border-2 border-border bg-card p-5 shadow-lg">
+          <h2 className="text-xl font-black text-foreground">Check-in diário</h2>
+          <p className="mt-1 text-base font-semibold text-muted-foreground">
+            Faça o check-in todo dia e ganhe de 1 até 7 moedas. A cada{" "}
+            {CHECKIN_JACKPOT_EVERY} check-ins da loja, quem apertar o botão leva{" "}
+            {CHECKIN_JACKPOT} moedas. Faltam {toJackpot}!
+          </p>
+
+          <div className="mt-4 grid grid-cols-7 gap-1.5">
+            {CHECKIN_REWARDS.map((reward, i) => {
+              const day = i + 1;
+              const done = day <= doneDays;
+              return (
+                <div
+                  key={day}
+                  className={`rounded-2xl border-2 px-1 py-2 text-center ${
+                    done ? "border-transparent text-white" : "border-border bg-muted"
+                  }`}
+                  style={done ? { backgroundColor: GOLD_DARK } : undefined}
+                >
+                  <span className="block text-base font-black">
+                    {done ? <Check className="mx-auto h-5 w-5" strokeWidth={3} /> : `+${reward}`}
+                  </span>
+                  <span className="block text-[11px] font-bold opacity-80">Dia {day}</span>
+                </div>
+              );
+            })}
+          </div>
+
+          <button
+            onClick={() => checkin.mutate()}
+            disabled={checkedToday || checkin.isPending}
+            className="mt-4 w-full rounded-2xl py-4 text-xl font-black text-white shadow-md active:scale-[0.98] disabled:opacity-60"
+            style={{ backgroundColor: checkedToday ? "oklch(0.6 0.02 80)" : GOLD_DARK }}
+          >
+            {checkedToday
+              ? "Check-in de hoje feito ✓"
+              : checkin.isPending
+                ? "Registrando…"
+                : `Faça o check-in e ganhe ${CHECKIN_REWARDS[nextDay - 1] ?? 1} moeda(s)`}
+          </button>
+          {message && (
+            <p className="mt-3 text-center text-base font-bold text-foreground">{message}</p>
+          )}
+        </section>
+
+        <section className="mt-4 rounded-3xl border-2 border-border bg-card p-5 shadow-lg">
           <h2 className="text-xl font-black text-foreground">Como usar</h2>
           <ul className="mt-2 flex flex-col gap-1 text-base font-semibold text-muted-foreground">
             <li>• Cada moeda vale R$ 0,01 de desconto.</li>

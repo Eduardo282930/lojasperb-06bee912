@@ -301,10 +301,12 @@ function CouponForm({
   initial,
   onSaved,
   compact,
+  editing,
 }: {
   initial?: Partial<Coupon>;
   onSaved: () => void;
   compact?: boolean;
+  editing?: boolean;
 }) {
   const [draft, setDraft] = useState<Coupon>({ ...emptyCoupon, ...initial });
   const [capped, setCapped] = useState(Boolean(initial?.maxDiscount));
@@ -459,7 +461,7 @@ function CouponForm({
         style={{ backgroundColor: ok ? GREEN : BLUE }}
       >
         <Plus className="h-6 w-6" strokeWidth={3} />
-        {ok ? "Cupom salvo!" : "Salvar cupom"}
+        {ok ? "Cupom salvo!" : editing ? "Salvar alterações" : "Salvar cupom"}
       </button>
       {error && (
         <p className="text-base font-bold" style={{ color: RED }}>
@@ -476,10 +478,17 @@ function CouponList({ coupons, onChanged }: { coupons: Coupon[]; onChanged: () =
   return (
     <ul className="mt-2 flex flex-col gap-2">
       {coupons.map((c) => (
-        <li
-          key={c.id}
-          className="flex items-center gap-3 rounded-2xl border-2 border-border p-3"
-        >
+        <CouponRow key={c.id} coupon={c} onChanged={onChanged} />
+      ))}
+    </ul>
+  );
+}
+
+function CouponRow({ coupon: c, onChanged }: { coupon: Coupon; onChanged: () => void }) {
+  const [editing, setEditing] = useState(false);
+  return (
+    <li className="rounded-2xl border-2 border-border p-3">
+      <div className="flex items-center gap-3">
           <div className="min-w-0 flex-1">
             <p className="font-black text-foreground">
               {c.code} · {couponLabel(c)}
@@ -520,9 +529,25 @@ function CouponList({ coupons, onChanged }: { coupons: Coupon[]; onChanged: () =
           >
             <Trash2 className="h-5 w-5" />
           </button>
-        </li>
-      ))}
-    </ul>
+      </div>
+      <button
+        onClick={() => setEditing((v) => !v)}
+        className="mt-2 w-full rounded-xl bg-muted py-2 text-base font-black text-foreground"
+      >
+        {editing ? "Fechar edição" : "Editar cupom"}
+      </button>
+      {editing && (
+        <CouponForm
+          initial={c}
+          editing
+          compact
+          onSaved={() => {
+            setEditing(false);
+            onChanged();
+          }}
+        />
+      )}
+    </li>
   );
 }
 
