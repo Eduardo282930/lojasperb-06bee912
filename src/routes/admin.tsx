@@ -292,6 +292,7 @@ const emptyCoupon: Coupon = {
   minOrder: 0,
   maxUses: null,
   maxUsesPerCustomer: null,
+  rewardCoins: 0,
   uses: 0,
   active: true,
   customerPhone: null,
@@ -455,6 +456,18 @@ function CouponForm({
         />
       )}
 
+      <label className="text-base font-bold text-foreground">
+        Moedas de volta ao concluir o pedido
+        <input
+          type="number"
+          min={0}
+          value={draft.rewardCoins}
+          onChange={(e) => setDraft({ ...draft, rewardCoins: Number(e.target.value) })}
+          placeholder="0"
+          className={input}
+        />
+      </label>
+
       <button
         onClick={() => void submit()}
         className="inline-flex items-center justify-center gap-2 rounded-2xl py-4 text-xl font-black text-white active:scale-[0.98]"
@@ -503,6 +516,7 @@ function CouponRow({ coupon: c, onChanged }: { coupon: Coupon; onChanged: () => 
               {c.maxUses === null ? "usos ilimitados" : `${c.uses}/${c.maxUses} usos`}
               {c.maxUsesPerCustomer !== null &&
                 ` · ${c.maxUsesPerCustomer} por cliente`}
+              {c.rewardCoins > 0 && ` · devolve ${c.rewardCoins} moedas`}
               {isExhausted(c) && " · esgotado"}
             </p>
           </div>
