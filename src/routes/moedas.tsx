@@ -86,8 +86,6 @@ function MoedasPage() {
   const nextDay = status?.nextDay ?? 1;
   const checkedToday = status?.checkedToday ?? false;
   const doneDays = checkedToday ? nextDay : nextDay - 1;
-  const toJackpot =
-    CHECKIN_JACKPOT_EVERY - ((status?.globalTotal ?? 0) % CHECKIN_JACKPOT_EVERY);
 
   return (
     <div className="min-h-screen bg-muted pb-16">
