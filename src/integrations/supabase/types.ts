@@ -226,6 +226,7 @@ export type Database = {
           max_uses: number | null
           max_uses_per_customer: number | null
           min_order: number
+          reward_coins: number
           store_key: string
           type: string
           updated_at: string
@@ -244,6 +245,7 @@ export type Database = {
           max_uses?: number | null
           max_uses_per_customer?: number | null
           min_order?: number
+          reward_coins?: number
           store_key?: string
           type?: string
           updated_at?: string
@@ -262,6 +264,7 @@ export type Database = {
           max_uses?: number | null
           max_uses_per_customer?: number | null
           min_order?: number
+          reward_coins?: number
           store_key?: string
           type?: string
           updated_at?: string
@@ -469,6 +472,47 @@ export type Database = {
           {
             foreignKeyName: "customer_duplicates_new_customer_id_fkey"
             columns: ["new_customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customer_notifications: {
+        Row: {
+          body: string
+          created_at: string
+          customer_id: string
+          id: string
+          kind: string
+          read_at: string | null
+          store_key: string
+          title: string
+        }
+        Insert: {
+          body?: string
+          created_at?: string
+          customer_id: string
+          id?: string
+          kind?: string
+          read_at?: string | null
+          store_key?: string
+          title?: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          customer_id?: string
+          id?: string
+          kind?: string
+          read_at?: string | null
+          store_key?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_notifications_customer_id_fkey"
+            columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
             referencedColumns: ["id"]
@@ -859,6 +903,7 @@ export type Database = {
           max_uses: number | null
           max_uses_per_customer: number | null
           min_order: number
+          reward_coins: number
           store_key: string
           type: string
           updated_at: string
@@ -886,6 +931,7 @@ export type Database = {
           max_uses: number | null
           max_uses_per_customer: number | null
           min_order: number
+          reward_coins: number
           store_key: string
           type: string
           updated_at: string
@@ -925,6 +971,21 @@ export type Database = {
         Returns: boolean
       }
       lookup_customer_name: { Args: { p_phone: string }; Returns: string }
+      mark_notifications_read: {
+        Args: { p_device_id: string; p_phone: string }
+        Returns: boolean
+      }
+      notifications_for_customer: {
+        Args: { p_device_id: string; p_phone: string }
+        Returns: {
+          body: string
+          created_at: string
+          id: string
+          kind: string
+          read_at: string
+          title: string
+        }[]
+      }
       only_digits: { Args: { p: string }; Returns: string }
       order_history_for_customer: {
         Args: { p_device_id: string; p_order_id: string; p_phone: string }
