@@ -105,6 +105,7 @@ export const syncLoyverseCustomer = createServerFn({ method: "POST" })
 
 type LoyverseReceipt = {
   receipt_number: string;
+  receipt_type?: string | null;
   receipt_date: string;
   total_money?: number | null;
   customer_id?: string | null;
@@ -123,7 +124,7 @@ export const fetchReceipts = createServerFn({ method: "GET" }).handler(
     if (!token) throw new Error("LOYVERSE_TOKEN não configurado");
 
     const [receiptsRes, customersRes] = await Promise.all([
-      loyverse<{ receipts?: LoyverseReceipt[] }>("receipts?limit=100", token),
+      loyverse<{ receipts?: LoyverseReceipt[] }>("receipts?limit=250", token),
       loyverse<{ customers?: LoyverseCustomer[] }>("customers?limit=250", token).catch(
         () => ({ customers: [] as LoyverseCustomer[] }),
       ),
@@ -133,7 +134,7 @@ export const fetchReceipts = createServerFn({ method: "GET" }).handler(
     for (const c of customersRes.customers ?? []) byId.set(c.id, c);
 
     return (receiptsRes.receipts ?? [])
-      .filter((r) => !r.cancelled_at)
+      .filter((r) => !r.cancelled_at && (r.receipt_type ?? "SALE") === "SALE")
       .map((r) => {
         const c = r.customer_id ? byId.get(r.customer_id) : undefined;
         return {

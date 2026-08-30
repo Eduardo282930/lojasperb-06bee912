@@ -1034,7 +1034,28 @@ function OrdersPanel() {
             </p>
           )}
 
-          <div className="mt-3 flex flex-wrap items-center gap-2">
+          <div className="mt-3 flex flex-wrap gap-2">
+            {ORDER_STATUSES.map((st) => {
+              const activeStep = o.status === st.value;
+              return (
+                <button
+                  key={st.value}
+                  disabled={busy === o.id || activeStep}
+                  onClick={() => void change(o, st.value, o.paymentStatus)}
+                  className={`rounded-xl border-2 px-3 py-2 text-sm font-black active:scale-95 disabled:opacity-100 ${
+                    activeStep
+                      ? "border-transparent text-white"
+                      : "border-border bg-background text-foreground"
+                  }`}
+                  style={activeStep ? { backgroundColor: BLUE } : undefined}
+                >
+                  {st.label}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="mt-2 flex flex-wrap items-center gap-2">
             <select
               value={o.status}
               disabled={busy === o.id}

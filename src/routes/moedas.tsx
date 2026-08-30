@@ -12,7 +12,6 @@ import {
   doCheckin,
   CHECKIN_REWARDS,
   CHECKIN_JACKPOT,
-  CHECKIN_JACKPOT_EVERY,
 } from "@/lib/coins";
 import { formatPrice } from "@/lib/cart";
 
@@ -86,8 +85,6 @@ function MoedasPage() {
   const nextDay = status?.nextDay ?? 1;
   const checkedToday = status?.checkedToday ?? false;
   const doneDays = checkedToday ? nextDay : nextDay - 1;
-  const toJackpot =
-    CHECKIN_JACKPOT_EVERY - ((status?.globalTotal ?? 0) % CHECKIN_JACKPOT_EVERY);
 
   return (
     <div className="min-h-screen bg-muted pb-16">
@@ -130,9 +127,8 @@ function MoedasPage() {
         <section className="rounded-3xl border-2 border-border bg-card p-5 shadow-lg">
           <h2 className="text-xl font-black text-foreground">Check-in diário</h2>
           <p className="mt-1 text-base font-semibold text-muted-foreground">
-            Faça o check-in todo dia e ganhe de 1 até 7 moedas. A cada{" "}
-            {CHECKIN_JACKPOT_EVERY} check-ins da loja, quem apertar o botão leva{" "}
-            {CHECKIN_JACKPOT} moedas. Faltam {toJackpot}!
+            Faça o check-in todo dia e ganhe de 1 até 7 moedas. No 7º dia você pode
+            ganhar até {CHECKIN_JACKPOT.toLocaleString("pt-BR")} moedas!
           </p>
 
           <div className="mt-4 grid grid-cols-7 gap-1.5">
@@ -148,9 +144,15 @@ function MoedasPage() {
                   style={done ? { backgroundColor: GOLD_DARK } : undefined}
                 >
                   <span className="block text-base font-black">
-                    {done ? <Check className="mx-auto h-5 w-5" strokeWidth={3} /> : `+${reward}`}
+                    {done ? (
+                      <Check className="mx-auto h-5 w-5" strokeWidth={3} />
+                    ) : (
+                      `+${reward}`
+                    )}
                   </span>
-                  <span className="block text-[11px] font-bold opacity-80">Dia {day}</span>
+                  <span className="block text-[11px] font-bold opacity-80">
+                    {day === 7 ? "Dia 7 🎁" : `Dia ${day}`}
+                  </span>
                 </div>
               );
             })}

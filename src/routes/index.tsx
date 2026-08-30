@@ -27,9 +27,9 @@ const PAGE_SIZE = 30;
 export const catalogQuery = queryOptions({
   queryKey: ["catalog"],
   queryFn: () => fetchCatalog(),
-  staleTime: 5 * 1000,
+  staleTime: 30 * 1000,
   gcTime: 30 * 60 * 1000,
-  refetchInterval: 5 * 1000,
+  refetchInterval: 60 * 1000,
   refetchIntervalInBackground: false,
   refetchOnWindowFocus: true,
   retry: 1,
@@ -378,6 +378,7 @@ function ProductCard({ product }: { product: CatalogProduct }) {
               alt={product.name}
               className="h-full w-full object-cover"
               loading="lazy"
+              decoding="async"
             />
           ) : (
             <div className="grid h-full w-full place-items-center">

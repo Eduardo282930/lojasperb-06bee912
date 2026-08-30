@@ -13,6 +13,9 @@ import {
   ClipboardList,
   Pencil,
   X,
+  Bell,
+  Phone,
+  BadgeCheck,
 } from "lucide-react";
 
 import {
@@ -26,6 +29,23 @@ import { useAdmin } from "@/lib/admin";
 import { fetchMyOrders } from "@/lib/orders";
 import { formatPrice } from "@/lib/cart";
 import { StoreLogoWithFallback } from "@/components/store-logo";
+import { useNotificationWatcher, useNotificationPermission } from "@/lib/notifications";
+
+/** (51) 99610-9657 */
+function prettyPhone(raw: string): string {
+  const d = (raw || "").replace(/\D/g, "").slice(-11);
+  if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+  if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return raw;
+}
+
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  const first = parts[0]?.charAt(0) ?? "";
+  const last = parts.length > 1 ? (parts[parts.length - 1]?.charAt(0) ?? "") : "";
+  return (first + last).toUpperCase();
+}
 
 const PURCHASE_TABS = [
   { status: "sent", label: "Recebido", icon: ClipboardList },
@@ -58,6 +78,8 @@ function EuPage() {
   const profile = useProfile();
   const { isAdmin } = useAdmin();
   const [editing, setEditing] = useState(false);
+  const notify = useNotificationPermission();
+  useNotificationWatcher(profile.phone);
 
   const claimedList = useClaimedCoupons(profile.phone).data ?? [];
   const coinBalance = useQuery({
@@ -115,15 +137,26 @@ function EuPage() {
         {/* Cadastro só aparece resumido; o cliente digita uma única vez. */}
         <section className="overflow-hidden rounded-3xl bg-gradient-to-br from-[oklch(0.55_0.22_255)] to-[oklch(0.45_0.2_290)] p-5 text-white shadow-lg">
           <div className="flex items-center gap-4">
-            <div className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-white/20 text-3xl font-black">
-              {(profile.name || "?").trim().charAt(0).toUpperCase()}
+            <div className="grid h-16 w-16 shrink-0 place-items-center rounded-full bg-white/25 text-2xl font-black ring-4 ring-white/20">
+              {initials(profile.name || "?")}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-2xl font-black">
-                {profile.name.trim() || "Bem-vindo à SPERB"}
+              <p className="text-xs font-black uppercase tracking-widest text-white/70">
+                {registered ? "Cliente SPERB" : "Bem-vindo"}
               </p>
-              <p className="truncate text-base font-semibold text-white/80">
-                {profile.phone.trim() || "Toque para se cadastrar"}
+              <p className="line-clamp-2 text-2xl font-black leading-tight">
+                {profile.name.trim() || "Faça seu cadastro"}
+              </p>
+              <p className="mt-1 flex items-center gap-1.5 text-base font-bold text-white/85">
+                {registered ? (
+                  <>
+                    <Phone className="h-4 w-4 shrink-0" strokeWidth={2.5} />
+                    <span className="truncate">{prettyPhone(profile.phone)}</span>
+                    <BadgeCheck className="h-4 w-4 shrink-0 text-white" strokeWidth={2.5} />
+                  </>
+                ) : (
+                  "Toque no lápis para começar"
+                )}
               </p>
             </div>
             <button
@@ -135,6 +168,23 @@ function EuPage() {
             </button>
           </div>
         </section>
+
+        {notify.state !== "granted" && notify.state !== "unsupported" && (
+          <button
+            onClick={() => void notify.request()}
+            className="mt-3 flex w-full items-center gap-3 rounded-2xl border-2 border-border bg-card px-4 py-3 text-left active:scale-[0.99]"
+          >
+            <Bell className="h-7 w-7 shrink-0 text-[oklch(0.72_0.17_75)]" strokeWidth={2.5} />
+            <span className="min-w-0 flex-1">
+              <span className="block text-base font-black text-foreground">
+                Ativar avisos no celular
+              </span>
+              <span className="block text-sm font-semibold text-muted-foreground">
+                Receba moedas e novos cupons na barra de notificações.
+              </span>
+            </span>
+          </button>
+        )}
 
         <section className="mt-4 rounded-3xl border-2 border-border bg-card p-4 shadow-sm">
           <div className="flex items-center justify-between gap-3">
