@@ -374,6 +374,12 @@ function CouponForm({
         maxDiscount: benefit === "percent" && capped ? (draft.maxDiscount ?? 0) : null,
         maxUses: limited ? (draft.maxUses ?? 1) : null,
         maxUsesPerCustomer: perCustomer ? (draft.maxUsesPerCustomer ?? 1) : null,
+        minOrder: hasMinOrder ? draft.minOrder : 0,
+        rewardMaxCoins:
+          draft.rewardType === "percent" && rewardCapped
+            ? (draft.rewardMaxCoins ?? 0)
+            : null,
+
       };
       await saveCoupon(saved);
       if (notifyClients) {
