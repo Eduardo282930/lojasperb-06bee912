@@ -313,8 +313,17 @@ function CouponForm({
   const [capped, setCapped] = useState(Boolean(initial?.maxDiscount));
   const [limited, setLimited] = useState(initial?.maxUses != null);
   const [perCustomer, setPerCustomer] = useState(initial?.maxUsesPerCustomer != null);
+  const [benefit, setBenefit] = useState<"percent" | "fixed" | "coins">(
+    initial?.type === "fixed"
+      ? "fixed"
+      : (initial?.value ?? 0) === 0 && (initial?.rewardCoins ?? 0) > 0
+        ? "coins"
+        : "percent",
+  );
+  const [notifyClients, setNotifyClients] = useState(false);
   const [error, setError] = useState("");
   const [ok, setOk] = useState(false);
+  const isCoins = benefit === "coins";
 
   async function submit() {
     setError("");
@@ -324,16 +333,32 @@ function CouponForm({
       return;
     }
     try {
-      await saveCoupon({
+      const saved: Coupon = {
         ...draft,
         code,
-        maxDiscount: draft.type === "percent" && capped ? draft.maxDiscount ?? 0 : null,
-        maxUses: limited ? draft.maxUses ?? 1 : null,
-        maxUsesPerCustomer: perCustomer ? draft.maxUsesPerCustomer ?? 1 : null,
-      });
+        type: isCoins ? "fixed" : benefit,
+        value: isCoins ? 0 : draft.value,
+        maxDiscount: benefit === "percent" && capped ? (draft.maxDiscount ?? 0) : null,
+        maxUses: limited ? (draft.maxUses ?? 1) : null,
+        maxUsesPerCustomer: perCustomer ? (draft.maxUsesPerCustomer ?? 1) : null,
+      };
+      await saveCoupon(saved);
+      if (notifyClients) {
+        const label = isCoins
+          ? `${saved.rewardCoins} moedas de volta`
+          : saved.type === "percent"
+            ? `${saved.value}% OFF`
+            : `${formatPrice(saved.value)} OFF`;
+        await broadcastNotification(
+          "coupon",
+          `🎟️ Novo cupom disponível: ${label}`,
+          saved.description.trim() || "Abra o app SPERB e resgate o seu cupom.",
+        );
+      }
       setOk(true);
       setTimeout(() => setOk(false), 1500);
       setDraft({ ...emptyCoupon, ...initial });
+      setNotifyClients(false);
       onSaved();
     } catch (err) {
       setError(
@@ -346,6 +371,12 @@ function CouponForm({
 
   const input =
     "w-full rounded-2xl border-2 border-border bg-background px-4 py-3 text-lg font-semibold text-foreground outline-none";
+
+  const BENEFITS = [
+    { id: "percent" as const, label: "% desconto" },
+    { id: "fixed" as const, label: "R$ desconto" },
+    { id: "coins" as const, label: "Moedas" },
+  ];
 
   return (
     <div className={`flex flex-col gap-3 ${compact ? "" : "mt-3"}`}>
@@ -363,26 +394,41 @@ function CouponForm({
         placeholder="O que ele faz (ex: 10% em toda a loja)"
         className={input}
       />
-      <div className="flex gap-2">
-        <select
-          value={draft.type}
-          onChange={(e) => setDraft({ ...draft, type: e.target.value as Coupon["type"] })}
-          className="rounded-2xl border-2 border-border bg-background px-3 py-3 text-lg font-bold text-foreground"
-        >
-          <option value="percent">% desconto</option>
-          <option value="fixed">R$ desconto</option>
-        </select>
+
+      <p className="text-base font-black text-muted-foreground">Tipo de benefício</p>
+      <div className="grid grid-cols-3 gap-2">
+        {BENEFITS.map((b) => {
+          const active = benefit === b.id;
+          return (
+            <button
+              key={b.id}
+              type="button"
+              onClick={() => setBenefit(b.id)}
+              className="rounded-2xl border-2 py-3 text-base font-black active:scale-95"
+              style={{
+                borderColor: active ? BLUE : "var(--border)",
+                backgroundColor: active ? BLUE : "var(--card)",
+                color: active ? "#fff" : "var(--foreground)",
+              }}
+            >
+              {b.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {!isCoins && (
         <input
           type="number"
           min={0}
           value={draft.value}
           onChange={(e) => setDraft({ ...draft, value: Number(e.target.value) })}
-          className={`min-w-0 flex-1 ${input}`}
-          placeholder="Valor"
+          className={input}
+          placeholder={benefit === "percent" ? "Desconto em %" : "Desconto em R$"}
         />
-      </div>
+      )}
 
-      {draft.type === "percent" && (
+      {benefit === "percent" && (
         <>
           <label className="flex items-center gap-3 text-lg font-bold text-foreground">
             <input
@@ -405,6 +451,7 @@ function CouponForm({
           )}
         </>
       )}
+
 
       <input
         type="number"
