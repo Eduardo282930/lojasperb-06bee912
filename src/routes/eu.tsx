@@ -87,7 +87,7 @@ function EuPage() {
 
   const claimedList = useClaimedCoupons(profile.phone).data ?? [];
   const allCoupons = useCoupons();
-  const myUses = useMyCouponUses(profile.phone);
+  const myUses = useMyCouponUses(profile.phone).data ?? {};
   const claimedIds = new Set(claimedList.map((c) => c.id));
   const availableCount = allCoupons.filter(
     (c) => !claimedIds.has(c.id) && isAvailableForCustomer(c, myUses[c.id] ?? 0),
