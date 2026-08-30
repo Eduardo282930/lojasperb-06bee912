@@ -135,22 +135,22 @@ function EuPage() {
 
       <main className="mx-auto max-w-3xl px-4 pt-4">
         {/* Cadastro só aparece resumido; o cliente digita uma única vez. */}
-        <section className="overflow-hidden rounded-3xl bg-gradient-to-br from-[oklch(0.55_0.22_255)] to-[oklch(0.45_0.2_290)] p-5 text-white shadow-lg">
-          <div className="flex items-center gap-4">
-            <div className="grid h-16 w-16 shrink-0 place-items-center rounded-full bg-white/25 text-2xl font-black ring-4 ring-white/20">
+        <section className="overflow-hidden rounded-2xl bg-gradient-to-br from-[oklch(0.55_0.22_255)] to-[oklch(0.45_0.2_290)] p-3.5 text-white shadow-lg">
+          <div className="flex items-center gap-3">
+            <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-white/25 text-lg font-black ring-2 ring-white/25">
               {initials(profile.name || "?")}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-black uppercase tracking-widest text-white/70">
+              <p className="text-[10px] font-black uppercase tracking-widest text-white/70">
                 {registered ? "Cliente SPERB" : "Bem-vindo"}
               </p>
-              <p className="line-clamp-2 text-2xl font-black leading-tight">
+              <p className="line-clamp-1 text-lg font-black leading-tight">
                 {profile.name.trim() || "Faça seu cadastro"}
               </p>
-              <p className="mt-1 flex items-center gap-1.5 text-base font-bold text-white/85">
+              <p className="mt-0.5 flex items-center gap-1.5 text-sm font-bold text-white/85">
                 {registered ? (
                   <>
-                    <Phone className="h-4 w-4 shrink-0" strokeWidth={2.5} />
+                    <Phone className="h-3.5 w-3.5 shrink-0" strokeWidth={2.5} />
                     <span className="truncate">{prettyPhone(profile.phone)}</span>
                     <BadgeCheck className="h-4 w-4 shrink-0 text-white" strokeWidth={2.5} />
                   </>
@@ -162,28 +162,50 @@ function EuPage() {
             <button
               onClick={() => setEditing(true)}
               aria-label={registered ? "Alterar meus dados" : "Fazer cadastro"}
-              className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white/20 active:scale-95"
+              className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/20 active:scale-95"
             >
-              <Pencil className="h-6 w-6" strokeWidth={2.5} />
+              <Pencil className="h-5 w-5" strokeWidth={2.5} />
             </button>
           </div>
         </section>
 
-        {notify.state !== "granted" && notify.state !== "unsupported" && (
-          <button
-            onClick={() => void notify.request()}
-            className="mt-3 flex w-full items-center gap-3 rounded-2xl border-2 border-border bg-card px-4 py-3 text-left active:scale-[0.99]"
-          >
-            <Bell className="h-7 w-7 shrink-0 text-[oklch(0.72_0.17_75)]" strokeWidth={2.5} />
+        {notify.state === "granted" ? (
+          <div className="mt-3 flex items-center gap-3 rounded-2xl border-2 border-[oklch(0.62_0.19_145)] bg-[oklch(0.62_0.19_145/0.08)] px-4 py-3">
+            <BellRing
+              className="h-6 w-6 shrink-0 text-[oklch(0.5_0.19_145)]"
+              strokeWidth={2.5}
+            />
             <span className="min-w-0 flex-1">
               <span className="block text-base font-black text-foreground">
-                Ativar avisos no celular
+                Notificações ativadas ✓
               </span>
-              <span className="block text-sm font-semibold text-muted-foreground">
-                Receba moedas e novos cupons na barra de notificações.
-              </span>
+              {notify.justEnabled && (
+                <span className="block text-sm font-semibold text-muted-foreground">
+                  Obrigado! Você receberá novidades, cupons, ofertas e benefícios.
+                </span>
+              )}
             </span>
-          </button>
+          </div>
+        ) : (
+          notify.state !== "unsupported" && (
+            <button
+              onClick={() => void notify.request()}
+              className="mt-3 flex w-full items-center gap-3 rounded-2xl border-2 border-border bg-card px-4 py-3 text-left active:scale-[0.99]"
+            >
+              <Bell
+                className="h-7 w-7 shrink-0 text-[oklch(0.72_0.17_75)]"
+                strokeWidth={2.5}
+              />
+              <span className="min-w-0 flex-1">
+                <span className="block text-base font-black text-foreground">
+                  Ativar avisos no celular
+                </span>
+                <span className="block text-sm font-semibold text-muted-foreground">
+                  Receba moedas e novos cupons na barra de notificações.
+                </span>
+              </span>
+            </button>
+          )
         )}
 
         <section className="mt-4 rounded-3xl border-2 border-border bg-card p-4 shadow-sm">
