@@ -18,6 +18,8 @@ import {
 } from "@/lib/coupons";
 import { fetchCoinBalance, coinsToBRL, maxCoinsFor, COIN_MAX_RATIO } from "@/lib/coins";
 import { recordOrder } from "@/lib/orders";
+import { useServerFn } from "@tanstack/react-start";
+import { createOrderCheckout } from "@/lib/payments.functions";
 
 
 const WHATSAPP_NUMBER = "5551996109657";
@@ -40,6 +42,9 @@ function SacolaPage() {
   const refreshCoupons = useCouponsRefresh();
   const qc = useQueryClient();
   const [useCoins, setUseCoins] = useState(true);
+  const [paying, setPaying] = useState(false);
+  const [payError, setPayError] = useState("");
+  const startCheckout = useServerFn(createOrderCheckout);
 
   const coinBalance = useQuery({
     queryKey: ["coins", "balance", profile.phone],
@@ -63,51 +68,86 @@ function SacolaPage() {
   const coinsDiscount = coinsToBRL(coinsToUse);
   const total = Math.max(0, eligible - coinsDiscount);
 
-  async function enviarWhatsApp() {
-    if (cart.length === 0) return;
-    const linhas = cart.map(
-      (c) => `- ${c.name} | Qtd: ${c.qty} | ${formatPrice(c.price)}`,
-    );
-    let texto = `Pedido SPERB\n\n${linhas.join("\n")}`;
-    if (profile.name) texto = `Pedido SPERB\nCliente: ${profile.name}\n\n${linhas.join("\n")}`;
-    if (applied || coinsToUse > 0) {
-      texto += `\n\nSubtotal: ${formatPrice(subtotal)}`;
-    }
-    if (applied) {
-      texto += `\nCUPOM SPERB ${applied.coupon.code}: -${formatPrice(applied.discount)}`;
-      texto += `\n(O resgate não garante o uso, sujeito a confirmação)`;
-    }
-    if (coinsToUse > 0) {
-      texto += `\nMoedas SPERB (${coinsToUse}): -${formatPrice(coinsDiscount)}`;
-    }
-    texto += `\n\nTotal: ${formatPrice(total)}`;
+  function orderItems() {
+    return cart.map((c) => ({
+      id: c.id,
+      name: c.name,
+      qty: c.qty,
+      price: priceValue(c.price),
+      image: c.image ?? null,
+    }));
+  }
 
-    const url = `https://api.whatsapp.com/send?phone=${WHATSAPP_NUMBER}&text=${encodeURIComponent(texto)}`;
-    window.open(url, "_blank");
-
-    // Registers the order so it appears in the owner's panel.
-    void recordOrder({
+  async function saveOrder(): Promise<string | null> {
+    const id = await recordOrder({
       name: profile.name,
       phone: profile.phone,
-      items: cart.map((c) => ({
-        id: c.id,
-        name: c.name,
-        qty: c.qty,
-        price: priceValue(c.price),
-        image: c.image ?? null,
-      })),
+      items: orderItems(),
       subtotal,
       discount: applied?.discount ?? 0,
       total,
       couponCode: applied?.coupon.code ?? "",
       coins: coinsToUse,
-    }).then(() => qc.invalidateQueries({ queryKey: ["coins"] }));
-
+    });
+    void qc.invalidateQueries({ queryKey: ["coins"] });
     if (applied) {
       await consumeCoupon(applied.coupon.id);
       unredeemCoupon(applied.coupon.id);
       await refreshCoupons();
     }
+    return id;
+  }
+
+  function whatsAppText() {
+    const linhas = cart.map(
+      (c) => `- ${c.name} | Qtd: ${c.qty} | ${formatPrice(c.price)}`,
+    );
+    let texto = profile.name
+      ? `Pedido SPERB\nCliente: ${profile.name}\n\n${linhas.join("\n")}`
+      : `Pedido SPERB\n\n${linhas.join("\n")}`;
+    if (applied || coinsToUse > 0) texto += `\n\nSubtotal: ${formatPrice(subtotal)}`;
+    if (applied) {
+      texto += `\nCUPOM SPERB ${applied.coupon.code}: -${formatPrice(applied.discount)}`;
+    }
+    if (coinsToUse > 0) {
+      texto += `\nMoedas SPERB (${coinsToUse}): -${formatPrice(coinsDiscount)}`;
+    }
+    texto += `\n\nTotal: ${formatPrice(total)}`;
+    return texto;
+  }
+
+  /** Pagamento online (Pix ou cartão) pelo checkout da InfinitePay. */
+  async function pagarAgora() {
+    if (cart.length === 0 || paying) return;
+    setPaying(true);
+    setPayError("");
+    try {
+      const id = await saveOrder();
+      if (!id) {
+        setPayError("Não foi possível registrar o pedido. Tente de novo.");
+        return;
+      }
+      const res = await startCheckout({ data: { orderId: id } });
+      if (!res.url) {
+        setPayError(
+          "O pagamento online está indisponível agora. Você pode enviar o pedido pelo WhatsApp.",
+        );
+        return;
+      }
+      clearCart();
+      window.location.href = res.url;
+    } catch {
+      setPayError("Falha ao abrir o pagamento. Tente novamente.");
+    } finally {
+      setPaying(false);
+    }
+  }
+
+  async function enviarWhatsApp() {
+    if (cart.length === 0) return;
+    const url = `https://api.whatsapp.com/send?phone=${WHATSAPP_NUMBER}&text=${encodeURIComponent(whatsAppText())}`;
+    window.open(url, "_blank");
+    await saveOrder();
   }
 
 
@@ -287,11 +327,23 @@ function SacolaPage() {
       {cart.length > 0 && (
         <div className="fixed inset-x-0 bottom-0 z-20 border-t-2 border-border bg-background/95 p-3 backdrop-blur">
           <div className="mx-auto max-w-3xl">
+            {payError && (
+              <p className="mb-2 rounded-xl bg-destructive/10 px-3 py-2 text-base font-bold text-destructive">
+                {payError}
+              </p>
+            )}
             <button
-              onClick={enviarWhatsApp}
-              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[oklch(0.62_0.19_145)] px-4 py-4 text-xl font-black text-white shadow-lg active:scale-[0.98]"
+              onClick={() => void pagarAgora()}
+              disabled={paying}
+              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[oklch(0.55_0.22_255)] px-4 py-4 text-xl font-black text-white shadow-lg disabled:opacity-60 active:scale-[0.98]"
             >
-              <WhatsAppIcon className="h-6 w-6" />
+              {paying ? "Abrindo pagamento…" : `Pagar ${formatPrice(total)} · Pix ou cartão`}
+            </button>
+            <button
+              onClick={() => void enviarWhatsApp()}
+              className="mt-2 flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-[oklch(0.62_0.19_145)] px-4 py-3 text-lg font-black text-[oklch(0.45_0.19_145)] active:scale-[0.98]"
+            >
+              <WhatsAppIcon className="h-5 w-5" />
               Enviar pelo WhatsApp
             </button>
           </div>
