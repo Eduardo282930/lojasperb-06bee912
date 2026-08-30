@@ -15,12 +15,8 @@ export function handle(): string {
   return (process.env["INFINITEPAY_HANDLE"] ?? "").trim();
 }
 
-export function webhookSecret(): string {
-  return (process.env["INFINITEPAY_WEBHOOK_SECRET"] ?? "").trim();
-}
-
 export function isConfigured(): boolean {
-  return handle() !== "" && webhookSecret() !== "";
+  return handle() !== "";
 }
 
 export async function createCheckoutLink(input: {

@@ -65,13 +65,11 @@ export const createOrderCheckout = createServerFn({ method: "POST" })
     }
 
     const origin = new URL(getRequest().url).origin;
-    const secret = (process.env["INFINITEPAY_WEBHOOK_SECRET"] ?? "").trim();
-
     const url = await createCheckoutLink({
       items,
       orderNsu: String(order.id),
       redirectUrl: `${origin}/pedidos?status=preparing`,
-      webhookUrl: `${origin}/api/public/infinitepay-webhook?key=${encodeURIComponent(secret)}`,
+      webhookUrl: `${origin}/api/public/infinitepay-webhook`,
       customer: {
         name: (order.customer_name as string) || undefined,
         phone: (order.customer_phone as string) || undefined,
