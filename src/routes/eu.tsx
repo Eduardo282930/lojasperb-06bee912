@@ -24,6 +24,9 @@ import {
   saveProfile,
   lookupCustomerName,
   useClaimedCoupons,
+  useCoupons,
+  useMyCouponUses,
+  isAvailableForCustomer,
 } from "@/lib/coupons";
 import { fetchCoinBalance, coinsToBRL } from "@/lib/coins";
 import { useAdmin } from "@/lib/admin";
@@ -83,6 +86,12 @@ function EuPage() {
   useNotificationWatcher(profile.phone);
 
   const claimedList = useClaimedCoupons(profile.phone).data ?? [];
+  const allCoupons = useCoupons();
+  const myUses = useMyCouponUses(profile.phone);
+  const claimedIds = new Set(claimedList.map((c) => c.id));
+  const availableCount = allCoupons.filter(
+    (c) => !claimedIds.has(c.id) && isAvailableForCustomer(c, myUses[c.id] ?? 0),
+  ).length;
   const coinBalance = useQuery({
     queryKey: ["coins", "balance", profile.phone],
     queryFn: () => fetchCoinBalance(profile.phone),
@@ -252,7 +261,8 @@ function EuPage() {
               <Coins className="h-8 w-8 text-[oklch(0.72_0.17_75)]" strokeWidth={2.5} />
               <span className="text-base font-black text-foreground">Moedas</span>
               <span className="text-sm font-bold text-[oklch(0.72_0.17_75)]">
-                {balance} · {formatPrice(coinsToBRL(balance))}
+                {balance.toLocaleString("pt-BR")} moedas ={" "}
+                {formatPrice(coinsToBRL(balance))}
               </span>
             </Link>
             <Link
@@ -262,7 +272,9 @@ function EuPage() {
               <Ticket className="h-8 w-8 text-[oklch(0.55_0.22_255)]" strokeWidth={2.5} />
               <span className="text-base font-black text-foreground">Cupons</span>
               <span className="text-sm font-bold text-[oklch(0.55_0.22_255)]">
-                {claimedList.length} resgatados
+                {availableCount > 0
+                  ? `${availableCount} disponíveis`
+                  : `${claimedList.length} resgatados`}
               </span>
             </Link>
           </div>
