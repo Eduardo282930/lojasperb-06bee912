@@ -48,6 +48,11 @@ type CouponRow = {
   max_uses: number | null;
   max_uses_per_customer?: number | null;
   reward_coins?: number | null;
+  reward_type?: string | null;
+  reward_percent?: number | string | null;
+  reward_min_order?: number | string | null;
+  reward_max_coins?: number | null;
+
   uses: number | null;
   active: boolean;
   customer_phone?: string | null;
