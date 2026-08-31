@@ -44,7 +44,10 @@ function SacolaPage() {
   const [useCoins, setUseCoins] = useState(true);
   const [paying, setPaying] = useState(false);
   const [payError, setPayError] = useState("");
-  const startCheckout = useServerFn(createOrderCheckout);
+  const startCheckout = useServerFn(startCartCheckout);
+  const attach = useServerFn(attachCheckout);
+  const navigate = Route.useNavigate();
+  const logged = profile.phone.trim().length >= 8 && profile.name.trim().length > 0;
 
   const coinBalance = useQuery({
     queryKey: ["coins", "balance", profile.phone],
