@@ -2,10 +2,17 @@
 export function flyToCart(from: HTMLElement | null, imageUrl?: string | null) {
   if (typeof document === "undefined" || !from) return;
   const target = document.getElementById("cart-anchor");
-  if (!target) return;
 
   const start = from.getBoundingClientRect();
-  const end = target.getBoundingClientRect();
+  // Sem carrinho na tela (primeiro item), a animação vai para o canto superior direito.
+  const end = target
+    ? target.getBoundingClientRect()
+    : ({
+        left: window.innerWidth - 72,
+        top: 16,
+        width: 48,
+        height: 48,
+      } as DOMRect);
 
   const el = document.createElement("div");
   el.style.position = "fixed";
@@ -44,7 +51,7 @@ export function flyToCart(from: HTMLElement | null, imageUrl?: string | null) {
   anim.onfinish = () => el.remove();
   anim.oncancel = () => el.remove();
 
-  target.animate(
+  target?.animate(
     [{ transform: "scale(1)" }, { transform: "scale(1.25)" }, { transform: "scale(1)" }],
     { duration: 400, delay: 550, easing: "ease-out" },
   );
