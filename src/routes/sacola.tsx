@@ -89,6 +89,7 @@ function SacolaPage() {
     const id = await recordOrder({
       name: profile.name,
       phone: profile.phone,
+      email: profile.email,
       items: orderItems(),
       subtotal,
       discount: applied?.discount ?? 0,
