@@ -139,14 +139,6 @@ function EuPage() {
             fallbackClassName="text-2xl font-black text-foreground"
           />
           <h1 className="text-2xl font-black text-foreground">Eu</h1>
-
-          <Link
-            to="/admin"
-            aria-label="Área do proprietário"
-            className="ml-auto grid h-11 w-11 place-items-center rounded-2xl border-2 border-border bg-card text-muted-foreground"
-          >
-            <Lock className="h-5 w-5" />
-          </Link>
         </div>
       </header>
 
