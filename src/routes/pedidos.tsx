@@ -217,6 +217,7 @@ function PedidosPage() {
   });
 
   const orders = data ?? [];
+  const lastOrder = orders.find((o) => o.id === lastOrderId);
   function bucket(o: Order): StatusValue {
     if (o.status === "canceled") return "canceled";
     if (o.status === "delivered") return "delivered";
