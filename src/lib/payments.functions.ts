@@ -75,12 +75,34 @@ export const startCartCheckout = createServerFn({ method: "POST" })
       console.log("[CHECKOUT] NSU criado:", nsu);
 
       const total = Number(data.total);
+      const totalCents = Math.round(total * 100);
+
+      console.log("[CHECKOUT] total recebido:", data.total);
+      console.log("[CHECKOUT] total convertido:", total);
+      console.log("[CHECKOUT] total em centavos:", totalCents);
+
+      /*
+       * A InfinitePay exige valor TOTAL maior que 1 centavo.
+       * Portanto, 0 ou 1 centavo nunca será enviado.
+       */
+      if (!Number.isFinite(total) || totalCents <= 1) {
+        console.error(
+          "[CHECKOUT] total inválido para InfinitePay:",
+          totalCents,
+        );
+
+        return {
+          url: null,
+          nsu: "",
+          reason: "invalid_total",
+        };
+      }
 
       let items = data.discounted
         ? [
             {
               quantity: 1,
-              price: Math.round(total * 100),
+              price: totalCents,
               description: "Pedido SPERB",
             },
           ]
@@ -97,21 +119,64 @@ export const startCartCheckout = createServerFn({ method: "POST" })
             ).slice(0, 120),
           }));
 
-      if (items.some((i) => i.price <= 0)) {
+      /*
+       * Se algum item tiver preço inválido,
+       * usamos o total do pedido como um único item.
+       */
+      if (
+        items.length === 0 ||
+        items.some(
+          (item) =>
+            !Number.isFinite(item.price) ||
+            item.price <= 0,
+        )
+      ) {
         console.warn(
-          "[CHECKOUT] preço inválido detectado, usando total",
+          "[CHECKOUT] preço inválido detectado, usando total do pedido",
         );
 
         items = [
           {
             quantity: 1,
-            price: Math.round(total * 100),
+            price: totalCents,
             description: "Pedido SPERB",
           },
         ];
       }
 
-      console.log("[CHECKOUT] itens preparados:", items);
+      /*
+       * Verifica o valor total dos itens.
+       * A InfinitePay não aceita total <= 1 centavo.
+       */
+      const itemsTotalCents = items.reduce(
+        (sum, item) =>
+          sum + item.price * item.quantity,
+        0,
+      );
+
+      console.log(
+        "[CHECKOUT] total dos itens em centavos:",
+        itemsTotalCents,
+      );
+
+      if (itemsTotalCents <= 1) {
+        console.warn(
+          "[CHECKOUT] total dos itens <= 1 centavo, usando total do pedido",
+        );
+
+        items = [
+          {
+            quantity: 1,
+            price: totalCents,
+            description: "Pedido SPERB",
+          },
+        ];
+      }
+
+      console.log(
+        "[CHECKOUT] itens finais:",
+        items,
+      );
 
       const request = getRequest();
 
@@ -233,6 +298,13 @@ export const attachCheckout = createServerFn({ method: "POST" })
       .eq("payment_status", "pending")
       .is("payment_url", null);
 
+    if (error) {
+      console.error(
+        "[CHECKOUT] erro ao anexar checkout:",
+        error,
+      );
+    }
+
     return {
       ok: !error,
     };
@@ -260,153 +332,244 @@ export const createOrderCheckout = createServerFn({
     },
   )
   .handler(async ({ data }) => {
-    const {
-      createCheckoutLink,
-      isConfigured,
-    } = await import(
-      "@/lib/infinitepay.server"
-    );
+    try {
+      console.log(
+        "[ORDER CHECKOUT] iniciou:",
+        data.orderId,
+      );
 
-    if (!isConfigured()) {
-      return {
-        url: null,
-        reason: "not_configured",
-      };
-    }
+      const {
+        createCheckoutLink,
+        isConfigured,
+      } = await import(
+        "@/lib/infinitepay.server"
+      );
 
-    const {
-      supabaseAdmin,
-    } = await import(
-      "@/integrations/supabase/client.server"
-    );
+      if (!isConfigured()) {
+        console.error(
+          "[ORDER CHECKOUT] InfinitePay não configurada",
+        );
 
-    const {
-      data: order,
-      error,
-    } = await supabaseAdmin
-      .from("orders")
-      .select(
-        "id, total, discount, coins_discount, payment_status, payment_url, customer_name, customer_phone, items",
-      )
-      .eq("id", data.orderId)
-      .maybeSingle();
+        return {
+          url: null,
+          reason: "not_configured",
+        };
+      }
 
-    if (error || !order) {
-      return {
-        url: null,
-        reason: "not_found",
-      };
-    }
+      const {
+        supabaseAdmin,
+      } = await import(
+        "@/integrations/supabase/client.server"
+      );
 
-    if (order.payment_status === "paid") {
-      return {
-        url: null,
-        reason: "already_paid",
-      };
-    }
+      const {
+        data: order,
+        error,
+      } = await supabaseAdmin
+        .from("orders")
+        .select(
+          "id, total, discount, coins_discount, payment_status, payment_url, customer_name, customer_phone, items",
+        )
+        .eq("id", data.orderId)
+        .maybeSingle();
 
-    if (order.payment_url) {
-      return {
-        url: order.payment_url as string,
-        reason: "existing",
-      };
-    }
+      if (error || !order) {
+        console.error(
+          "[ORDER CHECKOUT] pedido não encontrado:",
+          error,
+        );
 
-    const total = Number(order.total ?? 0);
+        return {
+          url: null,
+          reason: "not_found",
+        };
+      }
 
-    if (!(total > 0)) {
-      return {
-        url: null,
-        reason: "invalid_total",
-      };
-    }
+      if (order.payment_status === "paid") {
+        return {
+          url: null,
+          reason: "already_paid",
+        };
+      }
 
-    const rawItems = Array.isArray(order.items)
-      ? (order.items as Array<
-          Record<string, unknown>
-        >)
-      : [];
+      if (order.payment_url) {
+        return {
+          url: order.payment_url as string,
+          reason: "existing",
+        };
+      }
 
-    const hasDiscount =
-      Number(order.discount ?? 0) > 0 ||
-      Number(order.coins_discount ?? 0) > 0;
+      const total = Number(order.total ?? 0);
+      const totalCents = Math.round(total * 100);
 
-    const items = hasDiscount
-      ? [
+      console.log(
+        "[ORDER CHECKOUT] total:",
+        total,
+      );
+
+      console.log(
+        "[ORDER CHECKOUT] total em centavos:",
+        totalCents,
+      );
+
+      if (
+        !Number.isFinite(total) ||
+        totalCents <= 1
+      ) {
+        console.error(
+          "[ORDER CHECKOUT] total inválido para InfinitePay:",
+          totalCents,
+        );
+
+        return {
+          url: null,
+          reason: "invalid_total",
+        };
+      }
+
+      const rawItems = Array.isArray(order.items)
+        ? (order.items as Array<
+            Record<string, unknown>
+          >)
+        : [];
+
+      const hasDiscount =
+        Number(order.discount ?? 0) > 0 ||
+        Number(order.coins_discount ?? 0) > 0;
+
+      let items = hasDiscount
+        ? [
+            {
+              quantity: 1,
+              price: totalCents,
+              description: `Pedido SPERB ${String(
+                order.id,
+              ).slice(0, 8)}`,
+            },
+          ]
+        : rawItems.map((it) => ({
+            quantity: Math.max(
+              1,
+              Math.round(
+                Number(it["qty"] ?? 1),
+              ),
+            ),
+            price: Math.round(
+              Number(it["price"] ?? 0) * 100,
+            ),
+            description: String(
+              it["name"] ?? "Produto SPERB",
+            ).slice(0, 120),
+          }));
+
+      if (
+        items.length === 0 ||
+        items.some(
+          (item) =>
+            !Number.isFinite(item.price) ||
+            item.price <= 0,
+        )
+      ) {
+        items = [
           {
             quantity: 1,
-            price: Math.round(total * 100),
+            price: totalCents,
             description: `Pedido SPERB ${String(
               order.id,
             ).slice(0, 8)}`,
           },
-        ]
-      : rawItems.map((it) => ({
-          quantity: Math.max(
-            1,
-            Math.round(
-              Number(it["qty"] ?? 1),
-            ),
-          ),
-          price: Math.round(
-            Number(it["price"] ?? 0) * 100,
-          ),
-          description: String(
-            it["name"] ?? "Produto SPERB",
-          ).slice(0, 120),
-        }));
+        ];
+      }
 
-    if (
-      items.length === 0 ||
-      items.some((i) => i.price <= 0)
-    ) {
-      items.splice(0, items.length, {
-        quantity: 1,
-        price: Math.round(total * 100),
-        description: `Pedido SPERB ${String(
-          order.id,
-        ).slice(0, 8)}`,
+      const itemsTotalCents = items.reduce(
+        (sum, item) =>
+          sum + item.price * item.quantity,
+        0,
+      );
+
+      console.log(
+        "[ORDER CHECKOUT] total dos itens:",
+        itemsTotalCents,
+      );
+
+      if (itemsTotalCents <= 1) {
+        items = [
+          {
+            quantity: 1,
+            price: totalCents,
+            description: `Pedido SPERB ${String(
+              order.id,
+            ).slice(0, 8)}`,
+          },
+        ];
+      }
+
+      console.log(
+        "[ORDER CHECKOUT] itens finais:",
+        items,
+      );
+
+      const request = getRequest();
+
+      const origin = new URL(request.url).origin;
+
+      const url = await createCheckoutLink({
+        items,
+        orderNsu: String(order.id),
+        redirectUrl:
+          `${origin}/pedidos?status=preparing`,
+        webhookUrl:
+          `${origin}/api/public/infinitepay-webhook`,
+        customer: {
+          name:
+            (order.customer_name as string) ||
+            undefined,
+          phone:
+            (order.customer_phone as string) ||
+            undefined,
+        },
       });
-    }
 
-    const request = getRequest();
-    const origin = new URL(request.url).origin;
+      if (!url) {
+        console.error(
+          "[ORDER CHECKOUT] InfinitePay não retornou URL",
+        );
 
-    const url = await createCheckoutLink({
-      items,
-      orderNsu: String(order.id),
-      redirectUrl:
-        `${origin}/pedidos?status=preparing`,
-      webhookUrl:
-        `${origin}/api/public/infinitepay-webhook`,
-      customer: {
-        name:
-          (order.customer_name as string) ||
-          undefined,
-        phone:
-          (order.customer_phone as string) ||
-          undefined,
-      },
-    });
+        return {
+          url: null,
+          reason: "provider_error",
+        };
+      }
 
-    if (!url) {
+      await supabaseAdmin.rpc(
+        "set_order_payment_link",
+        {
+          p_order_id: String(order.id),
+          p_url: url,
+          p_provider: "infinitepay",
+        },
+      );
+
+      console.log(
+        "[ORDER CHECKOUT] checkout criado com sucesso",
+      );
+
       return {
-        url: null,
-        reason: "provider_error",
+        url,
+        reason: "created",
       };
+    } catch (error) {
+      console.error(
+        "[ORDER CHECKOUT] ERRO:",
+        error,
+      );
+
+      throw new Error(
+        `Falha no checkout do pedido: ${
+          error instanceof Error
+            ? error.message
+            : String(error)
+        }`,
+      );
     }
-
-    await supabaseAdmin.rpc(
-      "set_order_payment_link",
-      {
-        p_order_id: String(order.id),
-        p_url: url,
-        p_provider: "infinitepay",
-      },
-    );
-
-    return {
-      url,
-      reason: "created",
-    };
   });
