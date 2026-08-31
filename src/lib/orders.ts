@@ -47,6 +47,17 @@ export function statusLabel(v: string): string {
   return ORDER_STATUSES.find((s) => s.value === v)?.label ?? "Pedido recebido";
 }
 
+/** Rótulo que o cliente vê: pedido sem pagamento ainda não é "recebido". */
+export function displayStatusLabel(order: {
+  status: string;
+  paymentStatus: string;
+}): string {
+  if (order.status === "sent" && order.paymentStatus !== "paid") {
+    return "Aguardando pagamento";
+  }
+  return statusLabel(order.status);
+}
+
 export function paymentLabel(v: string): string {
   return PAYMENT_STATUSES.find((s) => s.value === v)?.label ?? "Aguardando pagamento";
 }
@@ -239,4 +250,13 @@ export async function resolveDuplicate(
 
 export function onlyDigits(s: string): string {
   return (s || "").replace(/\D/g, "");
+}
+
+/** Somente administrador: apaga os pedidos de um cliente de teste. */
+export async function deleteCustomerOrders(phone: string): Promise<number> {
+  const { data, error } = await supabase.rpc("admin_delete_customer_orders", {
+    p_phone: phone,
+  });
+  if (error) throw error;
+  return Number(data ?? 0);
 }

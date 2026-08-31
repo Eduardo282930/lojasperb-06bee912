@@ -10,6 +10,7 @@ import {
   fetchMyOrders,
   fetchOrderTimeline,
   statusLabel,
+  displayStatusLabel,
   paymentLabel,
   type Order,
 } from "@/lib/orders";
@@ -110,7 +111,7 @@ function OrderCard({ order, phone }: { order: Order; phone: string }) {
           <p className="text-sm font-bold text-muted-foreground">
             {new Date(order.createdAt).toLocaleString("pt-BR")}
           </p>
-          <p className="text-lg font-black text-foreground">{statusLabel(order.status)}</p>
+          <p className="text-lg font-black text-foreground">{displayStatusLabel(order)}</p>
           <p className="text-base font-semibold text-muted-foreground">
             {paymentLabel(order.paymentStatus)}
           </p>
@@ -345,7 +346,7 @@ function PedidosPage() {
               Pedido nº {lastOrder.id.slice(0, 8).toUpperCase()}
             </p>
             <p className="text-base font-bold text-muted-foreground">
-              {statusLabel(lastOrder.status)} · {paymentLabel(lastOrder.paymentStatus)}
+              {displayStatusLabel(lastOrder)} · {paymentLabel(lastOrder.paymentStatus)}
             </p>
             <p className="mt-1 text-sm font-semibold text-muted-foreground">
               Assim que o pagamento for confirmado, o pedido entra em preparação

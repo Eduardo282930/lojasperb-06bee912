@@ -128,19 +128,6 @@ function ProdutoPage() {
           <h1 className="min-w-0 flex-1 truncate text-2xl font-black text-foreground">
             {product.name}
           </h1>
-          <Link
-            id="cart-anchor"
-            to="/sacola"
-            className="relative grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-[oklch(0.62_0.19_145)] text-white active:scale-95"
-            aria-label="Ver carrinho"
-          >
-            <ShoppingCart className="h-7 w-7" />
-            {totalQty > 0 && (
-              <span className="absolute -right-1 -top-1 min-w-6 rounded-full bg-white px-1 text-center text-sm font-black text-[oklch(0.45_0.19_145)]">
-                {totalQty}
-              </span>
-            )}
-          </Link>
         </div>
       </header>
 

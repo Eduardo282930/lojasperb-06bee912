@@ -22,6 +22,7 @@ import { useServerFn } from "@tanstack/react-start";
 import {
   createOrderCheckout,
   abandonOrder,
+  paymentsStatus,
   MIN_CHECKOUT_BRL,
 } from "@/lib/payments.functions";
 
@@ -45,10 +46,11 @@ function SacolaPage() {
   const profile = useProfile();
   const refreshCoupons = useCouponsRefresh();
   const qc = useQueryClient();
-  const [useCoins, setUseCoins] = useState(true);
+  const [useCoins, setUseCoins] = useState(false);
   const [paying, setPaying] = useState(false);
   const [payError, setPayError] = useState("");
   const openCheckout = useServerFn(createOrderCheckout);
+  const checkPayments = useServerFn(paymentsStatus);
   const cancelOrder = useServerFn(abandonOrder);
   const navigate = Route.useNavigate();
   const logged = profile.phone.trim().length >= 8 && profile.name.trim().length > 0;
@@ -151,6 +153,15 @@ function SacolaPage() {
     setPayError("");
     let orderId: string | null = null;
     try {
+      // Só criamos o pedido (e a reserva de estoque) depois de confirmar que o
+      // pagamento online está disponível. Assim nada vira "pedido recebido" à toa.
+      const status = await checkPayments();
+      if (!status.configured) {
+        setPayError(
+          "O pagamento online está indisponível agora. Você pode enviar o pedido pelo WhatsApp.",
+        );
+        return;
+      }
       orderId = await saveOrder();
       if (!orderId) {
         setPayError("Não foi possível registrar o pedido. Tente de novo.");

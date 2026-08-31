@@ -243,3 +243,60 @@ export const syncCustomersToSupabase = createServerFn({ method: "POST" }).handle
   },
 );
 
+
+/**
+ * Loyverse é a fonte principal dos dados do cliente.
+ * Busca pelo telefone, atualiza o Supabase e devolve o cadastro mais recente.
+ */
+export const loyverseCustomerLookup = createServerFn({ method: "POST" })
+  .inputValidator((data: { phone: string }) => ({
+    phone: String(data?.phone ?? "").trim().slice(0, 30),
+  }))
+  .handler(
+    async ({
+      data,
+    }): Promise<{ found: boolean; name: string; email: string; phone: string }> => {
+      const empty = { found: false, name: "", email: "", phone: "" };
+      const key = digits(data.phone).slice(-8);
+      if (key.length < 8) return empty;
+
+      const token = process.env["LOYVERSE_TOKEN"];
+      if (!token) return empty;
+
+      try {
+        const list = await loyverse<{
+          customers?: Array<LoyverseCustomer & { email?: string | null }>;
+        }>("customers?limit=250", token);
+
+        const match = (list.customers ?? []).find(
+          (c) => digits(c.phone_number ?? "").slice(-8) === key,
+        );
+        if (!match) return empty;
+
+        const found = {
+          found: true,
+          name: match.name?.trim() ?? "",
+          email: match.email ?? "",
+          phone: match.phone_number ?? data.phone,
+        };
+
+        // Loyverse -> Supabase: mantém o cadastro do app sempre atualizado.
+        try {
+          const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+          await supabaseAdmin.rpc("upsert_customer_from_loyverse", {
+            p_loyverse_id: match.id,
+            p_name: found.name,
+            p_phone: found.phone,
+            p_email: found.email,
+          });
+        } catch (err) {
+          console.error("[Clientes] atualização Supabase falhou:", err);
+        }
+
+        return found;
+      } catch (err) {
+        console.error("[Clientes] busca no Loyverse falhou:", err);
+        return empty;
+      }
+    },
+  );

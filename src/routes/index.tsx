@@ -234,19 +234,6 @@ function Home() {
               )}
             </div>
 
-            <Link
-              id="cart-anchor"
-              to="/sacola"
-              aria-label="Ver carrinho"
-              className="relative grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[oklch(0.62_0.19_145)] text-white shadow active:scale-95"
-            >
-              <ShoppingCart className="h-6 w-6" />
-              {totalQty > 0 && (
-                <span className="absolute -right-1 -top-1 min-w-5 rounded-full bg-white px-1 text-center text-xs font-black text-[oklch(0.45_0.19_145)]">
-                  {totalQty}
-                </span>
-              )}
-            </Link>
           </div>
 
           <div className="mt-2 flex items-start gap-2">
