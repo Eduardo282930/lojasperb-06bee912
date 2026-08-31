@@ -9,7 +9,7 @@ export function FloatingCart() {
   const qty = cart.reduce((s, c) => s + c.qty, 0);
   const total = cart.reduce((s, c) => s + priceValue(c.price) * c.qty, 0);
 
-  const hidden = qty === 0 || path.startsWith("/sacola") || path.startsWith("/admin");
+  const hidden = qty === 0 || path.startsWith("/sacola");
   if (hidden) return null;
 
   return (

@@ -47,6 +47,17 @@ export function statusLabel(v: string): string {
   return ORDER_STATUSES.find((s) => s.value === v)?.label ?? "Pedido recebido";
 }
 
+/** Rótulo que o cliente vê: pedido sem pagamento ainda não é "recebido". */
+export function displayStatusLabel(order: {
+  status: string;
+  paymentStatus: string;
+}): string {
+  if (order.status === "sent" && order.paymentStatus !== "paid") {
+    return "Aguardando pagamento";
+  }
+  return statusLabel(order.status);
+}
+
 export function paymentLabel(v: string): string {
   return PAYMENT_STATUSES.find((s) => s.value === v)?.label ?? "Aguardando pagamento";
 }
