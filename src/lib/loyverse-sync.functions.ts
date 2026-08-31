@@ -133,16 +133,16 @@ export async function syncPaidOrder(orderId: string): Promise<SyncResult> {
 
 /** Reprocessamento manual pelo painel do administrador. */
 export const retryLoyverseSync = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((data: { orderId: string }) => {
     if (!data?.orderId) throw new Error("orderId");
     return { orderId: data.orderId };
   })
-  .handler(async ({ data }): Promise<SyncResult> => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: isAdmin } = await supabaseAdmin.rpc("has_role", {
-      _user_id: (await supabaseAdmin.auth.getUser()).data.user?.id ?? "",
+  .handler(async ({ data, context }): Promise<SyncResult> => {
+    const { data: isAdmin } = await context.supabase.rpc("has_role", {
+      _user_id: context.userId,
       _role: "admin",
     });
-    void isAdmin;
+    if (!isAdmin) return { ok: false, reason: "forbidden" };
     return syncPaidOrder(data.orderId);
   });
