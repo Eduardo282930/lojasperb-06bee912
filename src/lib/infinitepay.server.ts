@@ -24,7 +24,7 @@ export async function createCheckoutLink(input: {
   orderNsu: string;
   redirectUrl: string;
   webhookUrl: string;
-  customer?: { name?: string; phone?: string };
+  customer?: { name?: string; phone?: string; email?: string };
 }): Promise<string | null> {
   const h = handle();
 
@@ -46,10 +46,12 @@ export async function createCheckoutLink(input: {
   };
 
   const phone = (input.customer?.phone ?? "").replace(/\D/g, "");
+  const email = (input.customer?.email ?? "").trim();
 
-  if (input.customer?.name || phone) {
+  if (input.customer?.name || phone || email) {
     body["customer"] = {
       name: input.customer?.name || undefined,
+      email: email || undefined,
       phone_number: phone ? `+55${phone.slice(-11)}` : undefined,
     };
   }

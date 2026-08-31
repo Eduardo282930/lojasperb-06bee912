@@ -22,7 +22,7 @@ import {
 import {
   useProfile,
   saveProfile,
-  lookupCustomerName,
+  lookupCustomerProfile,
   useClaimedCoupons,
   useCoupons,
   useMyCouponUses,
@@ -310,12 +310,14 @@ function ProfileSheet({ onClose }: { onClose: () => void }) {
   const profile = useProfile();
   const [name, setName] = useState(profile.name);
   const [phone, setPhone] = useState(profile.phone);
+  const [email, setEmail] = useState(profile.email);
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [status, setStatus] = useState<"idle" | "checking" | "known" | "new">(
     profile.name ? "known" : "idle",
   );
   const locked = status === "known";
+  const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim());
 
   useEffect(() => {
     const digits = phone.replace(/\D/g, "");
@@ -326,10 +328,11 @@ function ProfileSheet({ onClose }: { onClose: () => void }) {
     let alive = true;
     setStatus("checking");
     const t = setTimeout(async () => {
-      const registered = await lookupCustomerName(phone);
+      const registered = await lookupCustomerProfile(phone);
       if (!alive) return;
-      if (registered) {
-        setName(registered);
+      if (registered?.name) {
+        setName(registered.name);
+        if (registered.email) setEmail((e) => e || registered.email);
         setStatus("known");
       } else {
         setStatus("new");
@@ -401,15 +404,36 @@ function ProfileSheet({ onClose }: { onClose: () => void }) {
           </label>
         )}
 
+        <label className="mt-3 block text-base font-bold text-muted-foreground">
+          E-mail
+          <input
+            value={email}
+            maxLength={120}
+            inputMode="email"
+            autoComplete="email"
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="voce@email.com"
+            className="mt-1 w-full rounded-2xl border-2 border-border bg-background px-4 py-3 text-lg font-semibold text-foreground outline-none focus:border-[oklch(0.55_0.22_255)]"
+          />
+          <span className="mt-1 block text-sm font-semibold text-muted-foreground">
+            Usado no pagamento online (Pix e cartão). Pedido pelo WhatsApp não precisa.
+          </span>
+        </label>
+
         <button
           disabled={
             phone.replace(/\D/g, "").length < 10 ||
-            (status === "new" && name.trim().length < 2)
+            (status === "new" && name.trim().length < 2) ||
+            (email.trim().length > 0 && !emailOk)
           }
           onClick={async () => {
             setSaveError("");
             try {
-              await saveProfile({ name: name.trim(), phone: phone.trim() });
+              await saveProfile({
+                name: name.trim(),
+                phone: phone.trim(),
+                email: email.trim().toLowerCase(),
+              });
               setStatus("known");
               setSaved(true);
               setTimeout(onClose, 700);

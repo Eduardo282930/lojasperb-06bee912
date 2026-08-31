@@ -743,6 +743,7 @@ export type Database = {
         Row: {
           active: boolean
           created_at: string
+          expires_at: string | null
           external_variant_id: string | null
           id: string
           order_id: string
@@ -754,6 +755,7 @@ export type Database = {
         Insert: {
           active?: boolean
           created_at?: string
+          expires_at?: string | null
           external_variant_id?: string | null
           id?: string
           order_id: string
@@ -765,6 +767,7 @@ export type Database = {
         Update: {
           active?: boolean
           created_at?: string
+          expires_at?: string | null
           external_variant_id?: string | null
           id?: string
           order_id?: string
@@ -790,6 +793,7 @@ export type Database = {
           coupon_code: string
           coupon_id: string | null
           created_at: string
+          customer_email: string
           customer_id: string | null
           customer_name: string
           customer_phone: string
@@ -821,6 +825,7 @@ export type Database = {
           coupon_code?: string
           coupon_id?: string | null
           created_at?: string
+          customer_email?: string
           customer_id?: string | null
           customer_name?: string
           customer_phone?: string
@@ -852,6 +857,7 @@ export type Database = {
           coupon_code?: string
           coupon_id?: string | null
           created_at?: string
+          customer_email?: string
           customer_id?: string | null
           customer_name?: string
           customer_phone?: string
@@ -1143,6 +1149,7 @@ export type Database = {
           p_coupon_code: string
           p_device_id: string
           p_discount: number
+          p_email?: string
           p_items: Json
           p_name: string
           p_phone: string
@@ -1156,6 +1163,7 @@ export type Database = {
         Args: { p_device_id: string; p_phone: string }
         Returns: Json
       }
+      expire_stale_reservations: { Args: never; Returns: number }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -1163,9 +1171,31 @@ export type Database = {
         }
         Returns: boolean
       }
+      lookup_customer_by_email: {
+        Args: { p_email: string }
+        Returns: {
+          name: string
+          phone: string
+        }[]
+      }
       lookup_customer_name: { Args: { p_phone: string }; Returns: string }
+      lookup_customer_profile: {
+        Args: { p_phone: string }
+        Returns: {
+          email: string
+          name: string
+        }[]
+      }
       mark_notifications_read: {
         Args: { p_device_id: string; p_phone: string }
+        Returns: boolean
+      }
+      mark_order_sync_failed: {
+        Args: { p_error: string; p_order_id: string }
+        Returns: boolean
+      }
+      mark_order_synced: {
+        Args: { p_order_id: string; p_receipt_id: string }
         Returns: boolean
       }
       notifications_for_customer: {
@@ -1216,10 +1246,20 @@ export type Database = {
         Args: { p_device_id: string; p_phone: string }
         Returns: string
       }
-      save_customer: {
-        Args: { p_device_id: string; p_name: string; p_phone: string }
-        Returns: string
-      }
+      save_customer:
+        | {
+            Args: { p_device_id: string; p_name: string; p_phone: string }
+            Returns: string
+          }
+        | {
+            Args: {
+              p_device_id: string
+              p_email: string
+              p_name: string
+              p_phone: string
+            }
+            Returns: string
+          }
       set_order_payment_link: {
         Args: { p_order_id: string; p_provider: string; p_url: string }
         Returns: boolean

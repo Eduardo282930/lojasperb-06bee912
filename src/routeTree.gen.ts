@@ -20,6 +20,7 @@ import { Route as ProdutoIdRouteImport } from './routes/produto.$id'
 import { Route as ApiPublicSyncCatalogRouteImport } from './routes/api/public/sync-catalog'
 import { Route as ApiPublicManifestRouteImport } from './routes/api/public/manifest'
 import { Route as ApiPublicInfinitepayWebhookRouteImport } from './routes/api/public/infinitepay-webhook'
+import { Route as ApiPublicExpireReservationsRouteImport } from './routes/api/public/expire-reservations'
 
 const SacolaRoute = SacolaRouteImport.update({
   id: '/sacola',
@@ -77,6 +78,12 @@ const ApiPublicInfinitepayWebhookRoute =
     path: '/api/public/infinitepay-webhook',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicExpireReservationsRoute =
+  ApiPublicExpireReservationsRouteImport.update({
+    id: '/api/public/expire-reservations',
+    path: '/api/public/expire-reservations',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -87,6 +94,7 @@ export interface FileRoutesByFullPath {
   '/pedidos': typeof PedidosRoute
   '/sacola': typeof SacolaRoute
   '/produto/$id': typeof ProdutoIdRoute
+  '/api/public/expire-reservations': typeof ApiPublicExpireReservationsRoute
   '/api/public/infinitepay-webhook': typeof ApiPublicInfinitepayWebhookRoute
   '/api/public/manifest': typeof ApiPublicManifestRoute
   '/api/public/sync-catalog': typeof ApiPublicSyncCatalogRoute
@@ -100,6 +108,7 @@ export interface FileRoutesByTo {
   '/pedidos': typeof PedidosRoute
   '/sacola': typeof SacolaRoute
   '/produto/$id': typeof ProdutoIdRoute
+  '/api/public/expire-reservations': typeof ApiPublicExpireReservationsRoute
   '/api/public/infinitepay-webhook': typeof ApiPublicInfinitepayWebhookRoute
   '/api/public/manifest': typeof ApiPublicManifestRoute
   '/api/public/sync-catalog': typeof ApiPublicSyncCatalogRoute
@@ -114,6 +123,7 @@ export interface FileRoutesById {
   '/pedidos': typeof PedidosRoute
   '/sacola': typeof SacolaRoute
   '/produto/$id': typeof ProdutoIdRoute
+  '/api/public/expire-reservations': typeof ApiPublicExpireReservationsRoute
   '/api/public/infinitepay-webhook': typeof ApiPublicInfinitepayWebhookRoute
   '/api/public/manifest': typeof ApiPublicManifestRoute
   '/api/public/sync-catalog': typeof ApiPublicSyncCatalogRoute
@@ -129,6 +139,7 @@ export interface FileRouteTypes {
     | '/pedidos'
     | '/sacola'
     | '/produto/$id'
+    | '/api/public/expire-reservations'
     | '/api/public/infinitepay-webhook'
     | '/api/public/manifest'
     | '/api/public/sync-catalog'
@@ -142,6 +153,7 @@ export interface FileRouteTypes {
     | '/pedidos'
     | '/sacola'
     | '/produto/$id'
+    | '/api/public/expire-reservations'
     | '/api/public/infinitepay-webhook'
     | '/api/public/manifest'
     | '/api/public/sync-catalog'
@@ -155,6 +167,7 @@ export interface FileRouteTypes {
     | '/pedidos'
     | '/sacola'
     | '/produto/$id'
+    | '/api/public/expire-reservations'
     | '/api/public/infinitepay-webhook'
     | '/api/public/manifest'
     | '/api/public/sync-catalog'
@@ -169,6 +182,7 @@ export interface RootRouteChildren {
   PedidosRoute: typeof PedidosRoute
   SacolaRoute: typeof SacolaRoute
   ProdutoIdRoute: typeof ProdutoIdRoute
+  ApiPublicExpireReservationsRoute: typeof ApiPublicExpireReservationsRoute
   ApiPublicInfinitepayWebhookRoute: typeof ApiPublicInfinitepayWebhookRoute
   ApiPublicManifestRoute: typeof ApiPublicManifestRoute
   ApiPublicSyncCatalogRoute: typeof ApiPublicSyncCatalogRoute
@@ -253,6 +267,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicInfinitepayWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/expire-reservations': {
+      id: '/api/public/expire-reservations'
+      path: '/api/public/expire-reservations'
+      fullPath: '/api/public/expire-reservations'
+      preLoaderRoute: typeof ApiPublicExpireReservationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -265,6 +286,7 @@ const rootRouteChildren: RootRouteChildren = {
   PedidosRoute: PedidosRoute,
   SacolaRoute: SacolaRoute,
   ProdutoIdRoute: ProdutoIdRoute,
+  ApiPublicExpireReservationsRoute: ApiPublicExpireReservationsRoute,
   ApiPublicInfinitepayWebhookRoute: ApiPublicInfinitepayWebhookRoute,
   ApiPublicManifestRoute: ApiPublicManifestRoute,
   ApiPublicSyncCatalogRoute: ApiPublicSyncCatalogRoute,

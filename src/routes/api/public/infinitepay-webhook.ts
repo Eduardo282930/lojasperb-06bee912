@@ -56,6 +56,15 @@ export const Route = createFileRoute("/api/public/infinitepay-webhook")({
           return new Response("retry", { status: 400 });
         }
 
+        // Pagamento confirmado: a reserva vira venda real no Loyverse.
+        // Idempotente: se o recibo já existe, nada é criado de novo.
+        try {
+          const { syncPaidOrder } = await import("@/lib/loyverse-sync.functions");
+          await syncPaidOrder(found.id);
+        } catch (err) {
+          console.error("[infinitepay] sync loyverse", err);
+        }
+
         return new Response("ok");
       },
     },
