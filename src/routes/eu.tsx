@@ -22,7 +22,7 @@ import {
 import {
   useProfile,
   saveProfile,
-  lookupCustomerProfile,
+  lookupCustomerLive,
   useClaimedCoupons,
   useCoupons,
   useMyCouponUses,
@@ -328,7 +328,7 @@ function ProfileSheet({ onClose }: { onClose: () => void }) {
     let alive = true;
     setStatus("checking");
     const t = setTimeout(async () => {
-      const registered = await lookupCustomerProfile(phone);
+      const registered = await lookupCustomerLive(phone);
       if (!alive) return;
       if (registered?.name) {
         setName(registered.name);
@@ -445,7 +445,7 @@ function ProfileSheet({ onClose }: { onClose: () => void }) {
             saved ? "bg-[oklch(0.62_0.19_145)]" : "bg-[oklch(0.55_0.22_255)]"
           }`}
         >
-          {saved ? "Salvo!" : "Salvar cadastro"}
+          {saved ? "Pronto!" : locked ? "Entrar" : "Salvar cadastro"}
         </button>
         {saveError && (
           <p className="mt-2 text-base font-bold text-[oklch(0.58_0.22_25)]">
