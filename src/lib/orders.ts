@@ -55,6 +55,7 @@ export function paymentLabel(v: string): string {
 export async function recordOrder(input: {
   name: string;
   phone: string;
+  email?: string;
   items: OrderItem[];
   subtotal: number;
   discount: number;
@@ -66,6 +67,7 @@ export async function recordOrder(input: {
     p_device_id: deviceId(),
     p_name: input.name,
     p_phone: input.phone,
+    p_email: input.email ?? "",
     p_items: input.items,
     p_subtotal: input.subtotal,
     p_discount: input.discount,

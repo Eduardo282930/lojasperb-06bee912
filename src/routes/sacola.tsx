@@ -52,6 +52,7 @@ function SacolaPage() {
   const cancelOrder = useServerFn(abandonOrder);
   const navigate = Route.useNavigate();
   const logged = profile.phone.trim().length >= 8 && profile.name.trim().length > 0;
+  const hasEmail = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(profile.email.trim());
 
   const coinBalance = useQuery({
     queryKey: ["coins", "balance", profile.phone],
