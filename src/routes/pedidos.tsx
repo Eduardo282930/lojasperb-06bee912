@@ -23,7 +23,7 @@ export const Route = createFileRoute("/pedidos")({
     const status = (STATUSES as readonly string[]).includes(raw)
       ? (raw as (typeof STATUSES)[number])
       : ("topay" as const);
-    return { status };
+    return { status, checkout: String(search["checkout"] ?? "") === "1" };
   },
 
   head: () => ({
