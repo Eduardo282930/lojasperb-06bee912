@@ -116,26 +116,43 @@ function SacolaPage() {
     return texto;
   }
 
-  /** Pagamento online (Pix ou cartão) pelo checkout da InfinitePay. */
+  /** Pagamento online: abre o checkout primeiro e só então cria o pedido. */
   async function pagarAgora() {
     if (cart.length === 0 || paying) return;
+    if (!logged) {
+      void navigate({ to: "/eu" });
+      return;
+    }
     setPaying(true);
     setPayError("");
     try {
-      const id = await saveOrder();
-      if (!id) {
-        setPayError("Não foi possível registrar o pedido. Tente de novo.");
-        return;
-      }
-      const res = await startCheckout({ data: { orderId: id } });
-      if (!res.url) {
+      const checkout = await startCheckout({
+        data: {
+          items: cart.map((c) => ({ name: c.name, qty: c.qty, price: priceValue(c.price) })),
+          total,
+          discounted: (applied?.discount ?? 0) > 0 || coinsDiscount > 0,
+          name: profile.name,
+          phone: profile.phone,
+        },
+      });
+      if (!checkout.url) {
         setPayError(
           "O pagamento online está indisponível agora. Você pode enviar o pedido pelo WhatsApp.",
         );
         return;
       }
+      // Checkout aberto com sucesso: agora sim registramos o pedido.
+      const id = await saveOrder();
+      if (!id) {
+        setPayError("Não foi possível registrar o pedido. Tente de novo.");
+        return;
+      }
+      await attach({ data: { orderId: id, nsu: checkout.nsu, url: checkout.url } });
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem("sperb-last-order", id);
+      }
       clearCart();
-      window.location.href = res.url;
+      window.location.href = checkout.url;
     } catch {
       setPayError("Falha ao abrir o pagamento. Tente novamente.");
     } finally {
@@ -145,6 +162,10 @@ function SacolaPage() {
 
   async function enviarWhatsApp() {
     if (cart.length === 0) return;
+    if (!logged) {
+      void navigate({ to: "/eu" });
+      return;
+    }
     const url = `https://api.whatsapp.com/send?phone=${WHATSAPP_NUMBER}&text=${encodeURIComponent(whatsAppText())}`;
     window.open(url, "_blank");
     await saveOrder();
