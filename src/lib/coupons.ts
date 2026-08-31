@@ -35,6 +35,8 @@ export type Coupon = {
 export type Profile = {
   name: string;
   phone: string;
+  /** Obrigatório para pagar online (a InfinitePay pede o e-mail). */
+  email: string;
 };
 
 type CouponRow = {
@@ -312,19 +314,26 @@ function readJSON<T>(key: string, fallback: T): T {
   }
 }
 
-let profileCache: Profile = { name: "", phone: "" };
+const BLANK_PROFILE: Profile = { name: "", phone: "", email: "" };
+
+let profileCache: Profile = BLANK_PROFILE;
 let redeemedCache: string[] = [];
 let initialized = false;
 
 function ensureInit() {
   if (initialized || typeof window === "undefined") return;
-  profileCache = readJSON<Profile>(PROFILE_KEY, { name: "", phone: "" });
+  const saved = readJSON<Partial<Profile>>(PROFILE_KEY, {});
+  profileCache = {
+    name: saved.name ?? "",
+    phone: saved.phone ?? "",
+    email: saved.email ?? "",
+  };
   redeemedCache = readJSON<string[]>(REDEEMED_KEY, []);
   initialized = true;
 }
 
 const EMPTY_REDEEMED: string[] = [];
-const EMPTY_PROFILE: Profile = { name: "", phone: "" };
+const EMPTY_PROFILE: Profile = BLANK_PROFILE;
 
 export function deviceId(): string {
   if (typeof window === "undefined") return "";
