@@ -392,8 +392,31 @@ export async function lookupCustomerProfile(
   return { name: row.name ?? "", email: row.email ?? "" };
 }
 
+/**
+ * Cadastro do cliente com o Loyverse como fonte principal.
+ * Busca no Loyverse (que também atualiza o banco) e, se não houver token ou
+ * cliente lá, usa o cadastro já salvo no banco.
+ */
+export async function lookupCustomerLive(
+  phone: string,
+): Promise<{ name: string; email: string } | null> {
+  const digits = (phone || "").replace(/\D/g, "");
+  if (digits.length < 8) return null;
+  try {
+    const live = await loyverseCustomerLookup({ data: { phone } });
+    if (live?.found && live.name) {
+      const local = await lookupCustomerProfile(phone);
+      return { name: live.name, email: live.email || local?.email || "" };
+    }
+  } catch (err) {
+    console.warn("[lookupCustomerLive] Loyverse indisponível", err);
+  }
+  return lookupCustomerProfile(phone);
+}
+
 /** Reconhece o cliente pelo e-mail já cadastrado. */
 export async function lookupCustomerByEmail(
+
   email: string,
 ): Promise<{ name: string; phone: string } | null> {
   const clean = (email || "").trim();
