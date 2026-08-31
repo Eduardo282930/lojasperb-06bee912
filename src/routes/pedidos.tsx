@@ -202,7 +202,13 @@ type StatusValue = (typeof SECTIONS)[number]["value"];
 
 function PedidosPage() {
   const profile = useProfile();
-  const { status } = Route.useSearch();
+  const { status, checkout } = Route.useSearch();
+  const [lastOrderId, setLastOrderId] = useState("");
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setLastOrderId(window.localStorage.getItem("sperb-last-order") ?? "");
+    }
+  }, []);
   const navigate = Route.useNavigate();
   const { data, isLoading } = useQuery({
     queryKey: ["my-orders", profile.phone],
