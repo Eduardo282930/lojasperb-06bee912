@@ -48,8 +48,8 @@ function SacolaPage() {
   const [useCoins, setUseCoins] = useState(true);
   const [paying, setPaying] = useState(false);
   const [payError, setPayError] = useState("");
-  const startCheckout = useServerFn(startCartCheckout);
-  const attach = useServerFn(attachCheckout);
+  const openCheckout = useServerFn(createOrderCheckout);
+  const cancelOrder = useServerFn(abandonOrder);
   const navigate = Route.useNavigate();
   const logged = profile.phone.trim().length >= 8 && profile.name.trim().length > 0;
 
