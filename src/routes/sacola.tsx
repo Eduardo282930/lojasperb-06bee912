@@ -19,7 +19,7 @@ import {
 import { fetchCoinBalance, coinsToBRL, maxCoinsFor, COIN_MAX_RATIO } from "@/lib/coins";
 import { recordOrder } from "@/lib/orders";
 import { useServerFn } from "@tanstack/react-start";
-import { createOrderCheckout } from "@/lib/payments.functions";
+import { startCartCheckout, attachCheckout } from "@/lib/payments.functions";
 
 
 const WHATSAPP_NUMBER = "5551996109657";
