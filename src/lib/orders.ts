@@ -251,3 +251,12 @@ export async function resolveDuplicate(
 export function onlyDigits(s: string): string {
   return (s || "").replace(/\D/g, "");
 }
+
+/** Somente administrador: apaga os pedidos de um cliente de teste. */
+export async function deleteCustomerOrders(phone: string): Promise<number> {
+  const { data, error } = await supabase.rpc("admin_delete_customer_orders", {
+    p_phone: phone,
+  });
+  if (error) throw error;
+  return Number(data ?? 0);
+}
