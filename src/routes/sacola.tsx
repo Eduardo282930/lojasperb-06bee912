@@ -124,44 +124,54 @@ function SacolaPage() {
     return texto;
   }
 
-  /** Pagamento online: abre o checkout primeiro e só então cria o pedido. */
+  /**
+   * Pagamento online: o pedido é criado como não pago (com reserva de estoque)
+   * e o checkout é aberto em seguida. Se o checkout falhar, o pedido é
+   * cancelado na hora e o estoque volta para a loja.
+   */
   async function pagarAgora() {
     if (cart.length === 0 || paying) return;
     if (!logged) {
       void navigate({ to: "/eu" });
       return;
     }
+    if (!hasEmail) {
+      setPayError("Cadastre seu e-mail em “Eu” para pagar com Pix ou cartão.");
+      void navigate({ to: "/eu" });
+      return;
+    }
+    if (total < MIN_CHECKOUT_BRL) {
+      setPayError(
+        `O pagamento online começa em ${formatPrice(MIN_CHECKOUT_BRL)}. Envie pelo WhatsApp.`,
+      );
+      return;
+    }
     setPaying(true);
     setPayError("");
+    let orderId: string | null = null;
     try {
-      const checkout = await startCheckout({
-        data: {
-          items: cart.map((c) => ({ name: c.name, qty: c.qty, price: priceValue(c.price) })),
-          total,
-          discounted: (applied?.discount ?? 0) > 0 || coinsDiscount > 0,
-          name: profile.name,
-          phone: profile.phone,
-        },
-      });
-      if (!checkout.url) {
-        setPayError(
-          "O pagamento online está indisponível agora. Você pode enviar o pedido pelo WhatsApp.",
-        );
-        return;
-      }
-      // Checkout aberto com sucesso: agora sim registramos o pedido.
-      const id = await saveOrder();
-      if (!id) {
+      orderId = await saveOrder();
+      if (!orderId) {
         setPayError("Não foi possível registrar o pedido. Tente de novo.");
         return;
       }
-      await attach({ data: { orderId: id, nsu: checkout.nsu, url: checkout.url } });
+      const checkout = await openCheckout({ data: { orderId } });
+      if (!checkout.url) {
+        await cancelOrder({ data: { orderId } });
+        setPayError(
+          checkout.reason === "min_value"
+            ? `O pagamento online começa em ${formatPrice(MIN_CHECKOUT_BRL)}.`
+            : "O pagamento online está indisponível agora. Você pode enviar o pedido pelo WhatsApp.",
+        );
+        return;
+      }
       if (typeof window !== "undefined") {
-        window.localStorage.setItem("sperb-last-order", id);
+        window.localStorage.setItem("sperb-last-order", orderId);
       }
       clearCart();
       window.location.href = checkout.url;
     } catch {
+      if (orderId) await cancelOrder({ data: { orderId } }).catch(() => undefined);
       setPayError("Falha ao abrir o pagamento. Tente novamente.");
     } finally {
       setPaying(false);
