@@ -1015,6 +1015,10 @@ export type Database = {
         Returns: number
       }
       admin_coin_balance: { Args: { p_customer_id: string }; Returns: number }
+      admin_delete_customer_orders: {
+        Args: { p_phone: string }
+        Returns: number
+      }
       admin_mark_receipt_synced: {
         Args: { p_order_id: string; p_receipt_id: string }
         Returns: boolean
@@ -1072,6 +1076,10 @@ export type Database = {
         Returns: boolean
       }
       consume_coupon: { Args: { p_coupon_id: string }; Returns: boolean }
+      consume_order_reservations: {
+        Args: { p_order_id: string }
+        Returns: number
+      }
       coupon_uses_for_customer: {
         Args: { p_device_id: string; p_phone: string }
         Returns: {
