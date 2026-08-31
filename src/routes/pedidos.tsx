@@ -338,6 +338,20 @@ function PedidosPage() {
       </header>
 
       <main className="mx-auto max-w-3xl pt-4">
+        {checkout && lastOrder && (
+          <div className="mx-4 mb-4 rounded-2xl border-2 border-[oklch(0.62_0.19_145)] bg-[oklch(0.62_0.19_145)]/10 p-4">
+            <p className="text-lg font-black text-foreground">
+              Pedido nº {lastOrder.id.slice(0, 8).toUpperCase()}
+            </p>
+            <p className="text-base font-bold text-muted-foreground">
+              {statusLabel(lastOrder.status)} · {paymentLabel(lastOrder.paymentStatus)}
+            </p>
+            <p className="mt-1 text-sm font-semibold text-muted-foreground">
+              Assim que o pagamento for confirmado, o pedido entra em preparação
+              automaticamente.
+            </p>
+          </div>
+        )}
         {isLoading && (
           <p className="px-4 text-lg font-semibold text-muted-foreground">Carregando…</p>
         )}
