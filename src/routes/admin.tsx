@@ -38,6 +38,7 @@ import {
 } from "@/lib/coupons";
 import {
   fetchOrders,
+  deleteCustomerOrders,
   onlyDigits,
   setOrderStatus,
   fetchDuplicates,
