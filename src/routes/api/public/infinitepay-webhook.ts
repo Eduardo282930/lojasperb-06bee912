@@ -31,8 +31,19 @@ export const Route = createFileRoute("/api/public/infinitepay-webhook")({
         }
 
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+        // O checkout é aberto antes do pedido: o nsu pode ser o id do pedido
+        // (fluxo antigo) ou o `payment_nsu` gravado depois da criação.
+        const { data: found } = await supabaseAdmin
+          .from("orders")
+          .select("id")
+          .or(`id.eq.${orderNsu},payment_nsu.eq.${orderNsu}`)
+          .limit(1)
+          .maybeSingle();
+        if (!found) return new Response("order not found", { status: 400 });
+
         const { error } = await supabaseAdmin.rpc("confirm_order_payment", {
-          p_order_id: orderNsu,
+          p_order_id: found.id,
           p_provider: "infinitepay",
           p_external_id: transactionNsu,
           p_method: check.captureMethod || String(payload["capture_method"] ?? ""),

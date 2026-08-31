@@ -139,14 +139,6 @@ function EuPage() {
             fallbackClassName="text-2xl font-black text-foreground"
           />
           <h1 className="text-2xl font-black text-foreground">Eu</h1>
-
-          <Link
-            to="/admin"
-            aria-label="Área do proprietário"
-            className="ml-auto grid h-11 w-11 place-items-center rounded-2xl border-2 border-border bg-card text-muted-foreground"
-          >
-            <Lock className="h-5 w-5" />
-          </Link>
         </div>
       </header>
 
@@ -287,13 +279,24 @@ function EuPage() {
           </div>
         </section>
 
-        {isAdmin && (
+        {isAdmin ? (
           <Link
             to="/admin"
             className="mt-6 block rounded-2xl bg-[oklch(0.55_0.22_255)] py-4 text-center text-xl font-black text-white shadow-md active:scale-[0.98]"
           >
             Abrir painel de administração
           </Link>
+        ) : (
+          // Acesso do proprietário: discreto, quase invisível para o cliente.
+          <div className="mt-10 flex justify-end">
+            <Link
+              to="/admin"
+              aria-label="Acesso restrito"
+              className="p-2 text-muted-foreground/20"
+            >
+              <Lock className="h-3.5 w-3.5" />
+            </Link>
+          </div>
         )}
       </main>
 

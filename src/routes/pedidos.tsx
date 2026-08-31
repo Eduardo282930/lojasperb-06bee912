@@ -23,7 +23,8 @@ export const Route = createFileRoute("/pedidos")({
     const status = (STATUSES as readonly string[]).includes(raw)
       ? (raw as (typeof STATUSES)[number])
       : ("topay" as const);
-    return { status };
+    const checkout = String(search["checkout"] ?? "") === "1";
+    return checkout ? { status, checkout: true as const } : { status };
   },
 
   head: () => ({
@@ -201,7 +202,13 @@ type StatusValue = (typeof SECTIONS)[number]["value"];
 
 function PedidosPage() {
   const profile = useProfile();
-  const { status } = Route.useSearch();
+  const { status, checkout } = Route.useSearch();
+  const [lastOrderId, setLastOrderId] = useState("");
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setLastOrderId(window.localStorage.getItem("sperb-last-order") ?? "");
+    }
+  }, []);
   const navigate = Route.useNavigate();
   const { data, isLoading } = useQuery({
     queryKey: ["my-orders", profile.phone],
@@ -210,6 +217,7 @@ function PedidosPage() {
   });
 
   const orders = data ?? [];
+  const lastOrder = orders.find((o) => o.id === lastOrderId);
   function bucket(o: Order): StatusValue {
     if (o.status === "canceled") return "canceled";
     if (o.status === "delivered") return "delivered";
@@ -331,6 +339,20 @@ function PedidosPage() {
       </header>
 
       <main className="mx-auto max-w-3xl pt-4">
+        {checkout && lastOrder && (
+          <div className="mx-4 mb-4 rounded-2xl border-2 border-[oklch(0.62_0.19_145)] bg-[oklch(0.62_0.19_145)]/10 p-4">
+            <p className="text-lg font-black text-foreground">
+              Pedido nº {lastOrder.id.slice(0, 8).toUpperCase()}
+            </p>
+            <p className="text-base font-bold text-muted-foreground">
+              {statusLabel(lastOrder.status)} · {paymentLabel(lastOrder.paymentStatus)}
+            </p>
+            <p className="mt-1 text-sm font-semibold text-muted-foreground">
+              Assim que o pagamento for confirmado, o pedido entra em preparação
+              automaticamente.
+            </p>
+          </div>
+        )}
         {isLoading && (
           <p className="px-4 text-lg font-semibold text-muted-foreground">Carregando…</p>
         )}

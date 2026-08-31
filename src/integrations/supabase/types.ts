@@ -803,6 +803,7 @@ export type Database = {
           paid_at: string | null
           payment_id: string | null
           payment_method: string
+          payment_nsu: string | null
           payment_provider: string
           payment_receipt_url: string | null
           payment_status: string
@@ -833,6 +834,7 @@ export type Database = {
           paid_at?: string | null
           payment_id?: string | null
           payment_method?: string
+          payment_nsu?: string | null
           payment_provider?: string
           payment_receipt_url?: string | null
           payment_status?: string
@@ -863,6 +865,7 @@ export type Database = {
           paid_at?: string | null
           payment_id?: string | null
           payment_method?: string
+          payment_nsu?: string | null
           payment_provider?: string
           payment_receipt_url?: string | null
           payment_status?: string

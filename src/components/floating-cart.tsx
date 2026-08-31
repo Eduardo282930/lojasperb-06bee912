@@ -16,7 +16,7 @@ export function FloatingCart() {
     <Link
       to="/sacola"
       aria-label={`Ver carrinho com ${qty} itens`}
-      className="fixed bottom-5 left-5 z-30 flex items-center gap-2 rounded-full bg-[oklch(0.62_0.19_145)] px-4 py-3 text-white shadow-lg active:scale-95"
+      className="fixed right-4 top-3 z-40 flex items-center gap-2 rounded-full bg-[oklch(0.62_0.19_145)] px-3 py-2 text-white shadow-lg active:scale-95"
     >
       <span className="relative">
         <ShoppingCart className="h-6 w-6" />
@@ -24,7 +24,7 @@ export function FloatingCart() {
           {qty}
         </span>
       </span>
-      <span className="text-base font-black">{formatPrice(total)}</span>
+      <span className="text-sm font-black">{formatPrice(total)}</span>
     </Link>
   );
 }
