@@ -369,7 +369,6 @@ export function useProfile(): Profile {
 }
 
 
-/** Saves the customer in the database, Loyverse, and keeps a local copy. */
 /** Name already registered for a phone number (locked by the store). */
 export async function lookupCustomerName(phone: string): Promise<string> {
   const digits = (phone || "").replace(/\D/g, "");
@@ -379,6 +378,35 @@ export async function lookupCustomerName(phone: string): Promise<string> {
   return (data as string | null) ?? "";
 }
 
+/** Nome e e-mail já cadastrados para este telefone. */
+export async function lookupCustomerProfile(
+  phone: string,
+): Promise<{ name: string; email: string } | null> {
+  const digits = (phone || "").replace(/\D/g, "");
+  if (digits.length < 8) return null;
+  const { data, error } = await supabase.rpc("lookup_customer_profile", {
+    p_phone: digits,
+  });
+  const row = (data ?? [])[0];
+  if (error || !row) return null;
+  return { name: row.name ?? "", email: row.email ?? "" };
+}
+
+/** Reconhece o cliente pelo e-mail já cadastrado. */
+export async function lookupCustomerByEmail(
+  email: string,
+): Promise<{ name: string; phone: string } | null> {
+  const clean = (email || "").trim();
+  if (!clean.includes("@")) return null;
+  const { data, error } = await supabase.rpc("lookup_customer_by_email", {
+    p_email: clean,
+  });
+  const row = (data ?? [])[0];
+  if (error || !row) return null;
+  return { name: row.name ?? "", phone: row.phone ?? "" };
+}
+
+/** Saves the customer in the database, Loyverse, and keeps a local copy. */
 export async function saveProfile(profile: Profile): Promise<void> {
   ensureInit();
   const locked = await lookupCustomerName(profile.phone);
@@ -392,6 +420,7 @@ export async function saveProfile(profile: Profile): Promise<void> {
     p_device_id: deviceId(),
     p_name: profile.name,
     p_phone: profile.phone,
+    p_email: profile.email ?? "",
   });
   if (error) throw error;
   // Mirror the customer into the Loyverse "Clientes" tab (never blocks saving).
