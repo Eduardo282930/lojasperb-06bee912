@@ -3,7 +3,7 @@
  * As credenciais ficam apenas no servidor (Secrets), nunca no navegador.
  */
 
-const BASE = "https://api.infinitepay.io/invoices/public/checkout";
+const BASE = "https://api.checkout.infinitepay.io";
 
 export type CheckoutItem = {
   quantity: number;
