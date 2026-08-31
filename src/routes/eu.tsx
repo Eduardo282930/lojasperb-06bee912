@@ -22,7 +22,7 @@ import {
 import {
   useProfile,
   saveProfile,
-  lookupCustomerName,
+  lookupCustomerProfile,
   useClaimedCoupons,
   useCoupons,
   useMyCouponUses,
