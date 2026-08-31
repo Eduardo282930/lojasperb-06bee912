@@ -14,6 +14,7 @@ export function FloatingCart() {
 
   return (
     <Link
+      id="cart-anchor"
       to="/sacola"
       aria-label={`Ver carrinho com ${qty} itens`}
       className="fixed right-4 top-3 z-40 flex items-center gap-2 rounded-full bg-[oklch(0.62_0.19_145)] px-3 py-2 text-white shadow-lg active:scale-95"
