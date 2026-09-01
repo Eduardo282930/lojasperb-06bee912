@@ -167,6 +167,12 @@ function EuPage() {
                   "Toque no lápis para começar"
                 )}
               </p>
+              {registered && profile.email.trim() && (
+                <p className="mt-0.5 truncate text-xs font-semibold text-white/75">
+                  {profile.email.trim()}
+                </p>
+              )}
+
             </div>
             <button
               onClick={() => setEditing(true)}
