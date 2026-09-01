@@ -370,6 +370,7 @@ function ProfileSheet({ onClose }: { onClose: () => void }) {
       if (found.phone) setPhone(found.phone);
       if (found.name) {
         setName(found.name);
+        setEmailFromLoyverse(true);
         setStatus("known");
       }
     }, 600);
