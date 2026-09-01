@@ -138,10 +138,23 @@ export function merchandiseOrder(
   });
 }
 
-/** Chave de rotação que muda a cada 6 horas (mesma ordem para todos no período). */
+/**
+ * Chave de rotação sorteada a cada visita: toda vez que o cliente abre o app,
+ * os produtos sugeridos aparecem numa ordem diferente. Fica igual enquanto ele
+ * navega (guardada na sessão), para a lista não "pular" durante a rolagem.
+ */
+let sessionBucket: number | null = null;
+
 function rotationBucket(): number {
-  return Math.floor(Date.now() / (6 * 60 * 60 * 1000));
+  if (sessionBucket !== null) return sessionBucket;
+  if (typeof window === "undefined") return 0;
+  const saved = window.sessionStorage.getItem("sperb-shuffle");
+  const value = saved ? Number(saved) : Math.floor(Math.random() * 1e9);
+  if (!saved) window.sessionStorage.setItem("sperb-shuffle", String(value));
+  sessionBucket = Number.isFinite(value) ? value : 0;
+  return sessionBucket;
 }
+
 
 function rotationValue(id: string): number {
   const seed = `${id}:${rotationBucket()}`;

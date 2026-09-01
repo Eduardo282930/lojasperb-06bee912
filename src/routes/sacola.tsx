@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Minus, Plus, Trash2, Ticket, Coins } from "lucide-react";
+import { ArrowLeft, Minus, Plus, Trash2, Ticket, Coins, Check } from "lucide-react";
 import { StoreLogoWithFallback } from "@/components/store-logo";
 import { useCart, updateQty, formatPrice, priceValue, clearCart } from "@/lib/cart";
 import {
@@ -49,6 +49,7 @@ function SacolaPage() {
   const [useCoins, setUseCoins] = useState(false);
   const [paying, setPaying] = useState(false);
   const [payError, setPayError] = useState("");
+  const [unchecked, setUnchecked] = useState<string[]>([]);
   const openCheckout = useServerFn(createOrderCheckout);
   const checkPayments = useServerFn(paymentsStatus);
   const cancelOrder = useServerFn(abandonOrder);
@@ -65,7 +66,20 @@ function SacolaPage() {
   const claimed = useClaimedCoupons(profile.phone).data ?? [];
   const myUses = useMyCouponUses(profile.phone).data ?? {};
 
-  const subtotal = cart.reduce((s, c) => s + priceValue(c.price) * c.qty, 0);
+  // Estilo Shopee: o cliente escolhe quais itens entram no pedido.
+  const isPicked = (id: string) => !unchecked.includes(id);
+  const picked = cart.filter((c) => isPicked(c.id));
+  const allPicked = cart.length > 0 && picked.length === cart.length;
+  function togglePick(id: string) {
+    setUnchecked((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+  }
+  function toggleAll() {
+    setUnchecked(allPicked ? cart.map((c) => c.id) : []);
+  }
+
+  const subtotal = picked.reduce((s, c) => s + priceValue(c.price) * c.qty, 0);
   // Cupons resgatados ficam salvos para o cliente; o limite pessoal é respeitado.
   const usable = [...coupons, ...claimed]
     .filter((c, i, arr) => arr.findIndex((x) => x.id === c.id) === i)
@@ -79,13 +93,18 @@ function SacolaPage() {
   const total = Math.max(0, eligible - coinsDiscount);
 
   function orderItems() {
-    return cart.map((c) => ({
+    return picked.map((c) => ({
       id: c.id,
       name: c.name,
       qty: c.qty,
       price: priceValue(c.price),
       image: c.image ?? null,
     }));
+  }
+
+  /** Tira do carrinho apenas os itens que foram comprados. */
+  function removePicked() {
+    for (const c of picked) updateQty(c.id, 0);
   }
 
   async function saveOrder(): Promise<string | null> {
@@ -109,8 +128,9 @@ function SacolaPage() {
     return id;
   }
 
+
   function whatsAppText() {
-    const linhas = cart.map(
+    const linhas = picked.map(
       (c) => `- ${c.name} | Qtd: ${c.qty} | ${formatPrice(c.price)}`,
     );
     let texto = profile.name
@@ -128,12 +148,13 @@ function SacolaPage() {
   }
 
   /**
-   * Pagamento online: o pedido é criado como não pago (com reserva de estoque)
-   * e o checkout é aberto em seguida. Se o checkout falhar, o pedido é
-   * cancelado na hora e o estoque volta para a loja.
+   * Pagamento online: o pedido só nasce depois que o checkout responde com a
+   * tela de pagamento. Se algo falhar, o pedido é apagado na hora e o estoque
+   * reservado volta para a loja.
    */
   async function pagarAgora() {
-    if (cart.length === 0 || paying) return;
+    if (picked.length === 0 || paying) return;
+
     if (!logged) {
       void navigate({ to: "/eu" });
       return;
@@ -173,25 +194,27 @@ function SacolaPage() {
         setPayError(
           checkout.reason === "min_value"
             ? `O pagamento online começa em ${formatPrice(MIN_CHECKOUT_BRL)}.`
-            : "O pagamento online está indisponível agora. Você pode enviar o pedido pelo WhatsApp.",
+            : `O pagamento online está indisponível agora (${checkout.reason ?? "erro"}). Você pode enviar o pedido pelo WhatsApp.`,
         );
         return;
       }
       if (typeof window !== "undefined") {
         window.localStorage.setItem("sperb-last-order", orderId);
       }
-      clearCart();
+      removePicked();
       window.location.href = checkout.url;
-    } catch {
+    } catch (err) {
       if (orderId) await cancelOrder({ data: { orderId } }).catch(() => undefined);
-      setPayError("Falha ao abrir o pagamento. Tente novamente.");
+      const detail = err instanceof Error ? err.message.slice(0, 120) : "";
+      setPayError(`Falha ao abrir o pagamento. ${detail}`.trim());
     } finally {
       setPaying(false);
     }
   }
 
   async function enviarWhatsApp() {
-    if (cart.length === 0) return;
+    if (picked.length === 0) return;
+
     if (!logged) {
       void navigate({ to: "/eu" });
       return;
@@ -238,6 +261,22 @@ function SacolaPage() {
           </div>
         ) : (
           <>
+            <button
+              onClick={toggleAll}
+              className="mb-2 inline-flex items-center gap-2 text-sm font-black text-foreground"
+            >
+              <span
+                className={`grid h-6 w-6 place-items-center rounded-md border-2 ${
+                  allPicked
+                    ? "border-[oklch(0.62_0.19_145)] bg-[oklch(0.62_0.19_145)] text-white"
+                    : "border-border bg-background text-transparent"
+                }`}
+              >
+                <Check className="h-4 w-4" strokeWidth={4} />
+              </span>
+              {allPicked ? "Desmarcar todos" : "Selecionar todos"}
+            </button>
+
             <ul className="flex flex-col gap-2">
               {cart.map((c) => {
                 const max =
@@ -245,11 +284,26 @@ function SacolaPage() {
                     ? Math.floor(c.stock)
                     : 999;
                 const atMax = c.qty >= max;
+                const on = isPicked(c.id);
                 return (
                   <li
                     key={c.id}
-                    className="flex items-center gap-2 rounded-xl border border-border bg-card p-2"
+                    className={`flex items-center gap-2 rounded-xl border bg-card p-2 ${
+                      on ? "border-border" : "border-dashed border-border opacity-60"
+                    }`}
                   >
+                    <button
+                      aria-label={on ? "Tirar do pedido" : "Incluir no pedido"}
+                      onClick={() => togglePick(c.id)}
+                      className={`grid h-6 w-6 shrink-0 place-items-center rounded-md border-2 ${
+                        on
+                          ? "border-[oklch(0.62_0.19_145)] bg-[oklch(0.62_0.19_145)] text-white"
+                          : "border-border bg-background text-transparent"
+                      }`}
+                    >
+                      <Check className="h-4 w-4" strokeWidth={4} />
+                    </button>
+
                     <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg border border-border bg-muted">
                       {c.image ? (
                         <img
@@ -270,8 +324,11 @@ function SacolaPage() {
                         {c.name}
                       </p>
                       <p className="text-xs font-semibold text-muted-foreground">
-                        {c.qty} x {formatPrice(c.price)}
+                        {formatPrice(c.price)}
                         {atMax && ` · máx. ${max}`}
+                      </p>
+                      <p className="text-base font-black text-[oklch(0.55_0.22_255)]">
+                        {formatPrice(priceValue(c.price) * c.qty)}
                       </p>
                     </div>
 
@@ -299,75 +356,16 @@ function SacolaPage() {
                         <Plus className="h-4 w-4" strokeWidth={3} />
                       </button>
                     </div>
-
-                    <span className="w-20 shrink-0 text-right text-base font-black text-[oklch(0.55_0.22_255)]">
-                      {formatPrice(priceValue(c.price) * c.qty)}
-                    </span>
                   </li>
                 );
               })}
             </ul>
 
-
-            <div className="mt-6 rounded-3xl border-2 border-border bg-card p-5">
-              <div className="flex items-center justify-between text-xl font-bold text-muted-foreground">
-                <span>Subtotal</span>
-                <span>{formatPrice(subtotal)}</span>
-              </div>
-              {applied && (
-                <div className="mt-2 flex items-center justify-between text-xl font-black text-[oklch(0.45_0.19_145)]">
-                  <span className="inline-flex items-center gap-2">
-                    <Ticket className="h-6 w-6" /> CUPOM SPERB {applied.coupon.code}
-                  </span>
-                  <span>-{formatPrice(applied.discount)}</span>
-                </div>
-              )}
-              {balance > 0 && (
-                <div className="mt-3 rounded-2xl bg-muted p-3">
-                  <label className="flex items-center justify-between gap-3">
-                    <span className="inline-flex items-center gap-2 text-lg font-black text-foreground">
-                      <Coins className="h-6 w-6 text-[oklch(0.72_0.17_75)]" />
-                      Usar minhas moedas
-                    </span>
-                    <input
-                      type="checkbox"
-                      checked={useCoins}
-                      onChange={(e) => setUseCoins(e.target.checked)}
-                      className="h-6 w-6 accent-[oklch(0.62_0.19_145)]"
-                    />
-                  </label>
-                  <p className="mt-1 text-base font-semibold text-muted-foreground">
-                    Saldo: {balance} moedas ({formatPrice(coinsToBRL(balance))}) · limite de{" "}
-                    {Math.round(COIN_MAX_RATIO * 100)}% do pedido
-                  </p>
-                  {coinsToUse > 0 && (
-                    <p className="mt-1 text-xl font-black text-[oklch(0.45_0.19_145)]">
-                      {coinsToUse} moedas · -{formatPrice(coinsDiscount)}
-                    </p>
-                  )}
-                </div>
-              )}
-              <div className="mt-3 flex items-center justify-between border-t-2 border-border pt-3">
-                <span className="text-2xl font-bold text-foreground">Total</span>
-                <span className="text-4xl font-black text-foreground">
-                  {formatPrice(total)}
-                </span>
-              </div>
-              {!applied && (
-                <Link
-                  to="/eu"
-                  className="mt-3 inline-flex items-center gap-2 text-lg font-bold text-[oklch(0.55_0.22_255)]"
-                >
-                  <Ticket className="h-5 w-5" /> Resgatar um CUPOM SPERB
-                </Link>
-              )}
-            </div>
-
             <button
               onClick={() => {
                 if (confirm("Esvaziar o carrinho?")) clearCart();
               }}
-              className="mt-4 w-full rounded-2xl border-2 border-border bg-background py-4 text-xl font-bold text-muted-foreground active:scale-95"
+              className="mt-4 w-full rounded-2xl border-2 border-border bg-background py-3 text-base font-bold text-muted-foreground active:scale-95"
             >
               Esvaziar carrinho
             </button>
@@ -376,29 +374,81 @@ function SacolaPage() {
       </main>
 
       {cart.length > 0 && (
-        <div className="fixed inset-x-0 bottom-0 z-20 border-t-2 border-border bg-background/95 p-3 backdrop-blur">
-          <div className="mx-auto max-w-3xl">
+        <div className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-background/95 backdrop-blur">
+          <div className="mx-auto max-w-3xl px-3 pb-3 pt-2">
             {payError && (
-              <p className="mb-2 rounded-xl bg-destructive/10 px-3 py-2 text-base font-bold text-destructive">
+              <p className="mb-2 rounded-xl bg-destructive/10 px-3 py-2 text-sm font-bold text-destructive">
                 {payError}
               </p>
             )}
-            <button
-              onClick={() => void pagarAgora()}
-              disabled={paying}
-              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[oklch(0.55_0.22_255)] px-4 py-4 text-xl font-black text-white shadow-lg disabled:opacity-60 active:scale-[0.98]"
-            >
-              {paying ? "Abrindo pagamento…" : `Pagar ${formatPrice(total)} · Pix ou cartão`}
-            </button>
-            <button
-              onClick={() => void enviarWhatsApp()}
-              className="mt-2 flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-[oklch(0.62_0.19_145)] px-4 py-3 text-lg font-black text-[oklch(0.45_0.19_145)] active:scale-[0.98]"
-            >
-              <WhatsAppIcon className="h-5 w-5" />
-              Enviar pelo WhatsApp
-            </button>
+
+            {/* Linha compacta: cupom + moedas, estilo Shopee. */}
+            <div className="mb-2 flex items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {applied ? (
+                <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[oklch(0.62_0.19_145)]/12 px-3 py-1.5 text-xs font-black text-[oklch(0.45_0.19_145)]">
+                  <Ticket className="h-4 w-4" />
+                  {applied.coupon.code} · -{formatPrice(applied.discount)}
+                </span>
+              ) : (
+                <Link
+                  to="/cupons"
+                  className="inline-flex shrink-0 items-center gap-1 rounded-full bg-muted px-3 py-1.5 text-xs font-black text-[oklch(0.55_0.22_255)]"
+                >
+                  <Ticket className="h-4 w-4" /> Usar cupom
+                </Link>
+              )}
+
+              {balance > 0 && (
+                <button
+                  onClick={() => setUseCoins((v) => !v)}
+                  className={`inline-flex shrink-0 items-center gap-1 rounded-full px-3 py-1.5 text-xs font-black ${
+                    useCoins
+                      ? "bg-[oklch(0.72_0.17_75)] text-white"
+                      : "bg-muted text-foreground"
+                  }`}
+                >
+                  <Coins className="h-4 w-4" />
+                  {coinsToUse > 0
+                    ? `${coinsToUse} moedas · -${formatPrice(coinsDiscount)}`
+                    : `Usar moedas (${balance})`}
+                </button>
+              )}
+              {balance > 0 && (
+                <span className="shrink-0 text-[11px] font-semibold text-muted-foreground">
+                  até {Math.round(COIN_MAX_RATIO * 100)}% do pedido
+                </span>
+              )}
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-bold text-muted-foreground">
+                  {picked.length} de {cart.length} {cart.length === 1 ? "item" : "itens"}
+                </p>
+                <p className="truncate text-2xl font-black text-foreground">
+                  {formatPrice(total)}
+                </p>
+              </div>
+              <button
+                onClick={() => void pagarAgora()}
+                disabled={paying || picked.length === 0}
+                className="shrink-0 rounded-2xl bg-[oklch(0.55_0.22_255)] px-5 py-3 text-base font-black text-white shadow-lg disabled:opacity-50 active:scale-[0.98]"
+              >
+                {paying ? "Abrindo…" : "Pagar Pix/cartão"}
+              </button>
+              <button
+                onClick={() => void enviarWhatsApp()}
+                disabled={picked.length === 0}
+                aria-label="Enviar pelo WhatsApp"
+                className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl border-2 border-[oklch(0.62_0.19_145)] text-[oklch(0.45_0.19_145)] disabled:opacity-50 active:scale-95"
+              >
+                <WhatsAppIcon className="h-6 w-6" />
+              </button>
+            </div>
           </div>
         </div>
+
+
 
       )}
     </div>

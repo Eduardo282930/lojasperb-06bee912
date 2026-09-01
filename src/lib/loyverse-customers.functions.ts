@@ -53,9 +53,10 @@ type LoyverseCustomer = {
  * Matching is done by phone number so the same person is never duplicated.
  */
 export const syncLoyverseCustomer = createServerFn({ method: "POST" })
-  .inputValidator((data: { name: string; phone: string }) => ({
+  .inputValidator((data: { name: string; phone: string; email?: string }) => ({
     name: String(data?.name ?? "").trim().slice(0, 80),
     phone: String(data?.phone ?? "").trim().slice(0, 30),
+    email: String(data?.email ?? "").trim().toLowerCase().slice(0, 120),
   }))
   .handler(async ({ data }): Promise<{ ok: boolean; id?: string }> => {
     const token = process.env["LOYVERSE_TOKEN"];
@@ -63,24 +64,27 @@ export const syncLoyverseCustomer = createServerFn({ method: "POST" })
     if (!data.name && !data.phone) return { ok: false };
 
     const phone = digits(data.phone);
-    let existing: LoyverseCustomer | undefined;
+    const key = phone.slice(-8);
+    let existing: (LoyverseCustomer & { email?: string | null }) | undefined;
     try {
-      const list = await loyverse<{ customers?: LoyverseCustomer[] }>(
-        "customers?limit=250",
-        token,
-      );
+      const list = await loyverse<{
+        customers?: Array<LoyverseCustomer & { email?: string | null }>;
+      }>("customers?limit=250", token);
       existing = (list.customers ?? []).find(
-        (c) => phone && digits(c.phone_number ?? "") === phone,
+        (c) =>
+          (key && digits(c.phone_number ?? "").slice(-8) === key) ||
+          (data.email && (c.email ?? "").trim().toLowerCase() === data.email),
       );
     } catch {
       existing = undefined;
     }
 
     const body: Record<string, unknown> = {
-      name: data.name || `Cliente ${phone.slice(-4)}`,
-      phone_number: data.phone || undefined,
+      name: data.name || existing?.name || `Cliente ${phone.slice(-4)}`,
+      phone_number: data.phone || existing?.phone_number || undefined,
+      email: data.email || existing?.email || undefined,
     };
-    if (existing) body.id = existing.id;
+    if (existing) body["id"] = existing.id;
 
     try {
       const saved = await loyverse<LoyverseCustomer>("customers", token, {
@@ -91,16 +95,52 @@ export const syncLoyverseCustomer = createServerFn({ method: "POST" })
       try {
         const { persistLoyverseCustomers } = await import("./catalog-cache.server");
         await persistLoyverseCustomers([
-          { id: saved.id, name: data.name, phone: data.phone, email: "" },
+          { id: saved.id, name: data.name, phone: data.phone, email: data.email },
         ]);
       } catch (err) {
         console.error("[Clientes] vínculo Supabase falhou:", err);
       }
       return { ok: true, id: saved.id };
-    } catch {
+    } catch (err) {
+      console.error("[Clientes] envio ao Loyverse falhou:", err);
       return { ok: false };
     }
   });
+
+/** Reconhece o cliente pelo e-mail cadastrado no Loyverse. */
+export const loyverseLookupByEmail = createServerFn({ method: "POST" })
+  .inputValidator((data: { email: string }) => ({
+    email: String(data?.email ?? "").trim().toLowerCase().slice(0, 120),
+  }))
+  .handler(
+    async ({
+      data,
+    }): Promise<{ found: boolean; name: string; phone: string; email: string }> => {
+      const empty = { found: false, name: "", phone: "", email: "" };
+      if (!data.email.includes("@")) return empty;
+      const token = process.env["LOYVERSE_TOKEN"];
+      if (!token) return empty;
+      try {
+        const list = await loyverse<{
+          customers?: Array<LoyverseCustomer & { email?: string | null }>;
+        }>("customers?limit=250", token);
+        const match = (list.customers ?? []).find(
+          (c) => (c.email ?? "").trim().toLowerCase() === data.email,
+        );
+        if (!match) return empty;
+        return {
+          found: true,
+          name: match.name?.trim() ?? "",
+          phone: match.phone_number ?? "",
+          email: data.email,
+        };
+      } catch (err) {
+        console.error("[Clientes] busca por e-mail falhou:", err);
+        return empty;
+      }
+    },
+  );
+
 
 
 type LoyverseReceipt = {

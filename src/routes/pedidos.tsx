@@ -235,14 +235,26 @@ function PedidosPage() {
   const trackRef = useRef<HTMLDivElement>(null);
   const activeTabRef = useRef<HTMLButtonElement>(null);
   const settleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const draggingRef = useRef(false);
+  const lockRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Enquanto o painel está sendo movido pelo toque na aba, o scroll é nosso:
+  // não deixamos o "arraste" recalcular a aba no meio da animação.
+  const lockedRef = useRef(false);
+
+  function lockScroll() {
+    lockedRef.current = true;
+    if (lockRef.current) clearTimeout(lockRef.current);
+    lockRef.current = setTimeout(() => {
+      lockedRef.current = false;
+    }, 600);
+  }
 
   // Mantém o painel visível igual à aba escolhida (sem brigar com o dedo).
   useEffect(() => {
     const el = trackRef.current;
-    if (!el || draggingRef.current) return;
+    if (!el || lockedRef.current) return;
     const target = activeIndex * el.clientWidth;
     if (Math.abs(el.scrollLeft - target) > 4) {
+      lockScroll();
       el.scrollTo({ left: target, behavior: "smooth" });
     }
   }, [activeIndex]);
@@ -257,6 +269,7 @@ function PedidosPage() {
 
   useEffect(() => () => {
     if (settleRef.current) clearTimeout(settleRef.current);
+    if (lockRef.current) clearTimeout(lockRef.current);
   }, []);
 
   function setStatus(next: StatusValue) {
@@ -266,6 +279,7 @@ function PedidosPage() {
   /** Toque numa aba: leva direto para a seção e sobe até o topo da lista. */
   function goTo(next: StatusValue) {
     const el = trackRef.current;
+    lockScroll();
     setStatus(next);
     if (el) {
       const idx = Math.max(0, SECTIONS.findIndex((s) => s.value === next));
@@ -279,24 +293,20 @@ function PedidosPage() {
   // Ao arrastar para o lado (estilo Shopee): só troca quando o deslize para,
   // e sempre centralizado na seção mais próxima.
   function onScroll() {
-    draggingRef.current = true;
+    if (lockedRef.current) return;
     if (settleRef.current) clearTimeout(settleRef.current);
     settleRef.current = setTimeout(() => {
-      draggingRef.current = false;
       const el = trackRef.current;
-      if (!el || el.clientWidth === 0) return;
+      if (!el || el.clientWidth === 0 || lockedRef.current) return;
       const idx = Math.min(
         SECTIONS.length - 1,
         Math.max(0, Math.round(el.scrollLeft / el.clientWidth)),
       );
-      const target = idx * el.clientWidth;
-      if (Math.abs(el.scrollLeft - target) > 2) {
-        el.scrollTo({ left: target, behavior: "smooth" });
-      }
       const nextValue = SECTIONS[idx]?.value;
       if (nextValue && nextValue !== status) setStatus(nextValue);
-    }, 140);
+    }, 160);
   }
+
 
   return (
     <div className="min-h-screen bg-background pb-16">

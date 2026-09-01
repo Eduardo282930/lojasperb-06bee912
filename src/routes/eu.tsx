@@ -23,6 +23,8 @@ import {
   useProfile,
   saveProfile,
   lookupCustomerLive,
+  lookupCustomerByEmail,
+
   useClaimedCoupons,
   useCoupons,
   useMyCouponUses,
@@ -167,6 +169,12 @@ function EuPage() {
                   "Toque no lápis para começar"
                 )}
               </p>
+              {registered && profile.email.trim() && (
+                <p className="mt-0.5 truncate text-xs font-semibold text-white/75">
+                  {profile.email.trim()}
+                </p>
+              )}
+
             </div>
             <button
               onClick={() => setEditing(true)}
@@ -343,6 +351,28 @@ function ProfileSheet({ onClose }: { onClose: () => void }) {
       clearTimeout(t);
     };
   }, [phone]);
+
+  // Entrar pelo e-mail: se o telefone ainda não foi digitado, buscamos o
+  // cadastro pelo e-mail e preenchemos o resto automaticamente.
+  useEffect(() => {
+    const clean = email.trim().toLowerCase();
+    if (!emailOk || phone.replace(/\D/g, "").length >= 10) return;
+    let alive = true;
+    const t = setTimeout(async () => {
+      const found = await lookupCustomerByEmail(clean);
+      if (!alive || !found) return;
+      if (found.phone) setPhone(found.phone);
+      if (found.name) {
+        setName(found.name);
+        setStatus("known");
+      }
+    }, 600);
+    return () => {
+      alive = false;
+      clearTimeout(t);
+    };
+  }, [email, emailOk, phone]);
+
 
   return (
     <div className="fixed inset-0 z-50 flex items-end bg-black/50 p-0 sm:items-center sm:justify-center sm:p-4">

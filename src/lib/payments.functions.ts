@@ -443,65 +443,29 @@ export const abandonOrder = createServerFn({
     },
   )
   .handler(async ({ data }) => {
-    const {
-      supabaseAdmin,
-    } = await import(
-      "@/integrations/supabase/client.server"
-    );
-
-    const {
-      data: order,
-    } = await supabaseAdmin
-      .from("orders")
-      .select(
-        "id, payment_status",
-      )
-      .eq(
-        "id",
-        data.orderId,
-      )
-      .maybeSingle();
-
-    if (
-      !order ||
-      order.payment_status ===
-        "paid"
-    ) {
-      return {
-        ok: false,
-      };
-    }
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     /*
-     * Libera a reserva de estoque.
+     * Checkout não abriu: o pedido é apagado por completo (junto da reserva
+     * temporária de estoque). Assim nada aparece como "Pedido recebido".
      */
-    await supabaseAdmin
-      .from(
-        "order_stock_reservations",
-      )
-      .update({
-        active: false,
-      })
-      .eq(
-        "order_id",
-        data.orderId,
-      );
+    const { data: removed } = await supabaseAdmin.rpc("discard_unpaid_order", {
+      p_order_id: data.orderId,
+    });
 
-    /*
-     * Marca o pedido como cancelado.
-     */
+    if (removed) return { ok: true };
+
+    /* Se não deu para apagar (já pago/sincronizado), apenas cancela. */
+    await supabaseAdmin
+      .from("order_stock_reservations")
+      .update({ active: false })
+      .eq("order_id", data.orderId);
+
     await supabaseAdmin
       .from("orders")
-      .update({
-        status: "canceled",
-        flow_state: "CANCELLED",
-      })
-      .eq(
-        "id",
-        data.orderId,
-      );
+      .update({ status: "canceled", flow_state: "CANCELLED" })
+      .eq("id", data.orderId)
+      .neq("payment_status", "paid");
 
-    return {
-      ok: true,
-    };
+    return { ok: true };
   });

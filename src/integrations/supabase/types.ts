@@ -1171,6 +1171,7 @@ export type Database = {
         Args: { p_device_id: string; p_phone: string }
         Returns: Json
       }
+      discard_unpaid_order: { Args: { p_order_id: string }; Returns: boolean }
       expire_stale_reservations: { Args: never; Returns: number }
       has_role: {
         Args: {
