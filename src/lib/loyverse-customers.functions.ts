@@ -94,8 +94,9 @@ export const syncLoyverseCustomer = createServerFn({ method: "POST" })
       // Liga o cliente do Supabase ao id do Loyverse (identificador estável).
       try {
         const { persistLoyverseCustomers } = await import("./catalog-cache.server");
+        // Espelho mínimo: e-mail fica SOMENTE no Loyverse (fonte única).
         await persistLoyverseCustomers([
-          { id: saved.id, name: data.name, phone: data.phone, email: data.email },
+          { id: saved.id, name: data.name, phone: data.phone, email: "" },
         ]);
       } catch (err) {
         console.error("[Clientes] vínculo Supabase falhou:", err);
