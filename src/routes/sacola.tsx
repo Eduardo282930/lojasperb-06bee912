@@ -18,10 +18,10 @@ import {
 } from "@/lib/coupons";
 import { fetchCoinBalance, coinsToBRL, maxCoinsFor, COIN_MAX_RATIO } from "@/lib/coins";
 import { recordOrder } from "@/lib/orders";
+import { deviceId } from "@/lib/coupons";
 import { useServerFn } from "@tanstack/react-start";
 import {
-  createOrderCheckout,
-  abandonOrder,
+  startCheckout,
   paymentsStatus,
   MIN_CHECKOUT_BRL,
 } from "@/lib/payments.functions";
@@ -50,9 +50,8 @@ function SacolaPage() {
   const [paying, setPaying] = useState(false);
   const [payError, setPayError] = useState("");
   const [unchecked, setUnchecked] = useState<string[]>([]);
-  const openCheckout = useServerFn(createOrderCheckout);
+  const startPay = useServerFn(startCheckout);
   const checkPayments = useServerFn(paymentsStatus);
-  const cancelOrder = useServerFn(abandonOrder);
   const navigate = Route.useNavigate();
   const logged = profile.phone.trim().length >= 8 && profile.name.trim().length > 0;
   const hasEmail = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(profile.email.trim());
@@ -172,7 +171,6 @@ function SacolaPage() {
     }
     setPaying(true);
     setPayError("");
-    let orderId: string | null = null;
     try {
       // Só criamos o pedido (e a reserva de estoque) depois de confirmar que o
       // pagamento online está disponível. Assim nada vira "pedido recebido" à toa.
@@ -183,14 +181,29 @@ function SacolaPage() {
         );
         return;
       }
-      orderId = await saveOrder();
-      if (!orderId) {
-        setPayError("Não foi possível registrar o pedido. Tente de novo.");
-        return;
-      }
-      const checkout = await openCheckout({ data: { orderId } });
+
+      /*
+       * Tudo acontece no servidor, em uma chamada só:
+       * cria o pedido + reserva de estoque, cria o checkout da InfinitePay
+       * e devolve a URL. Se algo falhar, o próprio servidor apaga o pedido
+       * e libera a reserva.
+       */
+      const checkout = await startPay({
+        data: {
+          deviceId: deviceId(),
+          name: profile.name,
+          phone: profile.phone,
+          email: profile.email,
+          items: orderItems(),
+          subtotal,
+          discount: applied?.discount ?? 0,
+          total,
+          couponCode: applied?.coupon.code ?? "",
+          coins: coinsToUse,
+        },
+      });
+
       if (!checkout.url) {
-        await cancelOrder({ data: { orderId } });
         setPayError(
           checkout.reason === "min_value"
             ? `O pagamento online começa em ${formatPrice(MIN_CHECKOUT_BRL)}.`
@@ -198,13 +211,24 @@ function SacolaPage() {
         );
         return;
       }
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem("sperb-last-order", orderId);
+
+      /*
+       * Checkout abriu: confirma o consumo do cupom e das moedas
+       * (o pedido e a reserva já foram criados pelo servidor).
+       */
+      void qc.invalidateQueries({ queryKey: ["coins"] });
+      if (applied) {
+        await consumeCoupon(applied.coupon.id);
+        unredeemCoupon(applied.coupon.id);
+        await refreshCoupons();
+      }
+
+      if (typeof window !== "undefined" && checkout.orderId) {
+        window.localStorage.setItem("sperb-last-order", checkout.orderId);
       }
       removePicked();
       window.location.href = checkout.url;
     } catch (err) {
-      if (orderId) await cancelOrder({ data: { orderId } }).catch(() => undefined);
       const detail = err instanceof Error ? err.message.slice(0, 120) : "";
       setPayError(`Falha ao abrir o pagamento. ${detail}`.trim());
     } finally {
