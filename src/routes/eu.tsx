@@ -23,6 +23,8 @@ import {
   useProfile,
   saveProfile,
   lookupCustomerLive,
+  lookupCustomerByEmail,
+
   useClaimedCoupons,
   useCoupons,
   useMyCouponUses,
