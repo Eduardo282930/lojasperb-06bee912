@@ -19,6 +19,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as ProdutoIdRouteImport } from './routes/produto.$id'
 import { Route as ApiPublicSyncCatalogRouteImport } from './routes/api/public/sync-catalog'
 import { Route as ApiPublicManifestRouteImport } from './routes/api/public/manifest'
+import { Route as ApiPublicIpDiagRouteImport } from './routes/api/public/ip-diag'
 import { Route as ApiPublicInfinitepayWebhookRouteImport } from './routes/api/public/infinitepay-webhook'
 import { Route as ApiPublicExpireReservationsRouteImport } from './routes/api/public/expire-reservations'
 
@@ -72,6 +73,11 @@ const ApiPublicManifestRoute = ApiPublicManifestRouteImport.update({
   path: '/api/public/manifest',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicIpDiagRoute = ApiPublicIpDiagRouteImport.update({
+  id: '/api/public/ip-diag',
+  path: '/api/public/ip-diag',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicInfinitepayWebhookRoute =
   ApiPublicInfinitepayWebhookRouteImport.update({
     id: '/api/public/infinitepay-webhook',
@@ -96,6 +102,7 @@ export interface FileRoutesByFullPath {
   '/produto/$id': typeof ProdutoIdRoute
   '/api/public/expire-reservations': typeof ApiPublicExpireReservationsRoute
   '/api/public/infinitepay-webhook': typeof ApiPublicInfinitepayWebhookRoute
+  '/api/public/ip-diag': typeof ApiPublicIpDiagRoute
   '/api/public/manifest': typeof ApiPublicManifestRoute
   '/api/public/sync-catalog': typeof ApiPublicSyncCatalogRoute
 }
@@ -110,6 +117,7 @@ export interface FileRoutesByTo {
   '/produto/$id': typeof ProdutoIdRoute
   '/api/public/expire-reservations': typeof ApiPublicExpireReservationsRoute
   '/api/public/infinitepay-webhook': typeof ApiPublicInfinitepayWebhookRoute
+  '/api/public/ip-diag': typeof ApiPublicIpDiagRoute
   '/api/public/manifest': typeof ApiPublicManifestRoute
   '/api/public/sync-catalog': typeof ApiPublicSyncCatalogRoute
 }
@@ -125,6 +133,7 @@ export interface FileRoutesById {
   '/produto/$id': typeof ProdutoIdRoute
   '/api/public/expire-reservations': typeof ApiPublicExpireReservationsRoute
   '/api/public/infinitepay-webhook': typeof ApiPublicInfinitepayWebhookRoute
+  '/api/public/ip-diag': typeof ApiPublicIpDiagRoute
   '/api/public/manifest': typeof ApiPublicManifestRoute
   '/api/public/sync-catalog': typeof ApiPublicSyncCatalogRoute
 }
@@ -141,6 +150,7 @@ export interface FileRouteTypes {
     | '/produto/$id'
     | '/api/public/expire-reservations'
     | '/api/public/infinitepay-webhook'
+    | '/api/public/ip-diag'
     | '/api/public/manifest'
     | '/api/public/sync-catalog'
   fileRoutesByTo: FileRoutesByTo
@@ -155,6 +165,7 @@ export interface FileRouteTypes {
     | '/produto/$id'
     | '/api/public/expire-reservations'
     | '/api/public/infinitepay-webhook'
+    | '/api/public/ip-diag'
     | '/api/public/manifest'
     | '/api/public/sync-catalog'
   id:
@@ -169,6 +180,7 @@ export interface FileRouteTypes {
     | '/produto/$id'
     | '/api/public/expire-reservations'
     | '/api/public/infinitepay-webhook'
+    | '/api/public/ip-diag'
     | '/api/public/manifest'
     | '/api/public/sync-catalog'
   fileRoutesById: FileRoutesById
@@ -184,6 +196,7 @@ export interface RootRouteChildren {
   ProdutoIdRoute: typeof ProdutoIdRoute
   ApiPublicExpireReservationsRoute: typeof ApiPublicExpireReservationsRoute
   ApiPublicInfinitepayWebhookRoute: typeof ApiPublicInfinitepayWebhookRoute
+  ApiPublicIpDiagRoute: typeof ApiPublicIpDiagRoute
   ApiPublicManifestRoute: typeof ApiPublicManifestRoute
   ApiPublicSyncCatalogRoute: typeof ApiPublicSyncCatalogRoute
 }
@@ -260,6 +273,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicManifestRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/ip-diag': {
+      id: '/api/public/ip-diag'
+      path: '/api/public/ip-diag'
+      fullPath: '/api/public/ip-diag'
+      preLoaderRoute: typeof ApiPublicIpDiagRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/infinitepay-webhook': {
       id: '/api/public/infinitepay-webhook'
       path: '/api/public/infinitepay-webhook'
@@ -288,6 +308,7 @@ const rootRouteChildren: RootRouteChildren = {
   ProdutoIdRoute: ProdutoIdRoute,
   ApiPublicExpireReservationsRoute: ApiPublicExpireReservationsRoute,
   ApiPublicInfinitepayWebhookRoute: ApiPublicInfinitepayWebhookRoute,
+  ApiPublicIpDiagRoute: ApiPublicIpDiagRoute,
   ApiPublicManifestRoute: ApiPublicManifestRoute,
   ApiPublicSyncCatalogRoute: ApiPublicSyncCatalogRoute,
 }

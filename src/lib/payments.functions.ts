@@ -98,21 +98,9 @@ export const createOrderCheckout = createServerFn({ method: "POST" })
         } = await supabaseAdmin
           .from("orders")
           .select(
-            [
-              "id",
-              "total",
-              "discount",
-              "coins_discount",
-              "payment_status",
-              "payment_url",
-              "payment_nsu",
-              "payment_provider",
-              "customer_name",
-              "customer_phone",
-              "customer_email",
-              "items",
-            ].join(", "),
+            "id, total, discount, coins_discount, payment_status, payment_url, payment_nsu, payment_provider, customer_name, customer_phone, customer_email, items",
           )
+
           .eq("id", data.orderId)
           .maybeSingle();
 
