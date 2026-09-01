@@ -344,9 +344,11 @@ function ProfileSheet({ onClose }: { onClose: () => void }) {
         setName(registered.name);
         // O e-mail vem exatamente do Loyverse (vazio lá = vazio aqui).
         setEmail(registered.email ?? "");
+        setEmailFromLoyverse(Boolean(registered.email));
         setStatus("known");
 
       } else {
+        setEmailFromLoyverse(false);
         setStatus("new");
       }
     }, 500);
