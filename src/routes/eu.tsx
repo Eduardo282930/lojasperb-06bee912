@@ -321,6 +321,8 @@ function ProfileSheet({ onClose }: { onClose: () => void }) {
   const [email, setEmail] = useState(profile.email);
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState("");
+  // True quando o e-mail veio do Loyverse (já cadastrado lá).
+  const [emailFromLoyverse, setEmailFromLoyverse] = useState(false);
   const [status, setStatus] = useState<"idle" | "checking" | "known" | "new">(
     profile.name ? "known" : "idle",
   );
