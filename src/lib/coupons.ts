@@ -4,7 +4,9 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   syncLoyverseCustomer,
   loyverseCustomerLookup,
+  loyverseLookupByEmail,
 } from "@/lib/loyverse-customers.functions";
+
 
 
 export type Coupon = {
