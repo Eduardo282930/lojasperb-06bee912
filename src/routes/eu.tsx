@@ -340,8 +340,10 @@ function ProfileSheet({ onClose }: { onClose: () => void }) {
       if (!alive) return;
       if (registered?.name) {
         setName(registered.name);
-        if (registered.email) setEmail((e) => e || registered.email);
+        // O e-mail vem exatamente do Loyverse (vazio lá = vazio aqui).
+        setEmail(registered.email ?? "");
         setStatus("known");
+
       } else {
         setStatus("new");
       }

@@ -399,9 +399,8 @@ export async function lookupCustomerProfile(
 }
 
 /**
- * Cadastro do cliente com o Loyverse como fonte principal.
- * Busca no Loyverse (que também atualiza o banco) e, se não houver token ou
- * cliente lá, usa o cadastro já salvo no banco.
+ * Cadastro do cliente: o Loyverse é a ÚNICA fonte de verdade.
+ * Nada é lido do banco — se não existir no Loyverse, é cliente novo.
  */
 export async function lookupCustomerLive(
   phone: string,
@@ -411,16 +410,15 @@ export async function lookupCustomerLive(
   try {
     const live = await loyverseCustomerLookup({ data: { phone } });
     if (live?.found && live.name) {
-      const local = await lookupCustomerProfile(phone);
-      return { name: live.name, email: live.email || local?.email || "" };
+      return { name: live.name, email: live.email ?? "" };
     }
   } catch (err) {
     console.warn("[lookupCustomerLive] Loyverse indisponível", err);
   }
-  return lookupCustomerProfile(phone);
+  return null;
 }
 
-/** Reconhece o cliente pelo e-mail (Loyverse primeiro, banco como espelho). */
+/** Reconhece o cliente pelo e-mail — somente pelo cadastro do Loyverse. */
 export async function lookupCustomerByEmail(
   email: string,
 ): Promise<{ name: string; phone: string } | null> {
@@ -434,19 +432,16 @@ export async function lookupCustomerByEmail(
   } catch (err) {
     console.warn("[lookupCustomerByEmail] Loyverse indisponível", err);
   }
-  const { data, error } = await supabase.rpc("lookup_customer_by_email", {
-    p_email: clean,
-  });
-  const row = (data ?? [])[0];
-  if (error || !row) return null;
-  return { name: row.name ?? "", phone: row.phone ?? "" };
+  return null;
 }
 
-/** Saves the customer in the database, Loyverse, and keeps a local copy. */
+
+/** Salva no Loyverse (fonte) e mantém apenas um espelho mínimo no banco. */
 export async function saveProfile(profile: Profile): Promise<void> {
   ensureInit();
-  const locked = await lookupCustomerName(profile.phone);
-  if (locked) profile = { ...profile, name: locked };
+  const live = await lookupCustomerLive(profile.phone);
+  if (live?.name) profile = { ...profile, name: live.name };
+
   profileCache = profile;
   if (typeof window !== "undefined") {
     window.localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
