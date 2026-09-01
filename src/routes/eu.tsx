@@ -350,6 +350,28 @@ function ProfileSheet({ onClose }: { onClose: () => void }) {
     };
   }, [phone]);
 
+  // Entrar pelo e-mail: se o telefone ainda não foi digitado, buscamos o
+  // cadastro pelo e-mail e preenchemos o resto automaticamente.
+  useEffect(() => {
+    const clean = email.trim().toLowerCase();
+    if (!emailOk || phone.replace(/\D/g, "").length >= 10) return;
+    let alive = true;
+    const t = setTimeout(async () => {
+      const found = await lookupCustomerByEmail(clean);
+      if (!alive || !found) return;
+      if (found.phone) setPhone(found.phone);
+      if (found.name) {
+        setName(found.name);
+        setStatus("known");
+      }
+    }, 600);
+    return () => {
+      alive = false;
+      clearTimeout(t);
+    };
+  }, [email, emailOk, phone]);
+
+
   return (
     <div className="fixed inset-0 z-50 flex items-end bg-black/50 p-0 sm:items-center sm:justify-center sm:p-4">
       <div className="max-h-[90vh] w-full overflow-y-auto rounded-t-3xl border-2 border-border bg-card p-5 shadow-2xl sm:max-w-md sm:rounded-3xl">
