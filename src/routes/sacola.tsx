@@ -130,7 +130,7 @@ function SacolaPage() {
 
 
   function whatsAppText() {
-    const linhas = cart.map(
+    const linhas = picked.map(
       (c) => `- ${c.name} | Qtd: ${c.qty} | ${formatPrice(c.price)}`,
     );
     let texto = profile.name
@@ -148,12 +148,13 @@ function SacolaPage() {
   }
 
   /**
-   * Pagamento online: o pedido é criado como não pago (com reserva de estoque)
-   * e o checkout é aberto em seguida. Se o checkout falhar, o pedido é
-   * cancelado na hora e o estoque volta para a loja.
+   * Pagamento online: o pedido só nasce depois que o checkout responde com a
+   * tela de pagamento. Se algo falhar, o pedido é apagado na hora e o estoque
+   * reservado volta para a loja.
    */
   async function pagarAgora() {
-    if (cart.length === 0 || paying) return;
+    if (picked.length === 0 || paying) return;
+
     if (!logged) {
       void navigate({ to: "/eu" });
       return;
