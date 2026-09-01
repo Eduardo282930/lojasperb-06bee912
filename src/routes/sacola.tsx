@@ -194,25 +194,27 @@ function SacolaPage() {
         setPayError(
           checkout.reason === "min_value"
             ? `O pagamento online começa em ${formatPrice(MIN_CHECKOUT_BRL)}.`
-            : "O pagamento online está indisponível agora. Você pode enviar o pedido pelo WhatsApp.",
+            : `O pagamento online está indisponível agora (${checkout.reason ?? "erro"}). Você pode enviar o pedido pelo WhatsApp.`,
         );
         return;
       }
       if (typeof window !== "undefined") {
         window.localStorage.setItem("sperb-last-order", orderId);
       }
-      clearCart();
+      removePicked();
       window.location.href = checkout.url;
-    } catch {
+    } catch (err) {
       if (orderId) await cancelOrder({ data: { orderId } }).catch(() => undefined);
-      setPayError("Falha ao abrir o pagamento. Tente novamente.");
+      const detail = err instanceof Error ? err.message.slice(0, 120) : "";
+      setPayError(`Falha ao abrir o pagamento. ${detail}`.trim());
     } finally {
       setPaying(false);
     }
   }
 
   async function enviarWhatsApp() {
-    if (cart.length === 0) return;
+    if (picked.length === 0) return;
+
     if (!logged) {
       void navigate({ to: "/eu" });
       return;
