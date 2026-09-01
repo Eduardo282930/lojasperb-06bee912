@@ -49,6 +49,7 @@ function SacolaPage() {
   const [useCoins, setUseCoins] = useState(false);
   const [paying, setPaying] = useState(false);
   const [payError, setPayError] = useState("");
+  const [unchecked, setUnchecked] = useState<string[]>([]);
   const openCheckout = useServerFn(createOrderCheckout);
   const checkPayments = useServerFn(paymentsStatus);
   const cancelOrder = useServerFn(abandonOrder);
@@ -65,7 +66,20 @@ function SacolaPage() {
   const claimed = useClaimedCoupons(profile.phone).data ?? [];
   const myUses = useMyCouponUses(profile.phone).data ?? {};
 
-  const subtotal = cart.reduce((s, c) => s + priceValue(c.price) * c.qty, 0);
+  // Estilo Shopee: o cliente escolhe quais itens entram no pedido.
+  const isPicked = (id: string) => !unchecked.includes(id);
+  const picked = cart.filter((c) => isPicked(c.id));
+  const allPicked = cart.length > 0 && picked.length === cart.length;
+  function togglePick(id: string) {
+    setUnchecked((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+  }
+  function toggleAll() {
+    setUnchecked(allPicked ? cart.map((c) => c.id) : []);
+  }
+
+  const subtotal = picked.reduce((s, c) => s + priceValue(c.price) * c.qty, 0);
   // Cupons resgatados ficam salvos para o cliente; o limite pessoal é respeitado.
   const usable = [...coupons, ...claimed]
     .filter((c, i, arr) => arr.findIndex((x) => x.id === c.id) === i)
@@ -79,13 +93,18 @@ function SacolaPage() {
   const total = Math.max(0, eligible - coinsDiscount);
 
   function orderItems() {
-    return cart.map((c) => ({
+    return picked.map((c) => ({
       id: c.id,
       name: c.name,
       qty: c.qty,
       price: priceValue(c.price),
       image: c.image ?? null,
     }));
+  }
+
+  /** Tira do carrinho apenas os itens que foram comprados. */
+  function removePicked() {
+    for (const c of picked) updateQty(c.id, 0);
   }
 
   async function saveOrder(): Promise<string | null> {
@@ -108,6 +127,7 @@ function SacolaPage() {
     }
     return id;
   }
+
 
   function whatsAppText() {
     const linhas = cart.map(
