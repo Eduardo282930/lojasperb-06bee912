@@ -456,15 +456,21 @@ export async function saveProfile(profile: Profile): Promise<void> {
   if (error) throw error;
   // Espelha no Loyverse (fonte principal), incluindo o e-mail.
   try {
-    await syncLoyverseCustomer({
+    const result = await syncLoyverseCustomer({
       data: {
         name: profile.name,
         phone: profile.phone,
         email: profile.email ?? "",
       },
     });
+    // Se o cliente informou e-mail, ele PRECISA chegar ao Loyverse —
+    // nada de salvar em silêncio só localmente.
+    if (profile.email && !result?.ok) {
+      throw new Error("loyverse-sync-failed");
+    }
   } catch (err) {
     console.warn("[saveProfile] Loyverse sync falhou", err);
+    if (profile.email) throw err;
   }
 }
 

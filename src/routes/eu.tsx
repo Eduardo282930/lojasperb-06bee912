@@ -321,6 +321,8 @@ function ProfileSheet({ onClose }: { onClose: () => void }) {
   const [email, setEmail] = useState(profile.email);
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState("");
+  // True quando o e-mail veio do Loyverse (já cadastrado lá).
+  const [emailFromLoyverse, setEmailFromLoyverse] = useState(false);
   const [status, setStatus] = useState<"idle" | "checking" | "known" | "new">(
     profile.name ? "known" : "idle",
   );
@@ -342,9 +344,11 @@ function ProfileSheet({ onClose }: { onClose: () => void }) {
         setName(registered.name);
         // O e-mail vem exatamente do Loyverse (vazio lá = vazio aqui).
         setEmail(registered.email ?? "");
+        setEmailFromLoyverse(Boolean(registered.email));
         setStatus("known");
 
       } else {
+        setEmailFromLoyverse(false);
         setStatus("new");
       }
     }, 500);
@@ -366,6 +370,7 @@ function ProfileSheet({ onClose }: { onClose: () => void }) {
       if (found.phone) setPhone(found.phone);
       if (found.name) {
         setName(found.name);
+        setEmailFromLoyverse(true);
         setStatus("known");
       }
     }, 600);
@@ -443,14 +448,24 @@ function ProfileSheet({ onClose }: { onClose: () => void }) {
             maxLength={120}
             inputMode="email"
             autoComplete="email"
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              setEmailFromLoyverse(false);
+            }}
             placeholder="voce@email.com"
             className="mt-1 w-full rounded-2xl border-2 border-border bg-background px-4 py-3 text-lg font-semibold text-foreground outline-none focus:border-[oklch(0.55_0.22_255)]"
           />
-          <span className="mt-1 block text-sm font-semibold text-muted-foreground">
-            Usado no pagamento online (Pix e cartão). Pedido pelo WhatsApp não precisa.
-          </span>
         </label>
+        {emailFromLoyverse && emailOk ? (
+          <p className="mt-1 flex items-center gap-1 text-sm font-bold text-[oklch(0.62_0.19_145)]">
+            <BadgeCheck className="h-4 w-4" strokeWidth={2.5} />
+            E-mail já cadastrado no seu cadastro da loja.
+          </p>
+        ) : (
+          <p className="mt-1 text-sm font-semibold text-muted-foreground">
+            Usado no pagamento online (Pix e cartão). Pedido pelo WhatsApp não precisa.
+          </p>
+        )}
 
         <button
           disabled={
