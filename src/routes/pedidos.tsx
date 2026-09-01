@@ -276,19 +276,22 @@ function PedidosPage() {
     void navigate({ search: { status: next }, replace: true });
   }
 
-  /** Toque numa aba: leva direto para a seção e sobe até o topo da lista. */
+  /** Toque numa aba: 1 clique já leva direto para a seção certa. */
   function goTo(next: StatusValue) {
     const el = trackRef.current;
     lockScroll();
     setStatus(next);
     if (el) {
       const idx = Math.max(0, SECTIONS.findIndex((s) => s.value === next));
-      el.scrollTo({ left: idx * el.clientWidth, behavior: "smooth" });
+      // Salto imediato: com animação, o "arraste" recalculava a aba no meio
+      // do caminho e voltava para o status anterior (daí os 2 cliques).
+      el.scrollTo({ left: idx * el.clientWidth, behavior: "auto" });
     }
     if (typeof window !== "undefined") {
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
   }
+
 
   // Ao arrastar para o lado (estilo Shopee): só troca quando o deslize para,
   // e sempre centralizado na seção mais próxima.
