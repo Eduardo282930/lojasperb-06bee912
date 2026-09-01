@@ -436,11 +436,12 @@ export async function lookupCustomerByEmail(
 }
 
 
-/** Saves the customer in the database, Loyverse, and keeps a local copy. */
+/** Salva no Loyverse (fonte) e mantém apenas um espelho mínimo no banco. */
 export async function saveProfile(profile: Profile): Promise<void> {
   ensureInit();
-  const locked = await lookupCustomerName(profile.phone);
-  if (locked) profile = { ...profile, name: locked };
+  const live = await lookupCustomerLive(profile.phone);
+  if (live?.name) profile = { ...profile, name: live.name };
+
   profileCache = profile;
   if (typeof window !== "undefined") {
     window.localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
