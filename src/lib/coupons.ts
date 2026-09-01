@@ -418,13 +418,20 @@ export async function lookupCustomerLive(
   return lookupCustomerProfile(phone);
 }
 
-/** Reconhece o cliente pelo e-mail já cadastrado. */
+/** Reconhece o cliente pelo e-mail (Loyverse primeiro, banco como espelho). */
 export async function lookupCustomerByEmail(
-
   email: string,
 ): Promise<{ name: string; phone: string } | null> {
-  const clean = (email || "").trim();
+  const clean = (email || "").trim().toLowerCase();
   if (!clean.includes("@")) return null;
+  try {
+    const live = await loyverseLookupByEmail({ data: { email: clean } });
+    if (live?.found && (live.name || live.phone)) {
+      return { name: live.name, phone: live.phone };
+    }
+  } catch (err) {
+    console.warn("[lookupCustomerByEmail] Loyverse indisponível", err);
+  }
   const { data, error } = await supabase.rpc("lookup_customer_by_email", {
     p_email: clean,
   });
@@ -450,13 +457,20 @@ export async function saveProfile(profile: Profile): Promise<void> {
     p_email: profile.email ?? "",
   });
   if (error) throw error;
-  // Mirror the customer into the Loyverse "Clientes" tab (never blocks saving).
+  // Espelha no Loyverse (fonte principal), incluindo o e-mail.
   try {
-    await syncLoyverseCustomer({ data: { name: profile.name, phone: profile.phone } });
+    await syncLoyverseCustomer({
+      data: {
+        name: profile.name,
+        phone: profile.phone,
+        email: profile.email ?? "",
+      },
+    });
   } catch (err) {
     console.warn("[saveProfile] Loyverse sync falhou", err);
   }
 }
+
 
 export function redeemCoupon(id: string) {
   ensureInit();
