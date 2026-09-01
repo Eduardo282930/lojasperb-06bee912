@@ -92,27 +92,54 @@ export const createOrderCheckout = createServerFn({ method: "POST" })
         /*
          * Busca o pedido completo.
          */
-        const {
-          data: order,
-          error,
-        } = await supabaseAdmin
-          .from("orders")
-          .select(
-            "id, total, discount, coins_discount, payment_status, payment_url, payment_nsu, payment_provider, customer_name, customer_phone, customer_email, items",
-          )
+        type CheckoutOrder = {
+          id: string;
+          total: number | null;
+          discount: number | null;
+          coins_discount: number | null;
+          payment_status: string | null;
+          payment_url: string | null;
+          payment_nsu: string | null;
+          payment_provider: string | null;
+          customer_name: string | null;
+          customer_phone: string | null;
+          customer_email: string | null;
+          items: unknown;
+        };
 
-          .eq("id", data.orderId)
-          .maybeSingle();
+        let order: CheckoutOrder | null = null;
+        let orderError: { message?: string } | null = null;
 
-        if (error) {
+        /*
+         * O pedido é criado no navegador e consultado imediatamente no servidor.
+         * Em produção, essa troca pode chegar à leitura antes de a nova linha ficar
+         * visível no endpoint de dados. Repetimos somente essa leitura curta para
+         * não devolver um falso `not_found` e deixar uma reserva órfã.
+         */
+        for (let attempt = 0; attempt < 4; attempt += 1) {
+          const result = await supabaseAdmin
+            .from("orders")
+            .select(
+              "id, total, discount, coins_discount, payment_status, payment_url, payment_nsu, payment_provider, customer_name, customer_phone, customer_email, items",
+            )
+            .eq("id", data.orderId)
+            .maybeSingle();
+
+          order = result.data as CheckoutOrder | null;
+          orderError = result.error;
+          if (order || orderError) break;
+          await new Promise((resolve) => setTimeout(resolve, 250 * (attempt + 1)));
+        }
+
+        if (orderError) {
           console.error(
             "[SPERB] Erro ao buscar pedido:",
-            error,
+            orderError,
           );
 
           return {
             url: null,
-            reason: "not_found",
+            reason: "database_error",
           };
         }
 
