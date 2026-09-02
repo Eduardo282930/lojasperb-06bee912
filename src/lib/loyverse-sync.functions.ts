@@ -156,12 +156,18 @@ export async function syncPaidOrder(orderId: string): Promise<SyncResult> {
     if (!paymentType) throw new Error("nenhuma forma de pagamento no Loyverse");
 
     const discounts = discountList.discounts ?? [];
+    const norm = (s: string | null | undefined) =>
+      (s ?? "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase();
     const couponDiscount = (kind: "VARIABLE_AMOUNT" | "VARIABLE_PERCENT") =>
       discounts.find(
-        (d) =>
-          (d.type ?? "").toUpperCase() === kind &&
-          (d.name ?? "").toLowerCase().includes("cupom"),
+        (d) => (d.type ?? "").toUpperCase() === kind && norm(d.name).includes("cupom"),
       );
+    /* Desconto usado para as moedas (pontos) — "Desconto Moedas" no Loyverse. */
+    const coinsDiscountEntry = () =>
+      discounts.find((d) => norm(d.name).includes("moeda")) ?? null;
 
     let loyverseCustomerId: string | null = null;
     if (order.customer_id) {
