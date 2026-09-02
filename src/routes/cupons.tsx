@@ -12,6 +12,8 @@ import {
   useClaimedCoupons,
   useMyCouponUses,
   isAvailableForCustomer,
+  useSelectedCouponId,
+  setSelectedCouponId,
   CLAIMED_KEY,
   type Coupon,
 } from "@/lib/coupons";
@@ -53,6 +55,8 @@ function CuponsPage() {
   const redeemed = useRedeemed();
   const qc = useQueryClient();
   const [claiming, setClaiming] = useState<string | null>(null);
+  const selectedId = useSelectedCouponId();
+  const navigate = Route.useNavigate();
 
   const claimedList = useClaimedCoupons(profile.phone).data ?? [];
   const myUses = useMyCouponUses(profile.phone).data ?? {};
@@ -122,8 +126,20 @@ function CuponsPage() {
                     <p className="mt-1 text-sm font-bold text-foreground">
                       {finished
                         ? "Limite de uso atingido"
-                        : "Guardado na sua conta — aplica sozinho na sacola"}
+                        : "Guardado na sua conta — use quando quiser"}
                     </p>
+                    {!finished && (
+                      <button
+                        onClick={() => {
+                          setSelectedCouponId(selectedId === c.id ? null : c.id);
+                          if (selectedId !== c.id) void navigate({ to: "/confirmar" });
+                        }}
+                        className="mt-3 w-full rounded-2xl px-4 py-3 text-lg font-black text-white active:scale-95"
+                        style={{ backgroundColor: selectedId === c.id ? GREEN : BLUE }}
+                      >
+                        {selectedId === c.id ? "Usando neste pedido · tirar" : "Usar neste pedido"}
+                      </button>
+                    )}
                   </li>
                 );
               })}
@@ -189,7 +205,8 @@ function CuponsPage() {
         </section>
 
         <p className="mt-4 text-sm text-muted-foreground">
-          Cada cupom fica salvo na sua conta e não precisa ser resgatado de novo.
+          Cada cupom fica salvo na sua conta. Nenhum desconto entra sozinho: escolha aqui o
+          cupom que você quer usar no pedido.
         </p>
       </main>
     </div>

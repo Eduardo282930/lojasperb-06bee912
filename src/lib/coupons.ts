@@ -493,3 +493,51 @@ export function unredeemCoupon(id: string) {
   }
   emit();
 }
+
+/* ---------------------------------------------------------------------- */
+/* Escolha explícita do cupom: nenhum cupom é aplicado sozinho.            */
+/* O cliente entra em "Cupons" e decide qual quer usar no pedido.          */
+/* ---------------------------------------------------------------------- */
+
+const CHOICE_KEY = "sperb-coupon-choice-v1";
+
+export function getSelectedCouponId(): string {
+  if (typeof window === "undefined") return "";
+  return window.localStorage.getItem(CHOICE_KEY) ?? "";
+}
+
+export function setSelectedCouponId(id: string | null) {
+  if (typeof window === "undefined") return;
+  if (id) window.localStorage.setItem(CHOICE_KEY, id);
+  else window.localStorage.removeItem(CHOICE_KEY);
+  window.dispatchEvent(new Event("sperb-coupon-choice"));
+}
+
+export function useSelectedCouponId(): string {
+  const [id, setId] = useState("");
+  useEffect(() => {
+    const read = () => setId(getSelectedCouponId());
+    read();
+    window.addEventListener("sperb-coupon-choice", read);
+    window.addEventListener("storage", read);
+    return () => {
+      window.removeEventListener("sperb-coupon-choice", read);
+      window.removeEventListener("storage", read);
+    };
+  }, []);
+  return id;
+}
+
+/** Cupom escolhido pelo cliente (e válido para este subtotal). */
+export function chosenCouponFor(
+  coupons: Coupon[],
+  selectedId: string,
+  subtotal: number,
+): { coupon: Coupon; discount: number } | null {
+  if (!selectedId) return null;
+  const coupon = coupons.find((c) => c.id === selectedId);
+  if (!coupon || !isAvailable(coupon)) return null;
+  const discount = discountFor(coupon, subtotal);
+  if (discount <= 0) return null;
+  return { coupon, discount };
+}

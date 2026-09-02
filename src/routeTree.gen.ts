@@ -14,11 +14,13 @@ import { Route as PedidosRouteImport } from './routes/pedidos'
 import { Route as MoedasRouteImport } from './routes/moedas'
 import { Route as EuRouteImport } from './routes/eu'
 import { Route as CuponsRouteImport } from './routes/cupons'
+import { Route as ConfirmarRouteImport } from './routes/confirmar'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ProdutoIdRouteImport } from './routes/produto.$id'
 import { Route as ApiPublicSyncCatalogRouteImport } from './routes/api/public/sync-catalog'
 import { Route as ApiPublicManifestRouteImport } from './routes/api/public/manifest'
+import { Route as ApiPublicLoyverseReconcileRouteImport } from './routes/api/public/loyverse-reconcile'
 import { Route as ApiPublicInfinitepayWebhookRouteImport } from './routes/api/public/infinitepay-webhook'
 import { Route as ApiPublicExpireReservationsRouteImport } from './routes/api/public/expire-reservations'
 
@@ -47,6 +49,11 @@ const CuponsRoute = CuponsRouteImport.update({
   path: '/cupons',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ConfirmarRoute = ConfirmarRouteImport.update({
+  id: '/confirmar',
+  path: '/confirmar',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminRoute = AdminRouteImport.update({
   id: '/admin',
   path: '/admin',
@@ -72,6 +79,12 @@ const ApiPublicManifestRoute = ApiPublicManifestRouteImport.update({
   path: '/api/public/manifest',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicLoyverseReconcileRoute =
+  ApiPublicLoyverseReconcileRouteImport.update({
+    id: '/api/public/loyverse-reconcile',
+    path: '/api/public/loyverse-reconcile',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicInfinitepayWebhookRoute =
   ApiPublicInfinitepayWebhookRouteImport.update({
     id: '/api/public/infinitepay-webhook',
@@ -88,6 +101,7 @@ const ApiPublicExpireReservationsRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/confirmar': typeof ConfirmarRoute
   '/cupons': typeof CuponsRoute
   '/eu': typeof EuRoute
   '/moedas': typeof MoedasRoute
@@ -96,12 +110,14 @@ export interface FileRoutesByFullPath {
   '/produto/$id': typeof ProdutoIdRoute
   '/api/public/expire-reservations': typeof ApiPublicExpireReservationsRoute
   '/api/public/infinitepay-webhook': typeof ApiPublicInfinitepayWebhookRoute
+  '/api/public/loyverse-reconcile': typeof ApiPublicLoyverseReconcileRoute
   '/api/public/manifest': typeof ApiPublicManifestRoute
   '/api/public/sync-catalog': typeof ApiPublicSyncCatalogRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/confirmar': typeof ConfirmarRoute
   '/cupons': typeof CuponsRoute
   '/eu': typeof EuRoute
   '/moedas': typeof MoedasRoute
@@ -110,6 +126,7 @@ export interface FileRoutesByTo {
   '/produto/$id': typeof ProdutoIdRoute
   '/api/public/expire-reservations': typeof ApiPublicExpireReservationsRoute
   '/api/public/infinitepay-webhook': typeof ApiPublicInfinitepayWebhookRoute
+  '/api/public/loyverse-reconcile': typeof ApiPublicLoyverseReconcileRoute
   '/api/public/manifest': typeof ApiPublicManifestRoute
   '/api/public/sync-catalog': typeof ApiPublicSyncCatalogRoute
 }
@@ -117,6 +134,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/confirmar': typeof ConfirmarRoute
   '/cupons': typeof CuponsRoute
   '/eu': typeof EuRoute
   '/moedas': typeof MoedasRoute
@@ -125,6 +143,7 @@ export interface FileRoutesById {
   '/produto/$id': typeof ProdutoIdRoute
   '/api/public/expire-reservations': typeof ApiPublicExpireReservationsRoute
   '/api/public/infinitepay-webhook': typeof ApiPublicInfinitepayWebhookRoute
+  '/api/public/loyverse-reconcile': typeof ApiPublicLoyverseReconcileRoute
   '/api/public/manifest': typeof ApiPublicManifestRoute
   '/api/public/sync-catalog': typeof ApiPublicSyncCatalogRoute
 }
@@ -133,6 +152,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/admin'
+    | '/confirmar'
     | '/cupons'
     | '/eu'
     | '/moedas'
@@ -141,12 +161,14 @@ export interface FileRouteTypes {
     | '/produto/$id'
     | '/api/public/expire-reservations'
     | '/api/public/infinitepay-webhook'
+    | '/api/public/loyverse-reconcile'
     | '/api/public/manifest'
     | '/api/public/sync-catalog'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/admin'
+    | '/confirmar'
     | '/cupons'
     | '/eu'
     | '/moedas'
@@ -155,12 +177,14 @@ export interface FileRouteTypes {
     | '/produto/$id'
     | '/api/public/expire-reservations'
     | '/api/public/infinitepay-webhook'
+    | '/api/public/loyverse-reconcile'
     | '/api/public/manifest'
     | '/api/public/sync-catalog'
   id:
     | '__root__'
     | '/'
     | '/admin'
+    | '/confirmar'
     | '/cupons'
     | '/eu'
     | '/moedas'
@@ -169,6 +193,7 @@ export interface FileRouteTypes {
     | '/produto/$id'
     | '/api/public/expire-reservations'
     | '/api/public/infinitepay-webhook'
+    | '/api/public/loyverse-reconcile'
     | '/api/public/manifest'
     | '/api/public/sync-catalog'
   fileRoutesById: FileRoutesById
@@ -176,6 +201,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
+  ConfirmarRoute: typeof ConfirmarRoute
   CuponsRoute: typeof CuponsRoute
   EuRoute: typeof EuRoute
   MoedasRoute: typeof MoedasRoute
@@ -184,6 +210,7 @@ export interface RootRouteChildren {
   ProdutoIdRoute: typeof ProdutoIdRoute
   ApiPublicExpireReservationsRoute: typeof ApiPublicExpireReservationsRoute
   ApiPublicInfinitepayWebhookRoute: typeof ApiPublicInfinitepayWebhookRoute
+  ApiPublicLoyverseReconcileRoute: typeof ApiPublicLoyverseReconcileRoute
   ApiPublicManifestRoute: typeof ApiPublicManifestRoute
   ApiPublicSyncCatalogRoute: typeof ApiPublicSyncCatalogRoute
 }
@@ -225,6 +252,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CuponsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/confirmar': {
+      id: '/confirmar'
+      path: '/confirmar'
+      fullPath: '/confirmar'
+      preLoaderRoute: typeof ConfirmarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin': {
       id: '/admin'
       path: '/admin'
@@ -260,6 +294,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicManifestRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/loyverse-reconcile': {
+      id: '/api/public/loyverse-reconcile'
+      path: '/api/public/loyverse-reconcile'
+      fullPath: '/api/public/loyverse-reconcile'
+      preLoaderRoute: typeof ApiPublicLoyverseReconcileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/infinitepay-webhook': {
       id: '/api/public/infinitepay-webhook'
       path: '/api/public/infinitepay-webhook'
@@ -280,6 +321,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
+  ConfirmarRoute: ConfirmarRoute,
   CuponsRoute: CuponsRoute,
   EuRoute: EuRoute,
   MoedasRoute: MoedasRoute,
@@ -288,6 +330,7 @@ const rootRouteChildren: RootRouteChildren = {
   ProdutoIdRoute: ProdutoIdRoute,
   ApiPublicExpireReservationsRoute: ApiPublicExpireReservationsRoute,
   ApiPublicInfinitepayWebhookRoute: ApiPublicInfinitepayWebhookRoute,
+  ApiPublicLoyverseReconcileRoute: ApiPublicLoyverseReconcileRoute,
   ApiPublicManifestRoute: ApiPublicManifestRoute,
   ApiPublicSyncCatalogRoute: ApiPublicSyncCatalogRoute,
 }
