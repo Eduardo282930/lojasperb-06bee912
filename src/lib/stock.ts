@@ -46,37 +46,23 @@ function saveHoldId(id: string | null) {
   else window.localStorage.removeItem(HOLD_KEY);
 }
 
-/** Valida o estoque em tempo real e reserva tudo de uma vez só. */
+/** Valida o estoque em tempo real (Loyverse) e reserva tudo de uma vez só. */
 export async function createStockHold(items: HoldItem[]): Promise<HoldResult> {
   const payload = items.map((i) => ({
     id: i.id,
     name: i.name,
     qty: Math.max(1, Math.round(i.qty)),
   }));
-  const { data, error } = await rpc()("create_stock_hold", {
-    p_device_id: deviceId(),
-    p_items: payload,
-    p_minutes: 20,
-  });
-  if (error) {
+  try {
+    const res = await createHoldOnServer({
+      data: { deviceId: deviceId(), items: payload },
+    });
+    saveHoldId(res.ok ? res.holdId : null);
+    return { ok: res.ok, holdId: res.holdId, problems: res.problems };
+  } catch {
+    saveHoldId(null);
     return { ok: false, holdId: "", problems: [] };
   }
-  const raw = (data ?? {}) as Record<string, unknown>;
-  if (raw["ok"] === true) {
-    const id = String(raw["hold_id"] ?? "");
-    saveHoldId(id);
-    return { ok: true, holdId: id, problems: [] };
-  }
-  saveHoldId(null);
-  const problems = Array.isArray(raw["problems"])
-    ? (raw["problems"] as Array<Record<string, unknown>>).map((p) => ({
-        id: String(p["id"] ?? ""),
-        name: String(p["name"] ?? ""),
-        requested: Number(p["requested"] ?? 0),
-        available: Number(p["available"] ?? 0),
-      }))
-    : [];
-  return { ok: false, holdId: "", problems };
 }
 
 /** Devolve o estoque reservado ao catálogo. */
@@ -85,7 +71,7 @@ export async function releaseStockHold(): Promise<void> {
   saveHoldId(null);
   if (!id) return;
   try {
-    await rpc()("release_stock_hold", { p_hold_id: id });
+    await releaseHoldOnServer({ data: { holdId: id } });
   } catch {
     /* a reserva vence sozinha em 20 minutos */
   }
