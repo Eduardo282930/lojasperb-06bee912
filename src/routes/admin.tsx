@@ -231,7 +231,12 @@ function AdminPage() {
             ))}
           </ul>
         )}
-        {section === "pedidos" && <OrdersPanel />}
+        {section === "pedidos" && (
+          <>
+            <SyncPanel />
+            <OrdersPanel />
+          </>
+        )}
         {section === "cupons" && <CouponsPanel />}
         {section === "recibos" && <ReceiptsPanel />}
         {section === "clientes" && <CustomersPanel />}
@@ -1572,6 +1577,127 @@ function PaymentsPanel() {
           <li>• Pago automaticamente muda o pedido para “Em preparação”.</li>
         </ul>
       </div>
+    </div>
+  );
+}
+
+
+/* ------------------- Sincronização com o Loyverse ---------------------- */
+
+type SyncRow = {
+  id: string;
+  customer_name: string | null;
+  total: number | null;
+  flow_state: string | null;
+  sync_error: string | null;
+  refund_state: string | null;
+  loyverse_receipt_id: string | null;
+};
+
+/**
+ * Mostra os pedidos que falharam ao virar recibo no Loyverse (SYNC_ERROR) e os
+ * reembolsos cujo dinheiro ainda precisa ser devolvido manualmente no
+ * InfinitePay. Nada é criado pelo valor cheio: o pedido espera aqui.
+ */
+function SyncPanel() {
+  const [busy, setBusy] = useState<string | null>(null);
+  const [msg, setMsg] = useState("");
+  const retry = useServerFn(retryLoyverseSync);
+
+  const { data, refetch, isLoading } = useQuery({
+    queryKey: ["admin-sync"],
+    queryFn: async (): Promise<SyncRow[]> => {
+      const { data, error } = await supabase
+        .from("orders")
+        .select(
+          "id, customer_name, total, flow_state, sync_error, refund_state, loyverse_receipt_id",
+        )
+        .or("flow_state.eq.SYNC_ERROR,refund_state.eq.money_pending")
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      return (data ?? []) as unknown as SyncRow[];
+    },
+    staleTime: 20 * 1000,
+  });
+
+  const rows = data ?? [];
+
+  return (
+    <div className="mb-4 rounded-3xl border-2 border-border bg-card p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-lg font-black text-foreground">Sincronização com o Loyverse</h3>
+        <button
+          disabled={busy !== null}
+          onClick={async () => {
+            setBusy("all");
+            setMsg("");
+            try {
+              const res = await fetch("/api/public/loyverse-reconcile", { method: "POST" });
+              const json = (await res.json()) as {
+                refundsApplied?: number;
+                resynced?: number;
+              };
+              setMsg(
+                `Reembolsos aplicados: ${json.refundsApplied ?? 0} · Recibos reenviados: ${json.resynced ?? 0}`,
+              );
+            } catch {
+              setMsg("Não foi possível reconciliar agora.");
+            }
+            setBusy(null);
+            void refetch();
+          }}
+          className="rounded-xl bg-muted px-3 py-2 text-sm font-black text-foreground active:scale-95 disabled:opacity-60"
+        >
+          {busy === "all" ? "Verificando…" : "Verificar agora"}
+        </button>
+      </div>
+
+      {msg && <p className="mt-1 text-sm font-bold text-muted-foreground">{msg}</p>}
+
+      {isLoading ? (
+        <p className="mt-2 text-sm font-semibold text-muted-foreground">Carregando…</p>
+      ) : rows.length === 0 ? (
+        <p className="mt-2 text-sm font-semibold text-muted-foreground">
+          Tudo sincronizado. Nenhum recibo pendente e nenhum reembolso a devolver.
+        </p>
+      ) : (
+        <ul className="mt-2 flex flex-col gap-2">
+          {rows.map((r) => (
+            <li key={r.id} className="rounded-2xl border border-border p-3">
+              <p className="text-base font-black text-foreground">
+                {r.customer_name || "Sem nome"} · {formatPrice(Number(r.total) || 0)}
+              </p>
+              {r.flow_state === "SYNC_ERROR" && (
+                <p className="text-sm font-bold text-destructive">
+                  Recibo não criado: {r.sync_error || "erro desconhecido"}
+                </p>
+              )}
+              {r.refund_state === "money_pending" && (
+                <p className="text-sm font-bold" style={{ color: GOLD }}>
+                  Reembolsado no Loyverse — devolver o dinheiro pelo InfinitePay.
+                </p>
+              )}
+              {r.flow_state === "SYNC_ERROR" && (
+                <button
+                  disabled={busy === r.id}
+                  onClick={async () => {
+                    setBusy(r.id);
+                    const out = await retry({ data: { orderId: r.id } });
+                    setMsg(out.ok ? "Recibo criado no Loyverse." : `Falhou: ${out.reason}`);
+                    setBusy(null);
+                    void refetch();
+                  }}
+                  className="mt-2 rounded-xl px-3 py-2 text-sm font-black text-white active:scale-95 disabled:opacity-60"
+                  style={{ backgroundColor: BLUE }}
+                >
+                  {busy === r.id ? "Enviando…" : "Tentar criar o recibo"}
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
