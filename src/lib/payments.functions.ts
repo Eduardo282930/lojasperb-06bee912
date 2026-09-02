@@ -254,6 +254,7 @@ export const startCheckout = createServerFn({ method: "POST" })
   .inputValidator(
     (data: {
       deviceId: string;
+      holdId?: string;
       name: string;
       phone: string;
       email: string;
@@ -282,6 +283,7 @@ export const startCheckout = createServerFn({ method: "POST" })
 
       return {
         deviceId: String(data.deviceId ?? ""),
+        holdId: String(data.holdId ?? ""),
         name: data.name.trim().slice(0, 120),
         phone: String(data.phone).slice(0, 30),
         email: String(data.email ?? "").trim().slice(0, 200),
@@ -300,6 +302,7 @@ export const startCheckout = createServerFn({ method: "POST" })
       };
     },
   )
+
   .handler(async ({ data }): Promise<CheckoutResult> => {
     let orderId: string | null = null;
 
