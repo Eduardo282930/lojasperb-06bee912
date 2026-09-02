@@ -57,7 +57,7 @@ export type ReconcileResult = {
   reason?: string;
 };
 
-export async function reconcileWithLoyverse(hours = 24 * 90): Promise<ReconcileResult> {
+export async function reconcileWithLoyverse(hours = 24 * 30): Promise<ReconcileResult> {
   const token = process.env["LOYVERSE_TOKEN"];
   if (!token) return { ok: false, refundsApplied: 0, resynced: 0, reason: "no_token" };
 
