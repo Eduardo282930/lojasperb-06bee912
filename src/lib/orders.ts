@@ -88,7 +88,7 @@ export async function recordOrder(input: {
     p_coupon_code: input.couponCode,
     p_coins: Math.max(0, Math.trunc(input.coins ?? 0)),
   };
-  const call = supabase.rpc as unknown as (
+  const call = supabase.rpc.bind(supabase) as unknown as (
     name: string,
     a: Record<string, unknown>,
   ) => Promise<{ data?: unknown; error?: { message: string } | null }>;

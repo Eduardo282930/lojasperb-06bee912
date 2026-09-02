@@ -32,7 +32,7 @@ type AnyRpc = (
 ) => Promise<{ data?: unknown; error?: { message: string } | null }>;
 
 function rpc(): AnyRpc {
-  return supabase.rpc as unknown as AnyRpc;
+  return supabase.rpc.bind(supabase) as unknown as AnyRpc;
 }
 
 export function getHoldId(): string {
