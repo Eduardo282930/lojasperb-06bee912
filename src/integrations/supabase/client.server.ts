@@ -2,8 +2,10 @@ import { createClient } from "@supabase/supabase-js";
 import type { Database } from "./types";
 
 function createSupabaseAdminClient() {
-  const SUPABASE_URL = process.env["SUPABASE_URL"];
+  // Banco oficial da SPERB: Supabase externo (EXT_*). Sem fallback para outro banco.
+  const SUPABASE_URL = process.env["EXT_SUPABASE_URL"] ?? process.env["SUPABASE_URL"];
   const SUPABASE_SERVICE_ROLE_KEY =
+    process.env["EXT_SUPABASE_SERVICE_ROLE_KEY"] ??
     process.env["SUPABASE_SERVICE_ROLE_KEY"];
 
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
