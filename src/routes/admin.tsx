@@ -41,6 +41,8 @@ import {
   deleteCustomerOrders,
   onlyDigits,
   setOrderStatus,
+  setPayOnDelivery,
+  canChangeStatus,
   fetchDuplicates,
   resolveDuplicate,
   statusLabel,
@@ -1261,10 +1263,19 @@ function OrdersPanel() {
     };
   }, [quickSync, refetch]);
 
-  async function change(o: Order, status: string, payment: string) {
+  async function change(o: Order, status: string) {
     setBusy(o.id);
-    await setOrderStatus(o.id, status, payment);
+    const ok = await setOrderStatus(o.id, status, "");
     setBusy(null);
+    if (!ok) window.alert("Esta mudança de status não é permitida.");
+    void refetch();
+  }
+
+  async function payOnDelivery(o: Order) {
+    setBusy(o.id);
+    const ok = await setPayOnDelivery(o.id);
+    setBusy(null);
+    if (!ok) window.alert("Não foi possível marcar o pagamento na entrega.");
     void refetch();
   }
 
@@ -1318,29 +1329,30 @@ function OrdersPanel() {
             <select
               value={o.status}
               disabled={busy === o.id}
-              onChange={(e) => void change(o, e.target.value, o.paymentStatus)}
+              onChange={(e) => void change(o, e.target.value)}
               aria-label={`Status do pedido de ${o.customerName}`}
               className="rounded-xl border-2 border-border bg-background px-3 py-2 text-base font-black text-foreground"
             >
               {ORDER_STATUSES.map((s) => (
-                <option key={s.value} value={s.value}>
+                <option
+                  key={s.value}
+                  value={s.value}
+                  disabled={!canChangeStatus(o, s.value, o.updatedAt)}
+                >
                   {s.label}
                 </option>
               ))}
             </select>
-            <select
-              value={o.paymentStatus}
-              disabled={busy === o.id}
-              onChange={(e) => void change(o, o.status, e.target.value)}
-              aria-label={`Pagamento do pedido de ${o.customerName}`}
-              className="rounded-xl border-2 border-border bg-background px-3 py-2 text-base font-black text-foreground"
-            >
-              {PAYMENT_STATUSES.map((s) => (
-                <option key={s.value} value={s.value}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
+            {o.paymentStatus !== "paid" && o.status !== "canceled" && (
+              <button
+                type="button"
+                disabled={busy === o.id}
+                onClick={() => void payOnDelivery(o)}
+                className="rounded-xl border-2 border-border bg-background px-3 py-2 text-base font-black text-foreground"
+              >
+                Pagamento na entrega
+              </button>
+            )}
             <span className="text-sm font-bold text-muted-foreground">
               {statusLabel(o.status)} · {paymentLabel(o.paymentStatus)}
               {o.paymentMethod ? ` · ${o.paymentMethod === "pix" ? "Pix" : "Cartão"}` : ""}
