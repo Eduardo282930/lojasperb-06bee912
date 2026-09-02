@@ -230,6 +230,8 @@ export async function syncPaidOrder(orderId: string): Promise<SyncResult> {
       }
       const entry: Record<string, unknown> = {
         id: target.id,
+        type: target.type,
+        scope: "ORDER",
         name: `Cupom ${order.coupon_code || ""}`.trim(),
         money_amount: Math.round(couponValue * 100) / 100,
       };
@@ -251,6 +253,8 @@ export async function syncPaidOrder(orderId: string): Promise<SyncResult> {
       }
       const entry: Record<string, unknown> = {
         id: target.id,
+        type: target.type,
+        scope: "ORDER",
         name: `Moedas (${coins} pts)`,
         money_amount: Math.round(coinsDiscount * 100) / 100,
       };

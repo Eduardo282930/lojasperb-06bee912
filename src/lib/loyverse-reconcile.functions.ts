@@ -38,12 +38,17 @@ export async function reconcileWithLoyverse(hours = 72): Promise<ReconcileResult
   try {
     const receipts = await receiptPages(token, since);
     const refunds = receipts.filter(
-      (r) => (r.receipt_type ?? "").toUpperCase() === "REFUND",
+      (r) =>
+        (r.receipt_type ?? "").toUpperCase() === "REFUND" ||
+        Boolean(r.cancelled_at),
     );
 
     for (const refund of refunds) {
-      const saleId = refund.refund_for;
-      const refundId = refund.receipt_number;
+      const isRefund = (refund.receipt_type ?? "").toUpperCase() === "REFUND";
+      const saleId = isRefund ? refund.refund_for : refund.receipt_number;
+      const refundId = isRefund
+        ? refund.receipt_number
+        : `cancelled:${refund.receipt_number ?? ""}`;
       if (!saleId || !refundId) continue;
 
       const { data: rawOrder } = await supabaseAdmin
