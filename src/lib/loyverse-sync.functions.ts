@@ -219,10 +219,27 @@ export async function syncPaidOrder(orderId: string): Promise<SyncResult> {
     }
 
     /*
-     * Moedas = pontos reais do cliente no Loyverse.
-     * Vão apenas como `points_deducted` no recibo — sem desconto extra
-     * "Desconto – Moedas", para o valor não ser abatido duas vezes.
+     * Moedas: o valor abatido entra no desconto "Desconto Moedas" do Loyverse
+     * e a quantidade de pontos vai em `points_deducted`, para o recibo bater
+     * exatamente com o que o cliente pagou.
      */
+    if (coinsDiscount > 0) {
+      const target = coinsDiscountEntry();
+      if (!target) {
+        throw new Error("desconto “Desconto Moedas” não existe no Loyverse");
+      }
+      const entry: Record<string, unknown> = {
+        discount_id: target.id,
+        discount_name: `Moedas (${coins} pts)`,
+        money_amount: Math.round(coinsDiscount * 100) / 100,
+      };
+      if ((target.type ?? "").toUpperCase() === "VARIABLE_PERCENT" && subtotal > 0) {
+        entry["percentage"] = Math.round((coinsDiscount / subtotal) * 10000) / 100;
+      }
+      totalDiscounts.push(entry);
+    }
+
+
 
 
     const body: Record<string, unknown> = {
