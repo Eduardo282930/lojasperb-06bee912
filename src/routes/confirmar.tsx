@@ -61,6 +61,8 @@ function ConfirmarPage() {
   const [busy, setBusy] = useState("");
   const [erro, setErro] = useState("");
   const [picker, setPicker] = useState(false);
+  // Escolha provisória: o cupom só entra no pedido quando o cliente toca em OK.
+  const [draftCouponId, setDraftCouponId] = useState<string | null>(null);
 
   const startPay = useServerFn(startCheckout);
   const checkPayments = useServerFn(paymentsStatus);
@@ -318,7 +320,10 @@ function ConfirmarPage() {
                   {applied ? `Cupom ${applied.coupon.code}` : "Nenhum cupom escolhido"}
                 </span>
                 <button
-                  onClick={() => setPicker(true)}
+                  onClick={() => {
+                    setDraftCouponId(selectedCouponId);
+                    setPicker(true);
+                  }}
                   className="rounded-xl bg-muted px-3 py-2 text-sm font-black text-[oklch(0.55_0.22_255)] active:scale-95"
                 >
                   {applied ? "Trocar cupom" : "Escolher cupom"}
@@ -386,16 +391,16 @@ function ConfirmarPage() {
             <ul className="mt-3 flex flex-col gap-2">
               <PickerRow
                 label="Não usar cupom"
-                selected={!selectedCouponId}
-                onSelect={() => setSelectedCouponId(null)}
+                selected={!draftCouponId}
+                onSelect={() => setDraftCouponId(null)}
               />
               {usable.map((c) => (
                 <PickerRow
                   key={c.id}
                   label={c.code}
                   detail={c.description ?? ""}
-                  selected={selectedCouponId === c.id}
-                  onSelect={() => setSelectedCouponId(c.id)}
+                  selected={draftCouponId === c.id}
+                  onSelect={() => setDraftCouponId(c.id)}
                 />
               ))}
             </ul>
@@ -405,7 +410,11 @@ function ConfirmarPage() {
               </p>
             )}
             <button
-              onClick={() => setPicker(false)}
+              onClick={() => {
+                // O cupom só é aplicado ao pedido agora, no OK.
+                setSelectedCouponId(draftCouponId);
+                setPicker(false);
+              }}
               className="mt-4 w-full rounded-2xl bg-[oklch(0.55_0.22_255)] py-4 text-2xl font-black text-white active:scale-[0.99]"
             >
               OK

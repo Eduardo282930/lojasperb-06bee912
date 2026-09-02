@@ -40,7 +40,7 @@ export const ORDER_STATUSES = [
 export const PAYMENT_STATUSES = [
   { value: "pending", label: "Aguardando pagamento" },
   { value: "paid", label: "Pago" },
-  { value: "refunded", label: "Estornado" },
+  { value: "refunded", label: "Reembolsado" },
 ] as const;
 
 export function statusLabel(v: string): string {
@@ -52,6 +52,8 @@ export function displayStatusLabel(order: {
   status: string;
   paymentStatus: string;
 }): string {
+  // Reembolso feito no Loyverse: o cliente vê cancelado e reembolsado.
+  if (order.paymentStatus === "refunded") return "Reembolsado e cancelado";
   if (order.status === "sent" && order.paymentStatus !== "paid") {
     return "Aguardando pagamento";
   }

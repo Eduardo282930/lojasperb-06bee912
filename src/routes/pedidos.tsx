@@ -54,10 +54,12 @@ const GREEN = "oklch(0.62 0.19 145)";
 
 const STEPS = ["sent", "preparing", "shipping", "delivered"] as const;
 
-function Progress({ status }: { status: string }) {
-  if (status === "canceled") {
+function Progress({ status, refunded }: { status: string; refunded?: boolean }) {
+  if (status === "canceled" || refunded) {
     return (
-      <p className="mt-2 text-base font-black text-muted-foreground">Pedido cancelado</p>
+      <p className="mt-2 text-base font-black text-muted-foreground">
+        {refunded ? "Pedido reembolsado e cancelado" : "Pedido cancelado"}
+      </p>
     );
   }
   const current = Math.max(0, STEPS.indexOf(status as (typeof STEPS)[number]));
@@ -86,7 +88,9 @@ function OrderCard({ order, phone }: { order: Order; phone: string }) {
   const [open, setOpen] = useState(false);
   const [paying, setPaying] = useState(false);
   const startCheckout = useServerFn(createOrderCheckout);
-  const unpaid = order.paymentStatus !== "paid" && order.status !== "canceled";
+  const refunded = order.paymentStatus === "refunded";
+  const unpaid =
+    order.paymentStatus !== "paid" && order.status !== "canceled" && !refunded;
 
   async function pagar() {
     if (paying) return;
@@ -123,7 +127,7 @@ function OrderCard({ order, phone }: { order: Order; phone: string }) {
         </span>
       </div>
 
-      <Progress status={order.status} />
+      <Progress status={order.status} refunded={refunded} />
 
       <ul className="mt-3 flex flex-col gap-2">
         {order.items.map((it, i) => (
@@ -232,7 +236,8 @@ function PedidosPage() {
   }, [checkout, lastOrder?.paymentStatus, status, navigate]);
 
   function bucket(o: Order): StatusValue {
-    if (o.status === "canceled") return "canceled";
+    // Reembolsado no Loyverse entra junto dos cancelados.
+    if (o.status === "canceled" || o.paymentStatus === "refunded") return "canceled";
     if (o.status === "delivered") return "delivered";
     if (o.paymentStatus !== "paid") return "topay";
     if (o.status === "shipping") return "shipping";

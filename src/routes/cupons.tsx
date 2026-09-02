@@ -58,6 +58,7 @@ function CuponsPage() {
   const qc = useQueryClient();
   const [claiming, setClaiming] = useState<string | null>(null);
   const selectedId = useSelectedCouponId();
+  const navigate = Route.useNavigate();
 
   const claimedList = useClaimedCoupons(profile.phone).data ?? [];
   const myUses = useMyCouponUses(profile.phone).data ?? {};
@@ -128,7 +129,9 @@ function CuponsPage() {
                         type="button"
                         onClick={(e) => {
                           e.preventDefault();
-                          setSelectedCouponId(active ? null : c.id);
+                          // Escolhe o cupom e leva o cliente de volta à loja.
+                          setSelectedCouponId(c.id);
+                          void navigate({ to: "/" });
                         }}
                         className="shrink-0 rounded-2xl px-6 py-3 text-lg font-black text-white active:scale-95"
                         style={{ backgroundColor: active ? GREEN : BLUE }}
