@@ -68,6 +68,9 @@ function SacolaPage() {
       }
       window.localStorage.setItem(SELECTION_KEY, JSON.stringify(picked.map((c) => c.id)));
       void navigate({ to: "/confirmar" });
+    } catch (err) {
+      console.error("[sacola] fazer pedido", err);
+      setErro("Não foi possível reservar o estoque agora. Tente novamente.");
     } finally {
       setBusy(false);
     }
