@@ -1,5 +1,5 @@
-import { supabase } from "@/integrations/supabase/client";
 import { deviceId } from "@/lib/coupons";
+import { createHoldOnServer, releaseHoldOnServer } from "@/lib/stock.functions";
 
 /**
  * Reserva temporária de estoque (hold).
