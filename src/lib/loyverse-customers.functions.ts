@@ -16,6 +16,8 @@ export type SimpleReceipt = {
   customerName: string;
   customerPhone: string;
   lines: ReceiptLine[];
+  /** true quando o Loyverse registrou reembolso/cancelamento desta venda. */
+  refunded?: boolean;
 };
 
 function digits(s: string): string {
