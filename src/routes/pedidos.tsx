@@ -7,6 +7,7 @@ import { useProfile } from "@/lib/coupons";
 
 import { useServerFn } from "@tanstack/react-start";
 import { createOrderCheckout } from "@/lib/payments.functions";
+import { runLoyverseQuickSync } from "@/lib/loyverse-reconcile.functions";
 import { formatPrice } from "@/lib/cart";
 import {
   fetchMyOrders,
