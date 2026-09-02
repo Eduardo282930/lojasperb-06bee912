@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { fetchCatalog, type CatalogProduct } from "@/lib/loyverse.functions";
+import { loadCachedCatalog, saveCachedCatalog } from "@/lib/catalog-cache";
 import { addToCart, useCart, formatPrice, syncCartPrices } from "@/lib/cart";
 import { fuzzyScore, STRONG_MATCH } from "@/lib/search";
 import { flyToCart } from "@/lib/fly";
@@ -33,9 +34,17 @@ import {
 
 const PAGE_SIZE = 30;
 
+const cached = typeof window === "undefined" ? null : loadCachedCatalog();
+
 export const catalogQuery = queryOptions({
   queryKey: ["catalog"],
-  queryFn: () => fetchCatalog(),
+  queryFn: async () => {
+    const catalog = await fetchCatalog();
+    saveCachedCatalog(catalog);
+    return catalog;
+  },
+  // Cópia local do aparelho: a vitrine aparece na hora e atualiza sozinha.
+  ...(cached ? { initialData: cached.catalog, initialDataUpdatedAt: cached.at } : {}),
   staleTime: 30 * 1000,
   gcTime: 30 * 60 * 1000,
   refetchInterval: 60 * 1000,
@@ -421,6 +430,8 @@ function ProductCard({
               className="h-full w-full object-cover"
               loading="lazy"
               decoding="async"
+              fetchPriority="low"
+              sizes="(max-width: 640px) 50vw, 220px"
             />
           ) : (
             <div className="grid h-full w-full place-items-center">
