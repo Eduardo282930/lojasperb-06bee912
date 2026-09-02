@@ -825,8 +825,19 @@ function ReceiptCard({ r }: { r: SimpleReceipt }) {
           <p className="text-xs font-semibold text-muted-foreground">
             {r.number} · {new Date(r.date).toLocaleString("pt-BR")}
           </p>
+          {r.refunded && (
+            <span
+              className="mt-1 inline-flex rounded-full px-2 py-0.5 text-xs font-black text-white"
+              style={{ backgroundColor: RED }}
+            >
+              Reembolsado no Loyverse
+            </span>
+          )}
         </div>
-        <span className="shrink-0 text-lg font-black" style={{ color: GREEN }}>
+        <span
+          className="shrink-0 text-lg font-black"
+          style={{ color: r.refunded ? RED : GREEN }}
+        >
           {formatPrice(r.total)}
         </span>
       </div>
