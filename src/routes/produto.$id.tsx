@@ -139,6 +139,8 @@ function ProdutoPage() {
                 src={selectedImage}
                 alt={fullName}
                 className="h-full w-full object-cover"
+                decoding="async"
+                fetchPriority="high"
               />
             ) : (
               <div className="grid h-full w-full place-items-center">

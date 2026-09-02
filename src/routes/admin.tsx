@@ -41,12 +41,13 @@ import {
   deleteCustomerOrders,
   onlyDigits,
   setOrderStatus,
+  setPayOnDelivery,
+  canChangeStatus,
   fetchDuplicates,
   resolveDuplicate,
   statusLabel,
   paymentLabel,
   ORDER_STATUSES,
-  PAYMENT_STATUSES,
   type Order,
 } from "@/lib/orders";
 import { useServerFn } from "@tanstack/react-start";
@@ -1241,6 +1242,7 @@ function OrdersPanel() {
     staleTime: 30 * 1000,
   });
   const [busy, setBusy] = useState<string | null>(null);
+  const syncReceipt = useServerFn(retryLoyverseSync);
 
   // Abrir a lista já traz reembolsos e recibos recentes do Loyverse.
   const quickSync = useServerFn(runLoyverseQuickSync);
@@ -1261,10 +1263,21 @@ function OrdersPanel() {
     };
   }, [quickSync, refetch]);
 
-  async function change(o: Order, status: string, payment: string) {
+  async function change(o: Order, status: string) {
     setBusy(o.id);
-    await setOrderStatus(o.id, status, payment);
+    const ok = await setOrderStatus(o.id, status, "");
     setBusy(null);
+    if (!ok) window.alert("Esta mudança de status não é permitida.");
+    void refetch();
+  }
+
+  async function payOnDelivery(o: Order) {
+    setBusy(o.id);
+    const ok = await setPayOnDelivery(o.id);
+    // O recibo do Loyverse é criado logo após o pagamento ser registrado.
+    if (ok) await syncReceipt({ data: { orderId: o.id } }).catch(() => null);
+    setBusy(null);
+    if (!ok) window.alert("Não foi possível marcar o pagamento na entrega.");
     void refetch();
   }
 
@@ -1318,32 +1331,35 @@ function OrdersPanel() {
             <select
               value={o.status}
               disabled={busy === o.id}
-              onChange={(e) => void change(o, e.target.value, o.paymentStatus)}
+              onChange={(e) => void change(o, e.target.value)}
               aria-label={`Status do pedido de ${o.customerName}`}
               className="rounded-xl border-2 border-border bg-background px-3 py-2 text-base font-black text-foreground"
             >
               {ORDER_STATUSES.map((s) => (
-                <option key={s.value} value={s.value}>
+                <option
+                  key={s.value}
+                  value={s.value}
+                  disabled={!canChangeStatus(o, s.value, o.updatedAt)}
+                >
                   {s.label}
                 </option>
               ))}
             </select>
-            <select
-              value={o.paymentStatus}
-              disabled={busy === o.id}
-              onChange={(e) => void change(o, o.status, e.target.value)}
-              aria-label={`Pagamento do pedido de ${o.customerName}`}
-              className="rounded-xl border-2 border-border bg-background px-3 py-2 text-base font-black text-foreground"
-            >
-              {PAYMENT_STATUSES.map((s) => (
-                <option key={s.value} value={s.value}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
+            {o.paymentStatus !== "paid" && o.status !== "canceled" && (
+              <button
+                type="button"
+                disabled={busy === o.id}
+                onClick={() => void payOnDelivery(o)}
+                className="rounded-xl border-2 border-border bg-background px-3 py-2 text-base font-black text-foreground"
+              >
+                Pagamento na entrega
+              </button>
+            )}
             <span className="text-sm font-bold text-muted-foreground">
               {statusLabel(o.status)} · {paymentLabel(o.paymentStatus)}
-              {o.paymentMethod ? ` · ${o.paymentMethod === "pix" ? "Pix" : "Cartão"}` : ""}
+              {o.paymentMethod
+                ? ` · ${o.paymentMethod === "pix" ? "Pix" : o.paymentMethod === "delivery" ? "Pagamento na entrega" : "Cartão"}`
+                : ""}
             </span>
             {o.receiptUrl && (
               <a

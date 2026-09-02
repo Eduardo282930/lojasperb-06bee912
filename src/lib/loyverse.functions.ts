@@ -518,3 +518,30 @@ export const fetchProduct = createServerFn({ method: "GET" })
     );
   });
 
+
+/**
+ * Estoque real das variações pedidas (usado pela reserva atômica).
+ * Produtos sem controle de estoque no Loyverse voltam com um número grande.
+ */
+export async function fetchLiveStock(
+  ids: string[],
+): Promise<Array<{ id: string; productKey: string; name: string; stock: number }>> {
+  const wanted = new Set(ids.filter(Boolean));
+  if (wanted.size === 0) return [];
+  const { products } = await getCatalog();
+  const out: Array<{ id: string; productKey: string; name: string; stock: number }> = [];
+  const push = (id: string, name: string, stock: number) => {
+    if (!wanted.has(id)) return;
+    out.push({
+      id,
+      productKey: id,
+      name,
+      stock: Number.isFinite(stock) ? stock : 1_000_000,
+    });
+  };
+  for (const p of products) {
+    push(p.id, p.name, p.stock);
+    for (const v of p.variants) push(v.id, `${p.name} ${v.label}`.trim(), v.stock);
+  }
+  return out;
+}
