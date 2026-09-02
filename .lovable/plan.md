@@ -1,46 +1,37 @@
-# Pedido, cupom, moedas, Loyverse e reembolso
+# Reembolso visível ao cliente + reserva de estoque até o recibo
 
-## 1. Carrinho → tela de confirmação
+## 1. Pedido reembolsado aparece como cancelado/reembolsado em "Meus pedidos"
 
-- No carrinho ficam apenas os itens, o total e **um** botão: **Fazer pedido**. Saem o botão "Mudar" e o botão separado de WhatsApp.
-- Cupom e moedas deixam de ser aplicados sozinhos: o carrinho mostra "Nenhum cupom" e "Moedas não usadas" até o cliente escolher.
-- Nova tela `/confirmar`: lista de produtos com quantidade, subtotal, cupom escolhido (com link para a área de cupons), moedas, entrega e **valor final**.
-- No rodapé dessa tela, dois botões grandes: **Fazer pedido pelo WhatsApp** e **Pagar agora via Pix**. O pedido só é criado ao tocar em um deles (Pix: só depois do checkout abrir sem erro).
+A tela do cliente já sabe mostrar "Pedido reembolsado e cancelado" quando o pedido vem com pagamento `refunded`. O que falta garantir é que o pedido reembolsado no Loyverse chegue nesse estado rapidamente e que a listagem do cliente traga esse campo.
 
-## 2. Cupom no Loyverse
+- Conferir a função do banco que lista os pedidos do cliente e garantir que ela devolva o pedido cancelado/reembolsado (sem filtrar cancelados) com o status de pagamento correto.
+- Garantir que a rotina de reembolso marque sempre: pedido `cancelado`, pagamento `reembolsado`, estoque liberado, moedas devolvidas uma vez e cupom liberado uma vez.
+- Fazer o app detectar o reembolso sem esperar: além do aviso automático do Loyverse (webhook), disparar uma verificação leve de reembolsos quando o cliente abre "Meus pedidos" e quando o Admin abre a tela de pedidos.
+- Ao detectar, o pedido sai imediatamente da aba atual e vai para "Cancelado", com a etiqueta "Reembolsado e cancelado".
 
-- O recibo passa a levar o desconto real, nunca o valor cheio.
-- Cupom em R$ → desconto "Desconto – Cupom | Variável, Σ" (valor fixo).
-  Cupom em % → desconto "Desconto – Cupom | Variável, %".
-- O valor enviado é exatamente o calculado no app, e o nome/código do cupom vai no recibo.
-- Se o desconto correspondente não existir no Loyverse, o pedido fica com erro de sincronização visível no admin (nunca cria recibo pelo valor cheio).
+## 2. Nunca vender sem estoque
 
-## 3. Moedas = pontos do Loyverse
+- Produto sem estoque não pode ser adicionado à sacola (botão bloqueado com aviso).
+- Ao clicar em "Fazer pedido", o estoque é revalidado em tempo real e reservado de forma atômica na mesma operação (já existe; será revisada e testada com dois clientes simultâneos).
+- Enquanto o cliente está na tela de confirmação, a unidade fica reservada e indisponível para os outros.
+- Se o cliente sair/desistir, a reserva é liberada na hora; se ele apenas parar, a reserva vence sozinha por tempo.
 
-- As moedas passam a refletir os **pontos reais do cliente no Loyverse**.
-- O app calcula sozinho quanto pode usar (até 30% do pedido); o cliente apenas aceita ou não usar.
-- No recibo vão os pontos deduzidos e o valor correspondente — sem desconto percentual "Desconto – Moedas".
+## 3. Reserva só é baixada quando o recibo existir no Loyverse
 
-## 4. Sincronização nos dois sentidos
-
-- App → Loyverse: venda, cupom e pontos usados no recibo.
-- Loyverse → App: uma rotina de sincronização lê recibos, estoque e pontos recentes e atualiza pedidos, estoque e saldo de moedas no app. Pode ser chamada por agendador e roda também ao abrir o app/admin.
-
-## 5. Estoque só é liberado após o recibo
-
-- Pagar → reserva temporária (estoque do app diminui).
-- Pagamento aprovado → pedido vai para **Preparando**, mas a reserva **continua ativa**.
-- Só depois de o Loyverse confirmar o recibo criado a reserva é encerrada e o estoque volta a ser o do Loyverse.
-
-## 6. Reembolso
-
-- A rotina de sincronização detecta recibo de reembolso no Loyverse: o pedido vira **Cancelado**, a reserva é encerrada, moedas usadas voltam ao cliente e o uso do cupom é liberado.
-- InfinitePay: estorno automático só se a API permitir. Se não permitir, o pedido fica marcado como "reembolso financeiro pendente" — o app nunca diz que o dinheiro foi devolvido sem confirmação.
+- Ao clicar em pagar, o pedido definitivo é criado e a reserva continua ativa (o estoque permanece bloqueado para os outros clientes).
+- A baixa definitiva só acontece quando o recibo é criado com sucesso no Loyverse e identificado como daquele pedido.
+- Busca automática: além do aviso do Loyverse, uma verificação periódica curta procura pedidos pagos ainda sem recibo, tenta criar/localizar o recibo e finaliza a reserva. Falha de sincronização mantém o pedido em erro visível no Admin, nunca cria venda pelo valor cheio.
+- Se o pagamento não for concluído dentro do prazo, o pedido é descartado e a reserva liberada automaticamente.
 
 ## Detalhes técnicos
 
-- Migração: `orders.refund_state`, `orders.loyverse_points_used`, `orders.loyverse_discount_id`; RPCs `finalize_reservation_after_receipt(order_id)`, `cancel_order_from_refund(order_id)` (devolve moedas e libera cupom, idempotentes por pedido).
-- `src/lib/loyverse-sync.functions.ts`: monta `total_discounts` (valor fixo ou %) usando os IDs dos descontos de cupom lidos de `GET /discounts`, envia `points_deducted`, e só chama a finalização da reserva depois do `POST /receipts` responder com o recibo.
-- Novo `src/lib/loyverse-reconcile.functions.ts` + rota `src/routes/api/public/loyverse-reconcile.ts`: lê `GET /receipts` recentes (inclui `REFUND`), pontos do cliente e estoque, e concilia com o app.
-- Webhook InfinitePay: marca pago/Preparando e dispara o recibo; a liberação da reserva sai do webhook e passa a depender da confirmação do recibo.
-- Carrinho: `src/routes/sacola.tsx` (sem auto-aplicar cupom/moedas), nova rota `src/routes/confirmar.tsx`, ajuste em `src/lib/coupons.ts` para escolha manual.
+- Banco (migração no Supabase externo, se necessário): revisar `orders_for_customer` para incluir `payment_status` de pedidos cancelados/reembolsados; garantir idempotência de `cancel_order_from_refund`.
+- Frontend: `src/routes/pedidos.tsx` (agrupamento já manda refund para "canceled"), `src/routes/index.tsx` e `src/routes/produto.$id.tsx` (bloqueio de adicionar sem estoque), `src/routes/sacola.tsx` / `src/routes/confirmar.tsx` (reserva e liberação).
+- Sincronização: `src/lib/loyverse-reconcile.functions.ts` ganha um modo "rápido" (janela curta) chamado ao abrir Meus Pedidos/Admin; `src/routes/api/public/loyverse-reconcile.ts` e `expire-reservations` seguem como rede de segurança.
+- Recibo/reserva: `confirm_order_receipt` → `finalize_reservation_after_receipt` continua sendo o único caminho de baixa.
+
+## Validação
+
+- Teste de concorrência: dois clientes tentando a última unidade — só um consegue reservar.
+- Pedido pago sem recibo: verificação automática cria o recibo e libera a reserva.
+- Reembolso feito no Loyverse: pedido aparece como "Reembolsado e cancelado" na área do cliente, estoque devolvido, moedas e cupom devolvidos uma única vez.
