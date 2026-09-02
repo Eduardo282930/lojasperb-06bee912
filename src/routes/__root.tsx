@@ -100,6 +100,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       },
       { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
       { rel: "manifest", href: "/api/public/manifest" },
+      // Imagens do catálogo abrem praticamente na hora.
+      { rel: "preconnect", href: "https://api.loyverse.com", crossOrigin: "" },
+      { rel: "preconnect", href: "https://loyverse-image.s3.amazonaws.com", crossOrigin: "" },
+      { rel: "dns-prefetch", href: "https://loyverse-image.s3.amazonaws.com" },
     ],
   }),
   shellComponent: RootShell,

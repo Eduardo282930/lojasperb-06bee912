@@ -48,7 +48,6 @@ import {
   statusLabel,
   paymentLabel,
   ORDER_STATUSES,
-  PAYMENT_STATUSES,
   type Order,
 } from "@/lib/orders";
 import { useServerFn } from "@tanstack/react-start";
@@ -1355,7 +1354,9 @@ function OrdersPanel() {
             )}
             <span className="text-sm font-bold text-muted-foreground">
               {statusLabel(o.status)} · {paymentLabel(o.paymentStatus)}
-              {o.paymentMethod ? ` · ${o.paymentMethod === "pix" ? "Pix" : "Cartão"}` : ""}
+              {o.paymentMethod
+                ? ` · ${o.paymentMethod === "pix" ? "Pix" : o.paymentMethod === "delivery" ? "Pagamento na entrega" : "Cartão"}`
+                : ""}
             </span>
             {o.receiptUrl && (
               <a
