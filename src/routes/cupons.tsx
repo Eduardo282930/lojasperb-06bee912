@@ -117,15 +117,19 @@ function CuponsPage() {
                       <p className="text-sm font-semibold text-muted-foreground">
                         Pedido mínimo: {formatPrice(c.minOrder)}
                       </p>
-                      {finished && (
-                        <p className="text-sm font-bold text-foreground">
-                          Limite de uso atingido
-                        </p>
-                      )}
                     </div>
-                    {!finished && (
+                    {finished ? (
+                      <span className="flex shrink-0 flex-col items-center gap-1 rounded-2xl bg-muted px-4 py-3 text-muted-foreground">
+                        <Lock className="h-6 w-6" />
+                        <span className="text-sm font-black uppercase">Usado</span>
+                      </span>
+                    ) : (
                       <button
-                        onClick={() => setSelectedCouponId(active ? null : c.id)}
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setSelectedCouponId(active ? null : c.id);
+                        }}
                         className="shrink-0 rounded-2xl px-6 py-3 text-lg font-black text-white active:scale-95"
                         style={{ backgroundColor: active ? GREEN : BLUE }}
                       >
