@@ -162,9 +162,6 @@ export async function syncPaidOrder(orderId: string): Promise<SyncResult> {
           (d.type ?? "").toUpperCase() === kind &&
           (d.name ?? "").toLowerCase().includes("cupom"),
       );
-    const pointsDiscount = discounts.find(
-      (d) => (d.type ?? "").toUpperCase() === "DISCOUNT_BY_POINTS",
-    );
 
     let loyverseCustomerId: string | null = null;
     if (order.customer_id) {
