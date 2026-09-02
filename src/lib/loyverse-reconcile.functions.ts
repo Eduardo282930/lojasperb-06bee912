@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { receiptPages } from "./loyverse-sync.functions";
 
 /**
  * Loyverse → SPERB.
@@ -15,22 +16,6 @@ import { createServerFn } from "@tanstack/react-start";
 
 type AnyRpc = (name: string, args?: Record<string, unknown>) => Promise<{ data?: unknown }>;
 
-type Receipt = {
-  receipt_number?: string;
-  receipt_type?: string | null;
-  refund_for?: string | null;
-  order?: string | null;
-  created_at?: string | null;
-};
-
-async function loyverse<T>(path: string, token: string): Promise<T> {
-  const res = await fetch(`https://api.loyverse.com/v1.0/${path}`, {
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-  });
-  if (!res.ok) throw new Error(`Loyverse ${path} ${res.status}`);
-  return (await res.json()) as T;
-}
-
 export type ReconcileResult = {
   ok: boolean;
   refundsApplied: number;
@@ -38,7 +23,7 @@ export type ReconcileResult = {
   reason?: string;
 };
 
-export async function reconcileWithLoyverse(hours = 72): Promise<ReconcileResult> {
+export async function reconcileWithLoyverse(hours = 24 * 30): Promise<ReconcileResult> {
   const token = process.env["LOYVERSE_TOKEN"];
   if (!token) return { ok: false, refundsApplied: 0, resynced: 0, reason: "no_token" };
 
@@ -51,17 +36,19 @@ export async function reconcileWithLoyverse(hours = 72): Promise<ReconcileResult
 
   /* 1) Reembolsos registrados no Loyverse. */
   try {
-    const list = await loyverse<{ receipts?: Receipt[] }>(
-      `receipts?limit=250&created_at_min=${encodeURIComponent(since)}`,
-      token,
-    );
-    const refunds = (list.receipts ?? []).filter(
-      (r) => (r.receipt_type ?? "").toUpperCase() === "REFUND",
+    const receipts = await receiptPages(token, since);
+    const refunds = receipts.filter(
+      (r) =>
+        (r.receipt_type ?? "").toUpperCase() === "REFUND" ||
+        Boolean(r.cancelled_at),
     );
 
     for (const refund of refunds) {
-      const saleId = refund.refund_for;
-      const refundId = refund.receipt_number;
+      const isRefund = (refund.receipt_type ?? "").toUpperCase() === "REFUND";
+      const saleId = isRefund ? refund.refund_for : refund.receipt_number;
+      const refundId = isRefund
+        ? refund.receipt_number
+        : `cancelled:${refund.receipt_number ?? ""}`;
       if (!saleId || !refundId) continue;
 
       const { data: rawOrder } = await supabaseAdmin
@@ -96,7 +83,7 @@ export async function reconcileWithLoyverse(hours = 72): Promise<ReconcileResult
       .eq("payment_status", "paid")
       .is("loyverse_receipt_id", null)
       .gte("created_at", since)
-      .limit(20);
+      .limit(50);
 
     if (pending && pending.length > 0) {
       const { syncPaidOrder } = await import("@/lib/loyverse-sync.functions");
@@ -113,5 +100,5 @@ export async function reconcileWithLoyverse(hours = 72): Promise<ReconcileResult
 }
 
 export const runLoyverseReconcile = createServerFn({ method: "POST" }).handler(
-  async (): Promise<ReconcileResult> => reconcileWithLoyverse(72),
+  async (): Promise<ReconcileResult> => reconcileWithLoyverse(),
 );

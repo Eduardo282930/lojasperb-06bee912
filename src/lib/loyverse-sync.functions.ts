@@ -17,10 +17,12 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 type LoyverseStore = { id: string };
 type LoyversePaymentType = { id: string; type?: string | null; name?: string | null };
 type LoyverseDiscount = { id: string; name?: string | null; type?: string | null };
-type LoyverseReceipt = {
+export type LoyverseReceipt = {
   receipt_number?: string;
   order?: string | null;
   receipt_type?: string | null;
+  refund_for?: string | null;
+  cancelled_at?: string | null;
   total_money?: number | null;
 };
 
@@ -53,6 +55,30 @@ export function orderTag(orderId: string): string {
   return `SPERB-${String(orderId).slice(0, 8)}`;
 }
 
+/** Paginação robusta para buscar recibos. */
+export async function receiptPages(token: string, createdAfter: string): Promise<LoyverseReceipt[]> {
+  const all: LoyverseReceipt[] = [];
+  let cursor: string | undefined;
+  do {
+    const url = new URL(`https://api.loyverse.com/v1.0/receipts`);
+    url.searchParams.set("limit", "250");
+    url.searchParams.set("created_at_min", createdAfter);
+    if (cursor) url.searchParams.set("cursor", cursor);
+
+    const res = await fetch(url.toString(), {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    });
+    if (!res.ok) throw new Error(`Loyverse receipts list ${res.status}`);
+    const data = (await res.json()) as { receipts?: LoyverseReceipt[]; cursor?: string };
+    all.push(...(data.receipts ?? []));
+    cursor = data.cursor;
+  } while (cursor);
+  return all;
+}
+
 /** Procura um recibo já criado para este pedido (proteção contra timeout). */
 async function findExistingReceipt(
   token: string,
@@ -60,11 +86,8 @@ async function findExistingReceipt(
   since: string,
 ): Promise<string | null> {
   try {
-    const list = await loyverse<{ receipts?: LoyverseReceipt[] }>(
-      `receipts?limit=250&created_at_min=${encodeURIComponent(since)}`,
-      token,
-    );
-    const hit = (list.receipts ?? []).find(
+    const list = await receiptPages(token, since);
+    const hit = list.find(
       (r) => (r.order ?? "") === tag && (r.receipt_type ?? "SALE") === "SALE",
     );
     return hit?.receipt_number ?? null;
@@ -208,12 +231,13 @@ export async function syncPaidOrder(orderId: string): Promise<SyncResult> {
         );
       }
       const entry: Record<string, unknown> = {
-        discount_id: target.id,
-        discount_name: `Cupom ${order.coupon_code || ""}`.trim(),
-        money_amount: Math.round(couponValue * 100) / 100,
+        id: target.id,
+        scope: "RECEIPT",
       };
       if (couponIsPercent && subtotal > 0) {
         entry["percentage"] = Math.round((couponValue / subtotal) * 10000) / 100;
+      } else {
+        entry["money_amount"] = Math.round(couponValue * 100) / 100;
       }
       totalDiscounts.push(entry);
     }
@@ -229,18 +253,16 @@ export async function syncPaidOrder(orderId: string): Promise<SyncResult> {
         throw new Error("desconto “Desconto Moedas” não existe no Loyverse");
       }
       const entry: Record<string, unknown> = {
-        discount_id: target.id,
-        discount_name: `Moedas (${coins} pts)`,
-        money_amount: Math.round(coinsDiscount * 100) / 100,
+        id: target.id,
+        scope: "RECEIPT",
       };
       if ((target.type ?? "").toUpperCase() === "VARIABLE_PERCENT" && subtotal > 0) {
         entry["percentage"] = Math.round((coinsDiscount / subtotal) * 10000) / 100;
+      } else {
+        entry["money_amount"] = Math.round(coinsDiscount * 100) / 100;
       }
       totalDiscounts.push(entry);
     }
-
-
-
 
     const body: Record<string, unknown> = {
       store_id: storeId,
