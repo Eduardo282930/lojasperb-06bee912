@@ -215,17 +215,12 @@ export async function syncPaidOrder(orderId: string): Promise<SyncResult> {
       totalDiscounts.push(entry);
     }
 
-    /* Moedas = pontos reais do cliente no Loyverse. */
-    if (coins > 0 && coinsDiscount > 0) {
-      if (!pointsDiscount) {
-        throw new Error("desconto por pontos não existe no Loyverse");
-      }
-      totalDiscounts.push({
-        discount_id: pointsDiscount.id,
-        discount_name: "Moedas SPERB",
-        money_amount: Math.round(coinsDiscount * 100) / 100,
-      });
-    }
+    /*
+     * Moedas = pontos reais do cliente no Loyverse.
+     * Vão apenas como `points_deducted` no recibo — sem desconto extra
+     * "Desconto – Moedas", para o valor não ser abatido duas vezes.
+     */
+
 
     const body: Record<string, unknown> = {
       store_id: storeId,
