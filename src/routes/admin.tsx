@@ -52,6 +52,7 @@ import {
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { retryLoyverseSync } from "@/lib/loyverse-sync.functions";
+import { runLoyverseQuickSync } from "@/lib/loyverse-reconcile.functions";
 import { useAdmin, adminSignIn, adminSignOut } from "@/lib/admin";
 import { paymentsStatus } from "@/lib/payments.functions";
 import { formatPrice } from "@/lib/cart";
