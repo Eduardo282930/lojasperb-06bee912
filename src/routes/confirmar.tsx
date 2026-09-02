@@ -159,7 +159,7 @@ function ConfirmarPage() {
       });
       await consumirBeneficios();
       limparCarrinho();
-      void navigate({ to: "/pedidos", search: { status: "received" } });
+      void navigate({ to: "/pedidos", search: { status: "topay" } });
     } catch {
       setErro("Não foi possível registrar o pedido. Tente novamente.");
     } finally {
