@@ -335,7 +335,7 @@ export const startCheckout = createServerFn({ method: "POST" })
         p_coupon_code: data.couponCode,
         p_coins: data.coins,
       };
-      const rpcCall = supabaseAdmin.rpc as unknown as (
+      const rpcCall = supabaseAdmin.rpc.bind(supabaseAdmin) as unknown as (
         name: string,
         args: Record<string, unknown>,
       ) => Promise<{ data?: unknown; error?: { message: string } | null }>;

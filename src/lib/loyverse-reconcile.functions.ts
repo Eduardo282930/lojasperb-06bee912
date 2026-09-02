@@ -43,7 +43,7 @@ export async function reconcileWithLoyverse(hours = 72): Promise<ReconcileResult
   if (!token) return { ok: false, refundsApplied: 0, resynced: 0, reason: "no_token" };
 
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const rpc = supabaseAdmin.rpc as unknown as AnyRpc;
+  const rpc = supabaseAdmin.rpc.bind(supabaseAdmin) as unknown as AnyRpc;
   const since = new Date(Date.now() - hours * 3600 * 1000).toISOString();
 
   let refundsApplied = 0;
