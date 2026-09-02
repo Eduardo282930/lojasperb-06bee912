@@ -13,6 +13,7 @@ export type OrderItem = {
 export type Order = {
   id: string;
   createdAt: string;
+  updatedAt: string;
   customerName: string;
   customerPhone: string;
   couponCode: string;
@@ -125,6 +126,7 @@ export async function fetchOrders(): Promise<Order[]> {
   return (data ?? []).map((r) => ({
     id: r.id,
     createdAt: r.created_at,
+    updatedAt: (r as { updated_at?: string }).updated_at ?? r.created_at,
     customerName: r.customer_name ?? "",
     customerPhone: r.customer_phone ?? "",
     couponCode: r.coupon_code ?? "",
@@ -150,6 +152,7 @@ export async function fetchMyOrders(phone: string): Promise<Order[]> {
   return (data ?? []).map((r) => ({
     id: r.id,
     createdAt: r.created_at,
+    updatedAt: (r as { updated_at?: string }).updated_at ?? r.created_at,
     customerName: r.customer_name ?? "",
     customerPhone: phone,
     couponCode: r.coupon_code ?? "",
