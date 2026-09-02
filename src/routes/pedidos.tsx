@@ -304,19 +304,26 @@ function PedidosPage() {
 
 
   // Ao arrastar para o lado (estilo Shopee): só troca quando o deslize para,
-  // e sempre centralizado na seção mais próxima.
+  // e sempre uma etapa por vez, mesmo se o dedo passar voando.
   function onScroll() {
     if (lockedRef.current) return;
     if (settleRef.current) clearTimeout(settleRef.current);
     settleRef.current = setTimeout(() => {
       const el = trackRef.current;
       if (!el || el.clientWidth === 0 || lockedRef.current) return;
-      const idx = Math.min(
+      const raw = Math.min(
         SECTIONS.length - 1,
         Math.max(0, Math.round(el.scrollLeft / el.clientWidth)),
       );
+      // Nunca pula mais de uma seção por deslize.
+      const idx = Math.max(activeIndex - 1, Math.min(activeIndex + 1, raw));
       const nextValue = SECTIONS[idx]?.value;
-      if (nextValue && nextValue !== status) setStatus(nextValue);
+      if (!nextValue) return;
+      if (idx !== raw) {
+        lockScroll();
+        el.scrollTo({ left: idx * el.clientWidth, behavior: "smooth" });
+      }
+      if (nextValue !== status) setStatus(nextValue);
     }, 160);
   }
 
@@ -325,13 +332,8 @@ function PedidosPage() {
     <div className="min-h-screen bg-background pb-16">
       <header className="sticky top-0 z-10 border-b-2 border-border bg-background/95 backdrop-blur">
         <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-3">
-          <Link
-            to="/eu"
-            aria-label="Voltar"
-            className="grid h-12 w-12 place-items-center rounded-2xl bg-muted text-foreground active:scale-95"
-          >
-            <ArrowLeft className="h-7 w-7" strokeWidth={2.5} />
-          </Link>
+          <BackButton fallback="/eu" />
+
           <h1 className="text-2xl font-black text-foreground">Meus pedidos</h1>
         </div>
 
