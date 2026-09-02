@@ -1241,6 +1241,25 @@ function OrdersPanel() {
   });
   const [busy, setBusy] = useState<string | null>(null);
 
+  // Abrir a lista já traz reembolsos e recibos recentes do Loyverse.
+  const quickSync = useServerFn(runLoyverseQuickSync);
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      try {
+        const res = await quickSync({});
+        if (alive && res.ok && (res.refundsApplied > 0 || res.resynced > 0)) {
+          void refetch();
+        }
+      } catch {
+        /* rede de segurança: o webhook continua sendo o canal principal */
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [quickSync, refetch]);
+
   async function change(o: Order, status: string, payment: string) {
     setBusy(o.id);
     await setOrderStatus(o.id, status, payment);
