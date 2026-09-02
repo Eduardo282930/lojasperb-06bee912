@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { receiptPages } from "./loyverse-sync.functions";
 
 /**
  * Loyverse → SPERB.
@@ -14,41 +15,6 @@ import { createServerFn } from "@tanstack/react-start";
  */
 
 type AnyRpc = (name: string, args?: Record<string, unknown>) => Promise<{ data?: unknown }>;
-
-type Receipt = {
-  receipt_number?: string;
-  receipt_type?: string | null;
-  refund_for?: string | null;
-  order?: string | null;
-  created_at?: string | null;
-};
-
-type ReceiptPage = {
-  receipts?: Receipt[];
-  cursor?: string | null;
-};
-
-async function loyverse<T>(path: string, token: string): Promise<T> {
-  const res = await fetch(`https://api.loyverse.com/v1.0/${path}`, {
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-  });
-  if (!res.ok) throw new Error(`Loyverse ${path} ${res.status}`);
-  return (await res.json()) as T;
-}
-
-/** Lê todas as páginas para não deixar um REFUND antigo escapar do limite 250. */
-async function receiptPages(token: string, since: string): Promise<Receipt[]> {
-  const receipts: Receipt[] = [];
-  let cursor = "";
-  do {
-    const params = new URLSearchParams({ limit: "250", created_at_min: since });
-    if (cursor) params.set("cursor", cursor);
-    const page = await loyverse<ReceiptPage>(`receipts?${params.toString()}`, token);
-    receipts.push(...(page.receipts ?? []));
-    cursor = page.cursor ?? "";
-  } while (cursor);
-  return receipts;
-}
 
 export type ReconcileResult = {
   ok: boolean;
@@ -129,5 +95,5 @@ export async function reconcileWithLoyverse(hours = 24 * 30): Promise<ReconcileR
 }
 
 export const runLoyverseReconcile = createServerFn({ method: "POST" }).handler(
-  async (): Promise<ReconcileResult> => reconcileWithLoyverse(),
+  async (): Promise<ReconcileResult> => reconcileWithLoyverse(24 * 30),
 );
