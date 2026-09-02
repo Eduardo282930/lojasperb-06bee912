@@ -158,7 +158,12 @@ function SacolaPage() {
                       <Check className="h-4 w-4" strokeWidth={4} />
                     </button>
 
-                    <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg border border-border bg-muted">
+                    {/* Tocar no produto abre os detalhes; a seta volta ao carrinho. */}
+                    <Link
+                      to="/produto/$id"
+                      params={{ id: c.id }}
+                      className="h-12 w-12 shrink-0 overflow-hidden rounded-lg border border-border bg-muted"
+                    >
                       {c.image ? (
                         <img
                           src={c.image}
@@ -171,9 +176,13 @@ function SacolaPage() {
                           SPERB
                         </div>
                       )}
-                    </div>
+                    </Link>
 
-                    <div className="min-w-0 flex-1">
+                    <Link
+                      to="/produto/$id"
+                      params={{ id: c.id }}
+                      className="min-w-0 flex-1"
+                    >
                       <p className="line-clamp-2 text-sm font-bold leading-tight text-foreground">
                         {c.name}
                       </p>
@@ -184,7 +193,7 @@ function SacolaPage() {
                       <p className="text-base font-black text-[oklch(0.55_0.22_255)]">
                         {formatPrice(priceValue(c.price) * c.qty)}
                       </p>
-                    </div>
+                    </Link>
 
                     <div className="flex shrink-0 items-center gap-1.5">
                       <button
