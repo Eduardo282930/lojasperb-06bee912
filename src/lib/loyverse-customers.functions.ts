@@ -189,8 +189,16 @@ export const fetchReceipts = createServerFn({ method: "GET" }).handler(
     const byId = new Map<string, LoyverseCustomer>();
     for (const c of customersRes.customers ?? []) byId.set(c.id, c);
 
+    /* Vendas que o Loyverse já reembolsou/cancelou aparecem marcadas. */
+    const refunded = new Set<string>();
+    for (const r of receiptsRes.receipts ?? []) {
+      const type = (r.receipt_type ?? "SALE").toUpperCase();
+      if (type === "REFUND" && r.refund_for) refunded.add(r.refund_for);
+      if (r.cancelled_at) refunded.add(r.receipt_number);
+    }
+
     return (receiptsRes.receipts ?? [])
-      .filter((r) => !r.cancelled_at && (r.receipt_type ?? "SALE") === "SALE")
+      .filter((r) => (r.receipt_type ?? "SALE").toUpperCase() === "SALE")
       .map((r) => {
         const c = r.customer_id ? byId.get(r.customer_id) : undefined;
         return {
@@ -198,6 +206,7 @@ export const fetchReceipts = createServerFn({ method: "GET" }).handler(
           number: r.receipt_number,
           date: r.receipt_date,
           total: Number(r.total_money) || 0,
+          refunded: refunded.has(r.receipt_number) || Boolean(r.cancelled_at),
           customerName: c?.name?.trim() || "Cliente não identificado",
           customerPhone: c?.phone_number ?? "",
           lines: (r.line_items ?? []).map((l) => ({
