@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { ArrowLeft, Minus, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Minus, Plus, Trash2, Check } from "lucide-react";
 import { StoreLogoWithFallback } from "@/components/store-logo";
 import { useCart, updateQty, formatPrice, priceValue, clearCart } from "@/lib/cart";
 import { SELECTION_KEY } from "@/lib/checkout-selection";
