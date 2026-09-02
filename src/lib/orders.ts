@@ -204,6 +204,47 @@ export async function setOrderStatus(
   return Boolean(data);
 }
 
+/** Admin-only: marca o pedido como "Pagamento na entrega" (segue como pago). */
+export async function setPayOnDelivery(orderId: string): Promise<boolean> {
+  const call = supabase.rpc.bind(supabase) as unknown as (
+    name: string,
+    a: Record<string, unknown>,
+  ) => Promise<{ data?: unknown; error?: { message: string } | null }>;
+  const { data, error } = await call("admin_set_pay_on_delivery", { p_order_id: orderId });
+  if (error) return false;
+  return Boolean(data);
+}
+
+/**
+ * Regras de avanço do pedido:
+ * Recebido → Preparando → A caminho → Entregue (sem voltar),
+ * exceto Preparando → Recebido, permitido só nos 5 primeiros minutos.
+ */
+const RANK: Record<string, number> = {
+  sent: 1,
+  preparing: 2,
+  shipping: 3,
+  delivered: 4,
+  canceled: 9,
+};
+
+export function canChangeStatus(
+  order: { status: string; createdAt?: string },
+  next: string,
+  preparingAt?: string | null,
+): boolean {
+  if (next === order.status) return true;
+  if (order.status === "delivered" || order.status === "canceled") return false;
+  if (next === "canceled") return true;
+  if ((RANK[next] ?? 0) > (RANK[order.status] ?? 0)) return true;
+  if (order.status === "preparing" && next === "sent") {
+    const t = preparingAt ? Date.parse(preparingAt) : NaN;
+    return Number.isFinite(t) && Date.now() - t < 5 * 60 * 1000;
+  }
+  return false;
+}
+
+
 /* --------------------- Revisão de clientes duplicados ------------------- */
 
 export type DuplicateReview = {
