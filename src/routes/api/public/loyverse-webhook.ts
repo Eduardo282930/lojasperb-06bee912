@@ -48,7 +48,7 @@ async function handle(request: Request): Promise<Response> {
   }
 
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const rpc = supabaseAdmin.rpc as unknown as AnyRpc;
+  const rpc = supabaseAdmin.rpc.bind(supabaseAdmin) as unknown as AnyRpc;
 
   let receiptsHandled = 0;
   let refundsApplied = 0;

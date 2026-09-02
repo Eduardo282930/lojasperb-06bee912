@@ -208,7 +208,10 @@ export async function syncPaidOrder(orderId: string): Promise<SyncResult> {
         );
       }
       const entry: Record<string, unknown> = {
-        discount_id: target.id,
+        // A API de recibos do Loyverse exige `id` dentro de total_discounts.
+        // `discount_id` é aceito em outros recursos, mas aqui gera
+        // MISSING_REQUIRED_PARAMETER: object.total_discounts[].id.
+        id: target.id,
         discount_name: `Cupom ${order.coupon_code || ""}`.trim(),
         money_amount: Math.round(couponValue * 100) / 100,
       };
@@ -229,7 +232,7 @@ export async function syncPaidOrder(orderId: string): Promise<SyncResult> {
         throw new Error("desconto “Desconto Moedas” não existe no Loyverse");
       }
       const entry: Record<string, unknown> = {
-        discount_id: target.id,
+        id: target.id,
         discount_name: `Moedas (${coins} pts)`,
         money_amount: Math.round(coinsDiscount * 100) / 100,
       };

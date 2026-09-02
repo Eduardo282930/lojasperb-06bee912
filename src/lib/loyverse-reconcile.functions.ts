@@ -23,12 +23,31 @@ type Receipt = {
   created_at?: string | null;
 };
 
+type ReceiptPage = {
+  receipts?: Receipt[];
+  cursor?: string | null;
+};
+
 async function loyverse<T>(path: string, token: string): Promise<T> {
   const res = await fetch(`https://api.loyverse.com/v1.0/${path}`, {
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
   });
   if (!res.ok) throw new Error(`Loyverse ${path} ${res.status}`);
   return (await res.json()) as T;
+}
+
+/** Lê todas as páginas para não deixar um REFUND antigo escapar do limite 250. */
+async function receiptPages(token: string, since: string): Promise<Receipt[]> {
+  const receipts: Receipt[] = [];
+  let cursor = "";
+  do {
+    const params = new URLSearchParams({ limit: "250", created_at_min: since });
+    if (cursor) params.set("cursor", cursor);
+    const page = await loyverse<ReceiptPage>(`receipts?${params.toString()}`, token);
+    receipts.push(...(page.receipts ?? []));
+    cursor = page.cursor ?? "";
+  } while (cursor);
+  return receipts;
 }
 
 export type ReconcileResult = {
@@ -38,7 +57,7 @@ export type ReconcileResult = {
   reason?: string;
 };
 
-export async function reconcileWithLoyverse(hours = 72): Promise<ReconcileResult> {
+export async function reconcileWithLoyverse(hours = 24 * 90): Promise<ReconcileResult> {
   const token = process.env["LOYVERSE_TOKEN"];
   if (!token) return { ok: false, refundsApplied: 0, resynced: 0, reason: "no_token" };
 
@@ -51,11 +70,8 @@ export async function reconcileWithLoyverse(hours = 72): Promise<ReconcileResult
 
   /* 1) Reembolsos registrados no Loyverse. */
   try {
-    const list = await loyverse<{ receipts?: Receipt[] }>(
-      `receipts?limit=250&created_at_min=${encodeURIComponent(since)}`,
-      token,
-    );
-    const refunds = (list.receipts ?? []).filter(
+    const receipts = await receiptPages(token, since);
+    const refunds = receipts.filter(
       (r) => (r.receipt_type ?? "").toUpperCase() === "REFUND",
     );
 
@@ -113,5 +129,5 @@ export async function reconcileWithLoyverse(hours = 72): Promise<ReconcileResult
 }
 
 export const runLoyverseReconcile = createServerFn({ method: "POST" }).handler(
-  async (): Promise<ReconcileResult> => reconcileWithLoyverse(72),
+  async (): Promise<ReconcileResult> => reconcileWithLoyverse(),
 );

@@ -10,12 +10,12 @@ export const Route = createFileRoute("/api/public/loyverse-reconcile")({
     handlers: {
       GET: async () => {
         const { reconcileWithLoyverse } = await import("@/lib/loyverse-reconcile.functions");
-        const result = await reconcileWithLoyverse(72);
+        const result = await reconcileWithLoyverse();
         return Response.json(result);
       },
       POST: async () => {
         const { reconcileWithLoyverse } = await import("@/lib/loyverse-reconcile.functions");
-        const result = await reconcileWithLoyverse(72);
+        const result = await reconcileWithLoyverse();
         return Response.json(result);
       },
     },
