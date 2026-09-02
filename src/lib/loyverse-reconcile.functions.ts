@@ -23,7 +23,7 @@ export type ReconcileResult = {
   reason?: string;
 };
 
-export async function reconcileWithLoyverse(hours = 24 * 30): Promise<ReconcileResult> {
+export async function reconcileWithLoyverse(hours = 72): Promise<ReconcileResult> {
   const token = process.env["LOYVERSE_TOKEN"];
   if (!token) return { ok: false, refundsApplied: 0, resynced: 0, reason: "no_token" };
 
@@ -78,7 +78,7 @@ export async function reconcileWithLoyverse(hours = 24 * 30): Promise<ReconcileR
       .eq("payment_status", "paid")
       .is("loyverse_receipt_id", null)
       .gte("created_at", since)
-      .limit(20);
+      .limit(50);
 
     if (pending && pending.length > 0) {
       const { syncPaidOrder } = await import("@/lib/loyverse-sync.functions");
@@ -95,5 +95,5 @@ export async function reconcileWithLoyverse(hours = 24 * 30): Promise<ReconcileR
 }
 
 export const runLoyverseReconcile = createServerFn({ method: "POST" }).handler(
-  async (): Promise<ReconcileResult> => reconcileWithLoyverse(24 * 30),
+  async (): Promise<ReconcileResult> => reconcileWithLoyverse(72),
 );
