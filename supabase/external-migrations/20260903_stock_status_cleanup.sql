@@ -274,7 +274,7 @@ BEGIN
 
   -- Cupons desativados/expirados sem nenhum vínculo (resgate, uso ou pedido).
   DELETE FROM public.coupons c
-   WHERE (c.active = false OR (c.expires_at IS NOT NULL AND c.expires_at < now() - interval '7 days'))
+   WHERE c.active = false AND c.updated_at < now() - interval '7 days'
      AND NOT EXISTS (SELECT 1 FROM public.orders o WHERE o.coupon_id = c.id)
      AND NOT EXISTS (SELECT 1 FROM public.coupon_redemptions r WHERE r.coupon_id = c.id)
      AND NOT EXISTS (SELECT 1 FROM public.customer_coupon_claims k WHERE k.coupon_id = c.id);
