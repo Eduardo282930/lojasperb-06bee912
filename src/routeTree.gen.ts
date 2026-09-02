@@ -24,6 +24,7 @@ import { Route as ApiPublicLoyverseWebhookRouteImport } from './routes/api/publi
 import { Route as ApiPublicLoyverseReconcileRouteImport } from './routes/api/public/loyverse-reconcile'
 import { Route as ApiPublicInfinitepayWebhookRouteImport } from './routes/api/public/infinitepay-webhook'
 import { Route as ApiPublicExpireReservationsRouteImport } from './routes/api/public/expire-reservations'
+import { Route as ApiPublicCleanupRouteImport } from './routes/api/public/cleanup'
 
 const SacolaRoute = SacolaRouteImport.update({
   id: '/sacola',
@@ -104,6 +105,11 @@ const ApiPublicExpireReservationsRoute =
     path: '/api/public/expire-reservations',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicCleanupRoute = ApiPublicCleanupRouteImport.update({
+  id: '/api/public/cleanup',
+  path: '/api/public/cleanup',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -115,6 +121,7 @@ export interface FileRoutesByFullPath {
   '/pedidos': typeof PedidosRoute
   '/sacola': typeof SacolaRoute
   '/produto/$id': typeof ProdutoIdRoute
+  '/api/public/cleanup': typeof ApiPublicCleanupRoute
   '/api/public/expire-reservations': typeof ApiPublicExpireReservationsRoute
   '/api/public/infinitepay-webhook': typeof ApiPublicInfinitepayWebhookRoute
   '/api/public/loyverse-reconcile': typeof ApiPublicLoyverseReconcileRoute
@@ -132,6 +139,7 @@ export interface FileRoutesByTo {
   '/pedidos': typeof PedidosRoute
   '/sacola': typeof SacolaRoute
   '/produto/$id': typeof ProdutoIdRoute
+  '/api/public/cleanup': typeof ApiPublicCleanupRoute
   '/api/public/expire-reservations': typeof ApiPublicExpireReservationsRoute
   '/api/public/infinitepay-webhook': typeof ApiPublicInfinitepayWebhookRoute
   '/api/public/loyverse-reconcile': typeof ApiPublicLoyverseReconcileRoute
@@ -150,6 +158,7 @@ export interface FileRoutesById {
   '/pedidos': typeof PedidosRoute
   '/sacola': typeof SacolaRoute
   '/produto/$id': typeof ProdutoIdRoute
+  '/api/public/cleanup': typeof ApiPublicCleanupRoute
   '/api/public/expire-reservations': typeof ApiPublicExpireReservationsRoute
   '/api/public/infinitepay-webhook': typeof ApiPublicInfinitepayWebhookRoute
   '/api/public/loyverse-reconcile': typeof ApiPublicLoyverseReconcileRoute
@@ -169,6 +178,7 @@ export interface FileRouteTypes {
     | '/pedidos'
     | '/sacola'
     | '/produto/$id'
+    | '/api/public/cleanup'
     | '/api/public/expire-reservations'
     | '/api/public/infinitepay-webhook'
     | '/api/public/loyverse-reconcile'
@@ -186,6 +196,7 @@ export interface FileRouteTypes {
     | '/pedidos'
     | '/sacola'
     | '/produto/$id'
+    | '/api/public/cleanup'
     | '/api/public/expire-reservations'
     | '/api/public/infinitepay-webhook'
     | '/api/public/loyverse-reconcile'
@@ -203,6 +214,7 @@ export interface FileRouteTypes {
     | '/pedidos'
     | '/sacola'
     | '/produto/$id'
+    | '/api/public/cleanup'
     | '/api/public/expire-reservations'
     | '/api/public/infinitepay-webhook'
     | '/api/public/loyverse-reconcile'
@@ -221,6 +233,7 @@ export interface RootRouteChildren {
   PedidosRoute: typeof PedidosRoute
   SacolaRoute: typeof SacolaRoute
   ProdutoIdRoute: typeof ProdutoIdRoute
+  ApiPublicCleanupRoute: typeof ApiPublicCleanupRoute
   ApiPublicExpireReservationsRoute: typeof ApiPublicExpireReservationsRoute
   ApiPublicInfinitepayWebhookRoute: typeof ApiPublicInfinitepayWebhookRoute
   ApiPublicLoyverseReconcileRoute: typeof ApiPublicLoyverseReconcileRoute
@@ -336,6 +349,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicExpireReservationsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/cleanup': {
+      id: '/api/public/cleanup'
+      path: '/api/public/cleanup'
+      fullPath: '/api/public/cleanup'
+      preLoaderRoute: typeof ApiPublicCleanupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -349,6 +369,7 @@ const rootRouteChildren: RootRouteChildren = {
   PedidosRoute: PedidosRoute,
   SacolaRoute: SacolaRoute,
   ProdutoIdRoute: ProdutoIdRoute,
+  ApiPublicCleanupRoute: ApiPublicCleanupRoute,
   ApiPublicExpireReservationsRoute: ApiPublicExpireReservationsRoute,
   ApiPublicInfinitepayWebhookRoute: ApiPublicInfinitepayWebhookRoute,
   ApiPublicLoyverseReconcileRoute: ApiPublicLoyverseReconcileRoute,
