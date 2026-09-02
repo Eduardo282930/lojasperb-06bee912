@@ -17,10 +17,12 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 type LoyverseStore = { id: string };
 type LoyversePaymentType = { id: string; type?: string | null; name?: string | null };
 type LoyverseDiscount = { id: string; name?: string | null; type?: string | null };
-type LoyverseReceipt = {
+export type LoyverseReceipt = {
   receipt_number?: string;
   order?: string | null;
   receipt_type?: string | null;
+  refund_for?: string | null;
+  cancelled_at?: string | null;
   total_money?: number | null;
 };
 
