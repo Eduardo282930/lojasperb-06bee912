@@ -7,6 +7,7 @@ import { useProfile } from "@/lib/coupons";
 
 import { useServerFn } from "@tanstack/react-start";
 import { createOrderCheckout } from "@/lib/payments.functions";
+import { runLoyverseQuickSync } from "@/lib/loyverse-reconcile.functions";
 import { formatPrice } from "@/lib/cart";
 import {
   fetchMyOrders,
@@ -217,13 +218,33 @@ function PedidosPage() {
     }
   }, []);
   const navigate = Route.useNavigate();
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, refetch } = useQuery({
     queryKey: ["my-orders", profile.phone],
     queryFn: () => fetchMyOrders(profile.phone),
     staleTime: 30 * 1000,
     // Voltando do pagamento, acompanha até o pedido entrar em "Preparando".
     refetchInterval: checkout ? 5000 : false,
   });
+
+  // Abrir "Meus pedidos" busca reembolsos e recibos recentes no Loyverse,
+  // para o pedido reembolsado já aparecer cancelado sem esperar nada.
+  const quickSync = useServerFn(runLoyverseQuickSync);
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      try {
+        const res = await quickSync({});
+        if (alive && res.ok && (res.refundsApplied > 0 || res.resynced > 0)) {
+          void refetch();
+        }
+      } catch {
+        /* sincronização é apenas complementar ao webhook */
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [quickSync, refetch]);
 
   const orders = data ?? [];
   const lastOrder = orders.find((o) => o.id === lastOrderId);

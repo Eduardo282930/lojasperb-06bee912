@@ -102,3 +102,12 @@ export async function reconcileWithLoyverse(hours = 24 * 30): Promise<ReconcileR
 export const runLoyverseReconcile = createServerFn({ method: "POST" }).handler(
   async (): Promise<ReconcileResult> => reconcileWithLoyverse(),
 );
+
+/**
+ * Verificação rápida (janela curta) usada quando o cliente abre "Meus pedidos"
+ * ou o Admin abre a lista: pega reembolsos recentes e reenvia recibos pendentes
+ * sem custo de varrer 30 dias.
+ */
+export const runLoyverseQuickSync = createServerFn({ method: "POST" }).handler(
+  async (): Promise<ReconcileResult> => reconcileWithLoyverse(72),
+);

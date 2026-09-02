@@ -52,6 +52,7 @@ import {
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { retryLoyverseSync } from "@/lib/loyverse-sync.functions";
+import { runLoyverseQuickSync } from "@/lib/loyverse-reconcile.functions";
 import { useAdmin, adminSignIn, adminSignOut } from "@/lib/admin";
 import { paymentsStatus } from "@/lib/payments.functions";
 import { formatPrice } from "@/lib/cart";
@@ -1240,6 +1241,25 @@ function OrdersPanel() {
     staleTime: 30 * 1000,
   });
   const [busy, setBusy] = useState<string | null>(null);
+
+  // Abrir a lista já traz reembolsos e recibos recentes do Loyverse.
+  const quickSync = useServerFn(runLoyverseQuickSync);
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      try {
+        const res = await quickSync({});
+        if (alive && res.ok && (res.refundsApplied > 0 || res.resynced > 0)) {
+          void refetch();
+        }
+      } catch {
+        /* rede de segurança: o webhook continua sendo o canal principal */
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [quickSync, refetch]);
 
   async function change(o: Order, status: string, payment: string) {
     setBusy(o.id);
