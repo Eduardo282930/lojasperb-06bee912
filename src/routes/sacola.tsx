@@ -1,9 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { ArrowLeft, Minus, Plus, Trash2, Check } from "lucide-react";
+import { Minus, Plus, Trash2, Check, ShoppingCart } from "lucide-react";
 import { StoreLogoWithFallback } from "@/components/store-logo";
+import { BackButton } from "@/components/back-button";
 import { useCart, updateQty, formatPrice, priceValue, clearCart } from "@/lib/cart";
 import { SELECTION_KEY } from "@/lib/checkout-selection";
+import { createStockHold, releaseStockHold } from "@/lib/stock";
 
 export const Route = createFileRoute("/sacola")({
   head: () => ({
@@ -18,6 +20,8 @@ export const Route = createFileRoute("/sacola")({
 function SacolaPage() {
   const cart = useCart();
   const [unchecked, setUnchecked] = useState<string[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [erro, setErro] = useState("");
   const navigate = Route.useNavigate();
 
   // Estilo Shopee: o cliente escolhe quais itens entram no pedido.
@@ -36,26 +40,48 @@ function SacolaPage() {
   const subtotal = picked.reduce((s, c) => s + priceValue(c.price) * c.qty, 0);
 
   /**
-   * Nada de pedido aqui: o carrinho só leva o cliente para a tela final de
-   * conferência, onde ele revisa tudo e escolhe WhatsApp ou Pix.
+   * "Fazer pedido" não cria pedido nenhum: valida o estoque em tempo real e
+   * reserva as unidades de forma atômica. Só depois o cliente vai conferir e
+   * escolher WhatsApp ou Pix.
    */
-  function irParaConfirmacao() {
-    if (picked.length === 0) return;
-    window.localStorage.setItem(SELECTION_KEY, JSON.stringify(picked.map((c) => c.id)));
-    void navigate({ to: "/confirmar" });
+  async function irParaConfirmacao() {
+    if (picked.length === 0 || busy) return;
+    setBusy(true);
+    setErro("");
+    try {
+      await releaseStockHold();
+      const hold = await createStockHold(
+        picked.map((c) => ({ id: c.id, name: c.name, qty: c.qty })),
+      );
+      if (!hold.ok) {
+        setErro(
+          hold.problems.length > 0
+            ? `Sem estoque suficiente: ${hold.problems
+                .map(
+                  (p) =>
+                    `${p.name || "produto"} (restam ${Math.max(0, Math.floor(p.available))})`,
+                )
+                .join(", ")}. Ajuste a quantidade para continuar.`
+            : "Não foi possível reservar o estoque agora. Tente novamente.",
+        );
+        return;
+      }
+      window.localStorage.setItem(SELECTION_KEY, JSON.stringify(picked.map((c) => c.id)));
+      void navigate({ to: "/confirmar" });
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
     <div className="min-h-screen bg-background pb-28">
       <header className="sticky top-0 z-10 border-b-2 border-border bg-background/95 backdrop-blur">
         <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-3">
-          <Link
-            to="/"
-            aria-label="Voltar"
+          <BackButton
+            fallback="/"
             className="grid h-14 w-14 place-items-center rounded-2xl bg-muted text-foreground active:scale-95"
-          >
-            <ArrowLeft className="h-8 w-8" strokeWidth={2.5} />
-          </Link>
+            iconClassName="h-8 w-8"
+          />
           <StoreLogoWithFallback
             storeName="SPERB"
             className="h-9 w-auto max-w-24 object-contain"
@@ -67,13 +93,19 @@ function SacolaPage() {
 
       <main className="mx-auto max-w-3xl px-4 pt-4">
         {cart.length === 0 ? (
-          <div className="mt-16 text-center">
-            <p className="text-2xl font-semibold text-foreground">
-              Seu carrinho está vazio.
+          <div className="mt-8 rounded-3xl border-2 border-dashed border-border bg-card p-8 text-center">
+            <span className="mx-auto grid h-20 w-20 place-items-center rounded-full bg-muted">
+              <ShoppingCart className="h-10 w-10 text-muted-foreground" />
+            </span>
+            <p className="mt-4 text-2xl font-black text-foreground">
+              Seu carrinho está vazio
+            </p>
+            <p className="mt-1 text-base font-semibold text-muted-foreground">
+              Escolha seus produtos com calma. Eles ficam guardados aqui.
             </p>
             <Link
               to="/"
-              className="mt-6 inline-block rounded-2xl bg-primary px-8 py-5 text-2xl font-bold text-primary-foreground"
+              className="mt-6 inline-block rounded-2xl bg-[oklch(0.55_0.22_255)] px-8 py-4 text-xl font-black text-white active:scale-95"
             >
               Ver produtos
             </Link>
@@ -194,22 +226,29 @@ function SacolaPage() {
 
       {cart.length > 0 && (
         <div className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-background/95 backdrop-blur">
-          <div className="mx-auto flex max-w-3xl items-center gap-3 px-3 pb-3 pt-2">
-            <div className="min-w-0 flex-1">
-              <p className="text-[11px] font-bold text-muted-foreground">
-                {picked.length} de {cart.length} {cart.length === 1 ? "item" : "itens"}
+          <div className="mx-auto max-w-3xl px-3 pb-3 pt-2">
+            {erro && (
+              <p className="mb-2 rounded-xl bg-destructive/10 px-3 py-2 text-sm font-bold text-destructive">
+                {erro}
               </p>
-              <p className="truncate text-2xl font-black text-foreground">
-                {formatPrice(subtotal)}
-              </p>
+            )}
+            <div className="flex items-center gap-3">
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-bold text-muted-foreground">
+                  {picked.length} de {cart.length} {cart.length === 1 ? "item" : "itens"}
+                </p>
+                <p className="truncate text-2xl font-black text-foreground">
+                  {formatPrice(subtotal)}
+                </p>
+              </div>
+              <button
+                onClick={() => void irParaConfirmacao()}
+                disabled={picked.length === 0 || busy}
+                className="shrink-0 rounded-2xl bg-[oklch(0.55_0.22_255)] px-7 py-4 text-xl font-black text-white shadow-lg disabled:opacity-50 active:scale-[0.98]"
+              >
+                {busy ? "Reservando…" : "Fazer pedido"}
+              </button>
             </div>
-            <button
-              onClick={irParaConfirmacao}
-              disabled={picked.length === 0}
-              className="shrink-0 rounded-2xl bg-[oklch(0.55_0.22_255)] px-7 py-4 text-xl font-black text-white shadow-lg disabled:opacity-50 active:scale-[0.98]"
-            >
-              Fazer pedido
-            </button>
           </div>
         </div>
       )}

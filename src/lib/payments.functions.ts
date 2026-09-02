@@ -180,7 +180,7 @@ async function linkCheckoutToOrder(
    */
   const nsu = order.payment_nsu ? String(order.payment_nsu) : String(order.id);
 
-  const redirectUrl = `${origin}/pedidos?status=topay&checkout=1`;
+  const redirectUrl = `${origin}/pedidos?status=preparing&checkout=1`;
   const webhookUrl = `${origin}/api/public/infinitepay-webhook`;
 
   console.log("[SPERB] Criando checkout InfinitePay:", {
@@ -254,6 +254,7 @@ export const startCheckout = createServerFn({ method: "POST" })
   .inputValidator(
     (data: {
       deviceId: string;
+      holdId?: string;
       name: string;
       phone: string;
       email: string;
@@ -282,6 +283,7 @@ export const startCheckout = createServerFn({ method: "POST" })
 
       return {
         deviceId: String(data.deviceId ?? ""),
+        holdId: String(data.holdId ?? ""),
         name: data.name.trim().slice(0, 120),
         phone: String(data.phone).slice(0, 30),
         email: String(data.email ?? "").trim().slice(0, 200),
@@ -300,6 +302,7 @@ export const startCheckout = createServerFn({ method: "POST" })
       };
     },
   )
+
   .handler(async ({ data }): Promise<CheckoutResult> => {
     let orderId: string | null = null;
 
@@ -316,33 +319,45 @@ export const startCheckout = createServerFn({ method: "POST" })
       }
 
       /*
-       * Cria o pedido e a reserva temporária de estoque.
-       * A RPC faz toda a validação de cupom e moedas no banco
-       * e devolve o ID do pedido diretamente.
+       * Cria o pedido definitivo. Quando existe reserva temporária (hold),
+       * ela é consumida na MESMA transação: o estoque nunca fica livre entre
+       * a conferência e o pedido, e dois clientes não pegam a mesma unidade.
        */
-      const { data: created, error: createError } = await supabaseAdmin.rpc(
-        "create_order",
-        {
-          p_device_id: data.deviceId,
-          p_name: data.name,
-          p_phone: data.phone,
-          p_email: data.email,
-          p_items: data.items as never,
-          p_subtotal: data.subtotal,
-          p_discount: data.discount,
-          p_total: data.total,
-          p_coupon_code: data.couponCode,
-          p_coins: data.coins,
-        },
-      );
+      const orderArgs = {
+        p_device_id: data.deviceId,
+        p_name: data.name,
+        p_phone: data.phone,
+        p_email: data.email,
+        p_items: data.items as never,
+        p_subtotal: data.subtotal,
+        p_discount: data.discount,
+        p_total: data.total,
+        p_coupon_code: data.couponCode,
+        p_coins: data.coins,
+      };
+      const rpcCall = supabaseAdmin.rpc as unknown as (
+        name: string,
+        args: Record<string, unknown>,
+      ) => Promise<{ data?: unknown; error?: { message: string } | null }>;
+
+      const { data: created, error: createError } = data.holdId
+        ? await rpcCall("create_order_from_hold", {
+            p_hold_id: data.holdId,
+            ...orderArgs,
+          })
+        : await rpcCall("create_order", orderArgs);
 
       if (createError || !created) {
         console.error("[SPERB] Erro ao criar pedido:", createError);
+        const message = createError?.message ?? "sem retorno";
         return {
           url: null,
-          reason: `create_order: ${createError?.message ?? "sem retorno"}`,
+          reason: message.includes("out_of_stock")
+            ? "out_of_stock"
+            : `create_order: ${message}`,
         };
       }
+
 
       orderId = String(created);
 

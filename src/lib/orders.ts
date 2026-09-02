@@ -73,8 +73,10 @@ export async function recordOrder(input: {
   total: number;
   couponCode: string;
   coins?: number;
+  /** Reserva temporária criada em "Fazer pedido" (vira reserva do pedido). */
+  holdId?: string;
 }): Promise<string | null> {
-  const { data, error } = await supabase.rpc("create_order", {
+  const args = {
     p_device_id: deviceId(),
     p_name: input.name,
     p_phone: input.phone,
@@ -85,13 +87,21 @@ export async function recordOrder(input: {
     p_total: input.total,
     p_coupon_code: input.couponCode,
     p_coins: Math.max(0, Math.trunc(input.coins ?? 0)),
-  });
+  };
+  const call = supabase.rpc as unknown as (
+    name: string,
+    a: Record<string, unknown>,
+  ) => Promise<{ data?: unknown; error?: { message: string } | null }>;
+  const { data, error } = input.holdId
+    ? await call("create_order_from_hold", { p_hold_id: input.holdId, ...args })
+    : await call("create_order", args);
   if (error) {
     console.warn("[recordOrder] falhou", error);
     return null;
   }
   return (data as string | null) ?? null;
 }
+
 
 function num(v: unknown): number {
   const n = typeof v === "string" ? Number(v) : (v as number);
