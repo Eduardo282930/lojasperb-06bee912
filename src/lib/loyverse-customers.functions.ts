@@ -151,6 +151,7 @@ type LoyverseReceipt = {
   total_money?: number | null;
   customer_id?: string | null;
   cancelled_at?: string | null;
+  refund_for?: string | null;
   line_items?: Array<{
     item_name?: string | null;
     quantity?: number | null;
