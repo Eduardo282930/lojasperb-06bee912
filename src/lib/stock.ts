@@ -26,14 +26,6 @@ export type HoldResult = {
 
 export type HoldItem = { id: string; name: string; qty: number };
 
-type AnyRpc = (
-  name: string,
-  args?: Record<string, unknown>,
-) => Promise<{ data?: unknown; error?: { message: string } | null }>;
-
-function rpc(): AnyRpc {
-  return supabase.rpc.bind(supabase) as unknown as AnyRpc;
-}
 
 export function getHoldId(): string {
   if (typeof window === "undefined") return "";
