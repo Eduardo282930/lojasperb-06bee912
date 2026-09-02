@@ -215,10 +215,20 @@ function PedidosPage() {
     queryKey: ["my-orders", profile.phone],
     queryFn: () => fetchMyOrders(profile.phone),
     staleTime: 30 * 1000,
+    // Voltando do pagamento, acompanha até o pedido entrar em "Preparando".
+    refetchInterval: checkout ? 5000 : false,
   });
 
   const orders = data ?? [];
   const lastOrder = orders.find((o) => o.id === lastOrderId);
+
+  // Pagamento confirmado → o cliente vai direto para "Preparando".
+  useEffect(() => {
+    if (checkout && lastOrder?.paymentStatus === "paid" && status !== "preparing") {
+      void navigate({ search: { status: "preparing" }, replace: true });
+    }
+  }, [checkout, lastOrder?.paymentStatus, status, navigate]);
+
   function bucket(o: Order): StatusValue {
     if (o.status === "canceled") return "canceled";
     if (o.status === "delivered") return "delivered";
