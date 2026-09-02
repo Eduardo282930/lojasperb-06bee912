@@ -233,10 +233,11 @@ export async function syncPaidOrder(orderId: string): Promise<SyncResult> {
       const entry: Record<string, unknown> = {
         id: target.id,
         scope: "RECEIPT",
-        money_amount: Math.round(couponValue * 100) / 100,
       };
       if (couponIsPercent && subtotal > 0) {
         entry["percentage"] = Math.round((couponValue / subtotal) * 10000) / 100;
+      } else {
+        entry["money_amount"] = Math.round(couponValue * 100) / 100;
       }
       totalDiscounts.push(entry);
     }
@@ -254,10 +255,11 @@ export async function syncPaidOrder(orderId: string): Promise<SyncResult> {
       const entry: Record<string, unknown> = {
         id: target.id,
         scope: "RECEIPT",
-        money_amount: Math.round(coinsDiscount * 100) / 100,
       };
       if ((target.type ?? "").toUpperCase() === "VARIABLE_PERCENT" && subtotal > 0) {
         entry["percentage"] = Math.round((coinsDiscount / subtotal) * 10000) / 100;
+      } else {
+        entry["money_amount"] = Math.round(coinsDiscount * 100) / 100;
       }
       totalDiscounts.push(entry);
     }
