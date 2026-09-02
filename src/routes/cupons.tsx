@@ -79,24 +79,7 @@ function CuponsPage() {
       </header>
 
       <main className="mx-auto max-w-3xl px-4 pt-4">
-        {/* Topo: onde conseguir mais cupons. */}
-        <a
-          href="#resgatar"
-          className="flex items-center gap-3 rounded-3xl border-2 p-4 active:scale-[0.99]"
-          style={{ borderColor: GOLD }}
-        >
-          <Gift className="h-8 w-8 shrink-0" style={{ color: GOLD }} />
-          <span className="min-w-0">
-            <span className="block text-xl font-black text-foreground">
-              Ganhe mais cupons
-            </span>
-            <span className="block text-base font-semibold text-muted-foreground">
-              {available.length} para resgatar · {claimedList.length} já resgatados
-            </span>
-          </span>
-        </a>
-
-        <section className="mt-5">
+        <section>
           <h2 className="text-lg font-black text-foreground">
             Resgatados ({claimedList.length})
           </h2>
