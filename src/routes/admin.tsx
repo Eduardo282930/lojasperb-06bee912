@@ -1677,7 +1677,7 @@ function SyncPanel() {
                 </p>
               )}
               {r.refund_state === "money_pending" && (
-                <p className="text-sm font-bold" style={{ color: GOLD }}>
+                <p className="text-sm font-bold" style={{ color: "oklch(0.72 0.17 62)" }}>
                   Reembolsado no Loyverse — devolver o dinheiro pelo InfinitePay.
                 </p>
               )}
