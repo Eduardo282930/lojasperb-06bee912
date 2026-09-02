@@ -19,6 +19,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as ProdutoIdRouteImport } from './routes/produto.$id'
 import { Route as ApiPublicSyncCatalogRouteImport } from './routes/api/public/sync-catalog'
 import { Route as ApiPublicManifestRouteImport } from './routes/api/public/manifest'
+import { Route as ApiPublicLoyverseReconcileRouteImport } from './routes/api/public/loyverse-reconcile'
 import { Route as ApiPublicInfinitepayWebhookRouteImport } from './routes/api/public/infinitepay-webhook'
 import { Route as ApiPublicExpireReservationsRouteImport } from './routes/api/public/expire-reservations'
 
@@ -72,6 +73,12 @@ const ApiPublicManifestRoute = ApiPublicManifestRouteImport.update({
   path: '/api/public/manifest',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicLoyverseReconcileRoute =
+  ApiPublicLoyverseReconcileRouteImport.update({
+    id: '/api/public/loyverse-reconcile',
+    path: '/api/public/loyverse-reconcile',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicInfinitepayWebhookRoute =
   ApiPublicInfinitepayWebhookRouteImport.update({
     id: '/api/public/infinitepay-webhook',
@@ -96,6 +103,7 @@ export interface FileRoutesByFullPath {
   '/produto/$id': typeof ProdutoIdRoute
   '/api/public/expire-reservations': typeof ApiPublicExpireReservationsRoute
   '/api/public/infinitepay-webhook': typeof ApiPublicInfinitepayWebhookRoute
+  '/api/public/loyverse-reconcile': typeof ApiPublicLoyverseReconcileRoute
   '/api/public/manifest': typeof ApiPublicManifestRoute
   '/api/public/sync-catalog': typeof ApiPublicSyncCatalogRoute
 }
@@ -110,6 +118,7 @@ export interface FileRoutesByTo {
   '/produto/$id': typeof ProdutoIdRoute
   '/api/public/expire-reservations': typeof ApiPublicExpireReservationsRoute
   '/api/public/infinitepay-webhook': typeof ApiPublicInfinitepayWebhookRoute
+  '/api/public/loyverse-reconcile': typeof ApiPublicLoyverseReconcileRoute
   '/api/public/manifest': typeof ApiPublicManifestRoute
   '/api/public/sync-catalog': typeof ApiPublicSyncCatalogRoute
 }
@@ -125,6 +134,7 @@ export interface FileRoutesById {
   '/produto/$id': typeof ProdutoIdRoute
   '/api/public/expire-reservations': typeof ApiPublicExpireReservationsRoute
   '/api/public/infinitepay-webhook': typeof ApiPublicInfinitepayWebhookRoute
+  '/api/public/loyverse-reconcile': typeof ApiPublicLoyverseReconcileRoute
   '/api/public/manifest': typeof ApiPublicManifestRoute
   '/api/public/sync-catalog': typeof ApiPublicSyncCatalogRoute
 }
@@ -141,6 +151,7 @@ export interface FileRouteTypes {
     | '/produto/$id'
     | '/api/public/expire-reservations'
     | '/api/public/infinitepay-webhook'
+    | '/api/public/loyverse-reconcile'
     | '/api/public/manifest'
     | '/api/public/sync-catalog'
   fileRoutesByTo: FileRoutesByTo
@@ -155,6 +166,7 @@ export interface FileRouteTypes {
     | '/produto/$id'
     | '/api/public/expire-reservations'
     | '/api/public/infinitepay-webhook'
+    | '/api/public/loyverse-reconcile'
     | '/api/public/manifest'
     | '/api/public/sync-catalog'
   id:
@@ -169,6 +181,7 @@ export interface FileRouteTypes {
     | '/produto/$id'
     | '/api/public/expire-reservations'
     | '/api/public/infinitepay-webhook'
+    | '/api/public/loyverse-reconcile'
     | '/api/public/manifest'
     | '/api/public/sync-catalog'
   fileRoutesById: FileRoutesById
@@ -184,6 +197,7 @@ export interface RootRouteChildren {
   ProdutoIdRoute: typeof ProdutoIdRoute
   ApiPublicExpireReservationsRoute: typeof ApiPublicExpireReservationsRoute
   ApiPublicInfinitepayWebhookRoute: typeof ApiPublicInfinitepayWebhookRoute
+  ApiPublicLoyverseReconcileRoute: typeof ApiPublicLoyverseReconcileRoute
   ApiPublicManifestRoute: typeof ApiPublicManifestRoute
   ApiPublicSyncCatalogRoute: typeof ApiPublicSyncCatalogRoute
 }
@@ -260,6 +274,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicManifestRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/loyverse-reconcile': {
+      id: '/api/public/loyverse-reconcile'
+      path: '/api/public/loyverse-reconcile'
+      fullPath: '/api/public/loyverse-reconcile'
+      preLoaderRoute: typeof ApiPublicLoyverseReconcileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/infinitepay-webhook': {
       id: '/api/public/infinitepay-webhook'
       path: '/api/public/infinitepay-webhook'
@@ -288,6 +309,7 @@ const rootRouteChildren: RootRouteChildren = {
   ProdutoIdRoute: ProdutoIdRoute,
   ApiPublicExpireReservationsRoute: ApiPublicExpireReservationsRoute,
   ApiPublicInfinitepayWebhookRoute: ApiPublicInfinitepayWebhookRoute,
+  ApiPublicLoyverseReconcileRoute: ApiPublicLoyverseReconcileRoute,
   ApiPublicManifestRoute: ApiPublicManifestRoute,
   ApiPublicSyncCatalogRoute: ApiPublicSyncCatalogRoute,
 }
