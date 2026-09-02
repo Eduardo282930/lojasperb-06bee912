@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Ticket, Gift } from "lucide-react";
+import { Ticket, Gift, Lock } from "lucide-react";
 
 import { StoreLogoWithFallback } from "@/components/store-logo";
 import { BackButton } from "@/components/back-button";
@@ -142,6 +142,23 @@ function CuponsPage() {
             </ul>
           )}
         </section>
+
+        {/* Onde conseguir mais cupons — logo abaixo dos resgatados. */}
+        <a
+          href="#resgatar"
+          className="mt-5 flex items-center gap-3 rounded-3xl border-2 p-4 active:scale-[0.99]"
+          style={{ borderColor: GOLD }}
+        >
+          <Gift className="h-8 w-8 shrink-0" style={{ color: GOLD }} />
+          <span className="min-w-0">
+            <span className="block text-xl font-black text-foreground">
+              Ganhe mais cupons
+            </span>
+            <span className="block text-base font-semibold text-muted-foreground">
+              {available.length} para resgatar · {claimedList.length} já resgatados
+            </span>
+          </span>
+        </a>
 
         <section id="resgatar" className="mt-6 scroll-mt-24">
           <h2 className="text-lg font-black text-foreground">
