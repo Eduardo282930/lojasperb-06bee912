@@ -1273,6 +1273,8 @@ function OrdersPanel() {
   async function payOnDelivery(o: Order) {
     setBusy(o.id);
     const ok = await setPayOnDelivery(o.id);
+    // O recibo do Loyverse é criado logo após o pagamento ser registrado.
+    if (ok) await syncReceipt({ data: { orderId: o.id } }).catch(() => null);
     setBusy(null);
     if (!ok) window.alert("Não foi possível marcar o pagamento na entrega.");
     void refetch();
