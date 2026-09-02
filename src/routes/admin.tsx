@@ -1242,6 +1242,7 @@ function OrdersPanel() {
     staleTime: 30 * 1000,
   });
   const [busy, setBusy] = useState<string | null>(null);
+  const syncReceipt = useServerFn(retryLoyverseSync);
 
   // Abrir a lista já traz reembolsos e recibos recentes do Loyverse.
   const quickSync = useServerFn(runLoyverseQuickSync);
