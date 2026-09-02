@@ -1,8 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Package, ChevronRight } from "lucide-react";
+import { Package, ChevronRight } from "lucide-react";
+import { BackButton } from "@/components/back-button";
 import { useProfile } from "@/lib/coupons";
+
 import { useServerFn } from "@tanstack/react-start";
 import { createOrderCheckout } from "@/lib/payments.functions";
 import { formatPrice } from "@/lib/cart";
