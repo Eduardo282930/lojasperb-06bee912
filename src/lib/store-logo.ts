@@ -11,16 +11,44 @@ import { createServerFn } from "@tanstack/react-start";
 
 export const STORE_LOGO_KEY = ["store_logo"] as const;
 
-/** Busca o logo da loja diretamente no Loyverse (item "LOGO DA LOJA"). */
+/**
+ * O logo fica salvo no Supabase para carregar instantaneamente.
+ * O Loyverse continua sendo a fonte: se mudar lá, o Supabase é atualizado
+ * automaticamente (em segundo plano, sem atrasar a tela).
+ */
 export const fetchStoreLogo = createServerFn({ method: "GET" }).handler(
   async (): Promise<string | null> => {
+    const { loadStoreLogoFromSupabase, persistStoreLogo, storeLogoAgeMs } = await import(
+      "./catalog-cache.server"
+    );
+    const { fetchStoreLogoUrl } = await import("./store-logo.server");
+
+    let saved: string | null = null;
+    let age = Number.POSITIVE_INFINITY;
     try {
-      const { fetchStoreLogoUrl } = await import("./store-logo.server");
-      return (await fetchStoreLogoUrl()) ?? null;
+      saved = await loadStoreLogoFromSupabase();
+      age = await storeLogoAgeMs();
     } catch (err) {
-      console.error("[Store Logo] Falha ao buscar logo no Loyverse:", err);
-      return null;
+      console.error("[Store Logo] Supabase indisponível:", err);
     }
+
+    const refresh = async () => {
+      try {
+        const fresh = await fetchStoreLogoUrl();
+        if (fresh && fresh !== saved) await persistStoreLogo(fresh);
+        return fresh ?? null;
+      } catch (err) {
+        console.error("[Store Logo] Falha ao buscar logo no Loyverse:", err);
+        return null;
+      }
+    };
+
+    if (saved && age < 6 * 60 * 60 * 1000) return saved;
+    if (saved) {
+      void refresh();
+      return saved;
+    }
+    return (await refresh()) ?? saved;
   },
 );
 
