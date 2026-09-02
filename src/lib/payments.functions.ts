@@ -180,7 +180,7 @@ async function linkCheckoutToOrder(
    */
   const nsu = order.payment_nsu ? String(order.payment_nsu) : String(order.id);
 
-  const redirectUrl = `${origin}/pedidos?status=topay&checkout=1`;
+  const redirectUrl = `${origin}/pedidos?status=preparing&checkout=1`;
   const webhookUrl = `${origin}/api/public/infinitepay-webhook`;
 
   console.log("[SPERB] Criando checkout InfinitePay:", {
