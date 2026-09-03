@@ -1205,39 +1205,6 @@ function CustomerDetail({
 
 /* ----------------------------- Pedidos --------------------------------- */
 
-/** Cliente de teste: só este número ganha o botão de limpeza. */
-const TEST_CUSTOMER_PHONE = "51999999999";
-
-function TestCleanupButton({ onDone }: { onDone: () => void }) {
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState("");
-
-  return (
-    <div className="mb-3 rounded-2xl border-2 border-dashed border-border bg-card p-3">
-      <p className="text-sm font-black text-muted-foreground">Somente testes</p>
-      <button
-        disabled={busy}
-        onClick={async () => {
-          if (!confirm("Apagar todos os pedidos de Eduardo Borges?")) return;
-          setBusy(true);
-          try {
-            const n = await deleteCustomerOrders(TEST_CUSTOMER_PHONE);
-            setMsg(`${n} pedido(s) apagado(s).`);
-            onDone();
-          } catch {
-            setMsg("Não foi possível apagar agora.");
-          }
-          setBusy(false);
-        }}
-        className="mt-1 rounded-xl bg-muted px-3 py-2 text-sm font-black text-foreground active:scale-95 disabled:opacity-60"
-      >
-        {busy ? "Apagando…" : "Excluir pedidos de Eduardo Borges (teste)"}
-      </button>
-      {msg && <p className="mt-1 text-sm font-bold text-muted-foreground">{msg}</p>}
-    </div>
-  );
-}
-
 /** Há quanto tempo o pedido do WhatsApp espera pagamento. */
 function waitingLabel(iso: string): string {
   const mins = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60000));
@@ -1312,16 +1279,12 @@ function OrdersPanel() {
   }
   if ((data ?? []).length === 0) {
     return (
-      <>
-        <TestCleanupButton onDone={() => void refetch()} />
-        <p className="text-lg font-semibold text-muted-foreground">Nenhum pedido ainda.</p>
-      </>
+      <p className="text-lg font-semibold text-muted-foreground">Nenhum pedido ainda.</p>
     );
   }
 
   return (
     <>
-    <TestCleanupButton onDone={() => void refetch()} />
     <ul className="flex flex-col gap-3">
       {(data ?? []).map((o) => (
         <li key={o.id} className="rounded-3xl border-2 border-border bg-card p-4 shadow-sm">
