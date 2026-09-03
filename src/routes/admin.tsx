@@ -49,7 +49,6 @@ import {
   fetchDuplicates,
   resolveDuplicate,
   statusLabel,
-  paymentLabel,
   minutesLeftToPay,
   ORDER_STATUSES,
   type Order,
