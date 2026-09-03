@@ -73,7 +73,20 @@ export const Route = createFileRoute("/")({
       { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
-  loader: ({ context }) => context.queryClient.ensureQueryData(catalogQuery),
+  // Nunca deixamos o servidor derrubar a página (tela branca / 500):
+  // se o Loyverse falhar no SSR, a vitrine tenta de novo no aparelho.
+  loader: async ({ context }) => {
+    try {
+      await context.queryClient.ensureQueryData(catalogQuery);
+    } catch (err) {
+      console.error("[Home] catálogo indisponível no SSR:", err);
+      context.queryClient.setQueryData(catalogQuery.queryKey, {
+        products: [],
+        categories: [],
+        storeLogo: null,
+      });
+    }
+  },
   component: Home,
   errorComponent: ErrorView,
   pendingComponent: () => (
