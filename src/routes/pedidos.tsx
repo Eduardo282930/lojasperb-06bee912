@@ -443,7 +443,7 @@ function PedidosPage() {
               Pedido nº {lastOrder.id.slice(0, 8).toUpperCase()}
             </p>
             <p className="text-base font-bold text-muted-foreground">
-              {displayStatusLabel(lastOrder)} · {paymentLabel(lastOrder.paymentStatus)}
+              {displayStatusLabel(lastOrder)} · {paymentDisplayLabel(lastOrder)}
             </p>
             <p className="mt-1 text-sm font-semibold text-muted-foreground">
               Assim que o pagamento for confirmado, o pedido entra em preparação
