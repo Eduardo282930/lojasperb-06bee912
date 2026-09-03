@@ -37,6 +37,39 @@ const SECTIONS: { value: StatusValue; label: string }[] = [
   { value: "canceled", label: "Cancelado" },
 ];
 
+export const Route = createFileRoute("/pedidos")({
+  ssr: false,
+
+  validateSearch: (search: Record<string, unknown>) => {
+    const raw = String(search["status"] ?? "topay");
+
+    const status = (STATUSES as readonly string[]).includes(raw)
+      ? (raw as StatusValue)
+      : "topay";
+
+    const checkout = String(search["checkout"] ?? "") === "1";
+
+    return checkout
+      ? { status, checkout: true as const }
+      : { status };
+  },
+
+  head: () => ({
+    meta: [
+      {
+        title: "Minhas compras — SPERB",
+      },
+      {
+        name: "description",
+        content:
+          "Acompanhe seus pedidos SPERB: pagamento, preparação, entrega e valores.",
+      },
+    ],
+  }),
+
+  component: PedidosPage,
+});
+
 const BLUE = "oklch(0.55 0.22 255)";
 const GREEN = "oklch(0.62 0.19 145)";
 
@@ -48,7 +81,9 @@ const STEPS = [
 ] as const;
 
 function Progress({ status }: { status: string }) {
-  if (status === "canceled") return null;
+  if (status === "canceled") {
+    return null;
+  }
 
   const current = Math.max(
     0,
@@ -81,20 +116,25 @@ function Progress({ status }: { status: string }) {
 }
 
 function refundMessage(order: Order): string | null {
-  if (order.refundState !== "money_pending") return null;
+  if (order.refundState !== "money_pending") {
+    return null;
+  }
 
   const provider =
     `${order.paymentProvider ?? ""} ${order.paymentMethod ?? ""}`.toLowerCase();
 
-  if (provider.includes("infinite")) {
+  const isInfinitePay = provider.includes("infinite");
+
+  const isWhatsApp =
+    provider.includes("whatsapp") ||
+    provider.includes("manual") ||
+    provider.includes("delivery");
+
+  if (isInfinitePay) {
     return "Pedido cancelado. O reembolso será processado pela InfinitePay. Você receberá a confirmação assim que for concluído.";
   }
 
-  if (
-    provider.includes("whatsapp") ||
-    provider.includes("manual") ||
-    provider.includes("delivery")
-  ) {
+  if (isWhatsApp) {
     return "Pedido cancelado. O reembolso será tratado pelo atendimento da SPERB.";
   }
 
@@ -110,6 +150,7 @@ function OrderCard({
 }) {
   const [open, setOpen] = useState(false);
   const [paying, setPaying] = useState(false);
+
   const startCheckout = useServerFn(createOrderCheckout);
 
   const refunded =
@@ -134,14 +175,16 @@ function OrderCard({
       setMinutesLeft(minutesLeftToPay(order));
     }, 30000);
 
-    return () => window.clearInterval(timer);
+    return () => {
+      window.clearInterval(timer);
+    };
   }, [order]);
 
   const timeline = useQuery({
     queryKey: ["order-timeline", order.id],
     queryFn: () => fetchOrderTimeline(order.id, phone),
     enabled: open,
-    staleTime: 30000,
+    staleTime: 30 * 1000,
   });
 
   async function pagar() {
@@ -151,7 +194,9 @@ function OrderCard({
 
     try {
       const result = await startCheckout({
-        data: { orderId: order.id },
+        data: {
+          orderId: order.id,
+        },
       });
 
       if (result.url) {
@@ -243,7 +288,9 @@ function OrderCard({
 
         {order.discount > 0 && (
           <div className="mt-3 flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Desconto</span>
+            <span className="text-muted-foreground">
+              Desconto
+            </span>
 
             <span
               className="font-semibold"
@@ -351,7 +398,9 @@ function OrderCard({
                     )}
                   </span>
 
-                  {entry.note && <span> — {entry.note}</span>}
+                  {entry.note && (
+                    <span> — {entry.note}</span>
+                  )}
                 </li>
               ))}
 
@@ -375,13 +424,12 @@ function PedidosPage() {
 
   const [lastOrderId, setLastOrderId] = useState("");
 
-  const initialIndex = Math.max(
-    0,
-    SECTIONS.findIndex((item) => item.value === status),
+  const [activeIndex, setActiveIndex] = useState(() =>
+    Math.max(
+      0,
+      SECTIONS.findIndex((item) => item.value === status),
+    ),
   );
-
-  const [activeIndex, setActiveIndex] =
-    useState<number>(initialIndex);
 
   const [indicator, setIndicator] = useState({
     left: 0,
@@ -404,7 +452,7 @@ function PedidosPage() {
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["my-orders", profile.phone],
     queryFn: () => fetchMyOrders(profile.phone),
-    staleTime: 30000,
+    staleTime: 30 * 1000,
     refetchInterval: checkout ? 5000 : false,
   });
 
@@ -415,7 +463,9 @@ function PedidosPage() {
 
     void (async () => {
       try {
-        const expired = await cancelExpiredUnpaidOrders();
+        const expired =
+          await cancelExpiredUnpaidOrders();
+
         const result = await quickSync({});
 
         if (
@@ -434,7 +484,8 @@ function PedidosPage() {
           void refetch();
         }
       } catch {
-        // O webhook continua sendo a principal atualização.
+        // O webhook continua sendo a principal fonte
+        // de atualização.
       }
     })();
 
@@ -452,37 +503,53 @@ function PedidosPage() {
   useEffect(() => {
     if (typeof window !== "undefined") {
       setLastOrderId(
-        window.localStorage.getItem("sperb-last-order") ?? "",
+        window.localStorage.getItem(
+          "sperb-last-order",
+        ) ?? "",
       );
     }
   }, []);
 
+  /*
+   * Sincroniza o painel com o status vindo da URL.
+   * Não usa animação aqui para evitar qualquer movimento
+   * intermediário que possa disparar uma troca de aba.
+   */
   useEffect(() => {
+    const foundIndex = SECTIONS.findIndex(
+      (item) => item.value === status,
+    );
+
     const index = Math.max(
       0,
-      SECTIONS.findIndex(
-        (item) => item.value === status,
-      ),
+      foundIndex === -1 ? 0 : foundIndex,
     );
 
     const track = trackRef.current;
 
     if (
       track &&
-      Math.abs(
-        track.scrollLeft -
-          index * track.clientWidth,
-      ) > 4
+      track.clientWidth > 0
     ) {
-      track.scrollTo({
-        left: index * track.clientWidth,
-        behavior: "auto",
-      });
+      const targetLeft =
+        index * track.clientWidth;
+
+      if (
+        Math.abs(
+          track.scrollLeft - targetLeft,
+        ) > 1
+      ) {
+        track.scrollLeft = targetLeft;
+      }
     }
 
     setActiveIndex(index);
   }, [status]);
 
+  /*
+   * Depois do pagamento confirmado,
+   * vai automaticamente para Preparando.
+   */
   useEffect(() => {
     if (
       checkout &&
@@ -528,32 +595,35 @@ function PedidosPage() {
 
   const groups = SECTIONS.map((section) => ({
     ...section,
+
     list: orders.filter(
-      (order) => bucket(order) === section.value,
+      (order) =>
+        bucket(order) === section.value,
     ),
   }));
 
   const updateIndicator = useCallback(
     (progressIndex = activeIndex) => {
       const tabs = tabsRef.current;
+
       if (!tabs) return;
 
       const buttons = tabRefs.current;
 
-      const floorIndex = Math.max(
+      const safeIndex = Math.max(
         0,
         Math.min(
           SECTIONS.length - 1,
-          Math.floor(progressIndex),
+          progressIndex,
         ),
       );
 
-      const ceilIndex = Math.max(
-        0,
-        Math.min(
-          SECTIONS.length - 1,
-          Math.ceil(progressIndex),
-        ),
+      const floorIndex = Math.floor(
+        safeIndex,
+      );
+
+      const ceilIndex = Math.ceil(
+        safeIndex,
       );
 
       const current = buttons[floorIndex];
@@ -561,12 +631,17 @@ function PedidosPage() {
 
       if (!current || !next) return;
 
-      const tabsRect = tabs.getBoundingClientRect();
-      const currentRect = current.getBoundingClientRect();
-      const nextRect = next.getBoundingClientRect();
+      const tabsRect =
+        tabs.getBoundingClientRect();
+
+      const currentRect =
+        current.getBoundingClientRect();
+
+      const nextRect =
+        next.getBoundingClientRect();
 
       const progress =
-        progressIndex - Math.floor(progressIndex);
+        safeIndex - floorIndex;
 
       const currentLeft =
         currentRect.left -
@@ -580,7 +655,8 @@ function PedidosPage() {
 
       const left =
         currentLeft +
-        (nextLeft - currentLeft) * progress;
+        (nextLeft - currentLeft) *
+          progress;
 
       const width =
         currentRect.width +
@@ -596,16 +672,27 @@ function PedidosPage() {
   );
 
   useEffect(() => {
-    updateIndicator();
+    const update = () => {
+      updateIndicator();
+    };
 
-    const onResize = () => updateIndicator();
+    update();
 
-    window.addEventListener("resize", onResize);
+    window.addEventListener(
+      "resize",
+      update,
+    );
 
     return () => {
-      window.removeEventListener("resize", onResize);
+      window.removeEventListener(
+        "resize",
+        update,
+      );
     };
-  }, [updateIndicator, groups.length]);
+  }, [
+    updateIndicator,
+    groups.length,
+  ]);
 
   function setStatus(next: StatusValue) {
     void navigate({
@@ -617,63 +704,81 @@ function PedidosPage() {
   }
 
   /*
-   * CLIQUE NA ABA:
+   * Clique na aba:
    *
-   * Um toque = salto direto.
-   *
-   * O arraste continua sendo controlado pelo onTrackScroll,
-   * portanto não mexemos no comportamento que já está funcionando.
+   * - troca o status imediatamente;
+   * - pula diretamente para o painel;
+   * - não usa animação;
+   * - não interfere no arraste.
    */
   function selectTab(index: number) {
     const track = trackRef.current;
+
     if (!track) return;
 
+    const safeIndex = Math.max(
+      0,
+      Math.min(
+        SECTIONS.length - 1,
+        index,
+      ),
+    );
+
     if (scrollStopRef.current) {
-      clearTimeout(scrollStopRef.current);
+      clearTimeout(
+        scrollStopRef.current,
+      );
       scrollStopRef.current = null;
     }
 
     if (rafRef.current !== null) {
-      cancelAnimationFrame(rafRef.current);
+      cancelAnimationFrame(
+        rafRef.current,
+      );
       rafRef.current = null;
     }
 
-    setActiveIndex(index);
+    const left =
+      safeIndex * track.clientWidth;
 
-    setStatus(SECTIONS[index].value);
+    setActiveIndex(safeIndex);
 
-    /*
-     * IMPORTANTE:
-     * clique usa "auto", não "smooth".
-     *
-     * Assim ele pula diretamente para a página escolhida,
-     * sem passar pelas abas intermediárias e sem o onScroll
-     * interpretar o movimento como outro comando.
-     */
-    track.scrollTo({
-      left: index * track.clientWidth,
-      behavior: "auto",
-    });
-
-    tabRefs.current[index]?.scrollIntoView({
-      behavior: "auto",
-      block: "nearest",
-      inline: "center",
-    });
+    setStatus(
+      SECTIONS[safeIndex].value,
+    );
 
     /*
-     * Atualiza a barrinha azul imediatamente.
+     * Salto direto.
+     * Não usa scrollTo nem smooth.
      */
-    requestAnimationFrame(() => {
-      updateIndicator(index);
-    });
+    track.scrollLeft = left;
+
+    /*
+     * Mantém a aba escolhida visível.
+     * Auto evita animação e evita interferência
+     * com o painel horizontal.
+     */
+    const selectedTab =
+      tabRefs.current[safeIndex];
+
+    if (selectedTab) {
+      selectedTab.scrollIntoView({
+        behavior: "auto",
+        block: "nearest",
+        inline: "center",
+      });
+    }
+
+    updateIndicator(safeIndex);
   }
 
   /*
-   * ARRASTE:
+   * Arraste horizontal.
    *
-   * Esta parte continua permitindo que a barrinha azul
-   * acompanhe o dedo em tempo real.
+   * Durante o movimento:
+   * - o conteúdo se move;
+   * - a linha azul acompanha;
+   * - o status da URL só muda quando o movimento termina.
    */
   function onTrackScroll() {
     const track = trackRef.current;
@@ -695,53 +800,69 @@ function PedidosPage() {
     );
 
     if (rafRef.current !== null) {
-      cancelAnimationFrame(rafRef.current);
+      cancelAnimationFrame(
+        rafRef.current,
+      );
     }
 
-    rafRef.current = requestAnimationFrame(() => {
-      setActiveIndex(raw);
-      updateIndicator(raw);
-    });
+    rafRef.current =
+      requestAnimationFrame(() => {
+        setActiveIndex(raw);
+        updateIndicator(raw);
+        rafRef.current = null;
+      });
 
     if (scrollStopRef.current) {
-      clearTimeout(scrollStopRef.current);
+      clearTimeout(
+        scrollStopRef.current,
+      );
     }
 
-    scrollStopRef.current = setTimeout(() => {
-      const currentTrack = trackRef.current;
+    scrollStopRef.current =
+      setTimeout(() => {
+        const currentTrack =
+          trackRef.current;
 
-      if (
-        !currentTrack ||
-        currentTrack.clientWidth === 0
-      ) {
-        return;
-      }
+        if (
+          !currentTrack ||
+          currentTrack.clientWidth === 0
+        ) {
+          return;
+        }
 
-      const nearest = Math.max(
-        0,
-        Math.min(
-          SECTIONS.length - 1,
-          Math.round(
-            currentTrack.scrollLeft /
-              currentTrack.clientWidth,
+        const nearest = Math.max(
+          0,
+          Math.min(
+            SECTIONS.length - 1,
+            Math.round(
+              currentTrack.scrollLeft /
+                currentTrack.clientWidth,
+            ),
           ),
-        ),
-      );
+        );
 
-      setActiveIndex(nearest);
+        setActiveIndex(nearest);
 
-      setStatus(SECTIONS[nearest].value);
-    }, 120);
+        setStatus(
+          SECTIONS[nearest].value,
+        );
+
+        scrollStopRef.current = null;
+      }, 120);
   }
 
   useEffect(() => {
     return () => {
       if (rafRef.current !== null) {
-        cancelAnimationFrame(rafRef.current);
+        cancelAnimationFrame(
+          rafRef.current,
+        );
       }
 
       if (scrollStopRef.current) {
-        clearTimeout(scrollStopRef.current);
+        clearTimeout(
+          scrollStopRef.current,
+        );
       }
     };
   }, []);
@@ -772,31 +893,38 @@ function PedidosPage() {
           ref={tabsRef}
           className="relative mx-auto flex max-w-3xl overflow-x-auto px-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
-          {groups.map((group, index) => (
-            <button
-              key={group.value}
-              ref={(element) => {
-                tabRefs.current[index] = element;
-              }}
-              type="button"
-              onClick={() => selectTab(index)}
-              className="relative shrink-0 whitespace-nowrap px-4 pb-3 pt-2 text-base font-medium transition-colors"
-              style={{
-                color:
-                  Math.round(activeIndex) === index
-                    ? BLUE
-                    : "var(--muted-foreground)",
-              }}
-            >
-              {group.label}
+          {groups.map(
+            (group, index) => (
+              <button
+                key={group.value}
+                ref={(element) => {
+                  tabRefs.current[index] =
+                    element;
+                }}
+                type="button"
+                onClick={() =>
+                  selectTab(index)
+                }
+                className="relative shrink-0 whitespace-nowrap px-4 pb-3 pt-2 text-base font-medium transition-colors"
+                style={{
+                  color:
+                    Math.round(
+                      activeIndex,
+                    ) === index
+                      ? BLUE
+                      : "var(--muted-foreground)",
+                }}
+              >
+                {group.label}
 
-              {group.list.length > 0 && (
-                <span className="ml-1 text-sm">
-                  {group.list.length}
-                </span>
-              )}
-            </button>
-          ))}
+                {group.list.length > 0 && (
+                  <span className="ml-1 text-sm">
+                    {group.list.length}
+                  </span>
+                )}
+              </button>
+            ),
+          )}
 
           <span
             aria-hidden="true"
@@ -821,8 +949,13 @@ function PedidosPage() {
             </p>
 
             <p className="mt-1 text-sm text-muted-foreground">
-              {displayStatusLabel(lastOrder)} ·{" "}
-              {paymentDisplayLabel(lastOrder)}
+              {displayStatusLabel(
+                lastOrder,
+              )}{" "}
+              ·{" "}
+              {paymentDisplayLabel(
+                lastOrder,
+              )}
             </p>
           </div>
         )}
@@ -833,73 +966,86 @@ function PedidosPage() {
           </p>
         )}
 
-        {!isLoading && orders.length === 0 && (
-          <div className="mx-4 rounded-2xl border border-dashed border-border p-8 text-center">
-            <Package className="mx-auto h-12 w-12 text-muted-foreground" />
+        {!isLoading &&
+          orders.length === 0 && (
+            <div className="mx-4 rounded-2xl border border-dashed border-border p-8 text-center">
+              <Package className="mx-auto h-12 w-12 text-muted-foreground" />
 
-            <p className="mt-3 text-base font-semibold text-foreground">
-              Você ainda não fez nenhuma compra.
-            </p>
+              <p className="mt-3 text-base font-semibold text-foreground">
+                Você ainda não fez nenhuma compra.
+              </p>
 
-            <Link
-              to="/"
-              className="mt-4 inline-block rounded-xl px-5 py-3 text-base font-semibold text-white"
+              <Link
+                to="/"
+                className="mt-4 inline-block rounded-xl px-5 py-3 text-base font-semibold text-white"
+                style={{
+                  backgroundColor: BLUE,
+                }}
+              >
+                Ver produtos
+              </Link>
+            </div>
+          )}
+
+        {!isLoading &&
+          orders.length > 0 && (
+            <div
+              ref={trackRef}
+              onScroll={onTrackScroll}
+              className="flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
               style={{
-                backgroundColor: BLUE,
+                scrollbarWidth: "none",
               }}
             >
-              Ver produtos
-            </Link>
-          </div>
-        )}
+              {groups.map(
+                (group) => (
+                  <section
+                    key={group.value}
+                    className="w-full shrink-0 snap-start px-4"
+                  >
+                    <div className="mb-3 flex items-center justify-between">
+                      <h2 className="text-xl font-semibold text-foreground">
+                        {group.label}
+                      </h2>
 
-        {!isLoading && orders.length > 0 && (
-          <div
-            ref={trackRef}
-            onScroll={onTrackScroll}
-            className="flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-            style={{
-              scrollbarWidth: "none",
-            }}
-          >
-            {groups.map((group) => (
-              <section
-                key={group.value}
-                className="w-full shrink-0 snap-start px-4"
-              >
-                <div className="mb-3 flex items-center justify-between">
-                  <h2 className="text-xl font-semibold text-foreground">
-                    {group.label}
-                  </h2>
+                      <span className="text-sm font-medium text-muted-foreground">
+                        {group.list.length}
+                      </span>
+                    </div>
 
-                  <span className="text-sm font-medium text-muted-foreground">
-                    {group.list.length}
-                  </span>
-                </div>
+                    {group.list.length ===
+                    0 ? (
+                      <div className="rounded-2xl border border-dashed border-border p-7 text-center">
+                        <Package className="mx-auto h-10 w-10 text-muted-foreground" />
 
-                {group.list.length === 0 ? (
-                  <div className="rounded-2xl border border-dashed border-border p-7 text-center">
-                    <Package className="mx-auto h-10 w-10 text-muted-foreground" />
-
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      Nenhuma compra aqui.
-                    </p>
-                  </div>
-                ) : (
-                  <ul className="flex flex-col gap-3">
-                    {group.list.map((order) => (
-                      <OrderCard
-                        key={order.id}
-                        order={order}
-                        phone={profile.phone}
-                      />
-                    ))}
-                  </ul>
-                )}
-              </section>
-            ))}
-          </div>
-        )}
+                        <p className="mt-2 text-sm text-muted-foreground">
+                          Nenhuma compra aqui.
+                        </p>
+                      </div>
+                    ) : (
+                      <ul className="flex flex-col gap-3">
+                        {group.list.map(
+                          (order) => (
+                            <OrderCard
+                              key={
+                                order.id
+                              }
+                              order={
+                                order
+                              }
+                              phone={
+                                profile.phone
+                              }
+                            />
+                          ),
+                        )}
+                      </ul>
+                    )}
+                  </section>
+                ),
+              )}
+            </div>
+          )}
       </main>
     </div>
   );
