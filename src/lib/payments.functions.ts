@@ -225,7 +225,9 @@ async function linkCheckoutToOrder(
       payment_provider: "infinitepay",
       payment_url: url,
       payment_nsu: nsu,
-    })
+      /* O cliente tem 60 minutos para pagar; a reserva segue de pé até lá. */
+      payment_deadline_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+    } as never)
     .eq("id", order.id);
 
   if (updateError) {

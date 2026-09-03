@@ -14,7 +14,9 @@ import {
   fetchOrderTimeline,
   statusLabel,
   displayStatusLabel,
-  paymentLabel,
+  paymentDisplayLabel,
+  minutesLeftToPay,
+  cancelExpiredUnpaidOrders,
   type Order,
 } from "@/lib/orders";
 
@@ -93,6 +95,14 @@ function OrderCard({ order, phone }: { order: Order; phone: string }) {
   const unpaid =
     order.paymentStatus !== "paid" && order.status !== "canceled" && !refunded;
 
+  // Contador do prazo de pagamento (só existe para pagamento online).
+  const [minutesLeft, setMinutesLeft] = useState(() => minutesLeftToPay(order));
+  useEffect(() => {
+    setMinutesLeft(minutesLeftToPay(order));
+    const t = setInterval(() => setMinutesLeft(minutesLeftToPay(order)), 30000);
+    return () => clearInterval(t);
+  }, [order]);
+
   async function pagar() {
     if (paying) return;
     setPaying(true);
@@ -120,7 +130,7 @@ function OrderCard({ order, phone }: { order: Order; phone: string }) {
           </p>
           <p className="text-lg font-black text-foreground">{displayStatusLabel(order)}</p>
           <p className="text-base font-semibold text-muted-foreground">
-            {paymentLabel(order.paymentStatus)}
+            {paymentDisplayLabel(order)}
           </p>
         </div>
         <span className="shrink-0 text-2xl font-black" style={{ color: BLUE }}>
@@ -158,6 +168,39 @@ function OrderCard({ order, phone }: { order: Order; phone: string }) {
       {order.discount > 0 && (
         <p className="mt-2 text-base font-bold" style={{ color: GREEN }}>
           Cupom {order.couponCode} · -{formatPrice(order.discount)}
+        </p>
+      )}
+
+      {unpaid && minutesLeft > 0 && (
+        <p className="mt-3 rounded-2xl bg-muted px-3 py-2 text-base font-black text-foreground">
+          Você tem 60 minutos para pagar · faltam {minutesLeft}{" "}
+          {minutesLeft === 1 ? "minuto" : "minutos"}
+        </p>
+      )}
+
+      {order.refundState === "refunded" && (
+        <p className="mt-3 text-base font-black" style={{ color: GREEN }}>
+          Reembolso confirmado
+          {order.refundProofUrl && (
+            <>
+              {" · "}
+              <a
+                href={order.refundProofUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="underline"
+                style={{ color: BLUE }}
+              >
+                Ver comprovante
+              </a>
+            </>
+          )}
+        </p>
+      )}
+
+      {order.status === "canceled" && order.refundState === "money_pending" && (
+        <p className="mt-3 text-base font-bold text-muted-foreground">
+          Cancelado · reembolso em processamento
         </p>
       )}
 
@@ -233,8 +276,9 @@ function PedidosPage() {
     let alive = true;
     void (async () => {
       try {
+        const expired = await cancelExpiredUnpaidOrders();
         const res = await quickSync({});
-        if (alive && res.ok && (res.refundsApplied > 0 || res.resynced > 0)) {
+        if (alive && (expired > 0 || (res.ok && (res.refundsApplied > 0 || res.resynced > 0)))) {
           void refetch();
         }
       } catch {
@@ -399,7 +443,7 @@ function PedidosPage() {
               Pedido nº {lastOrder.id.slice(0, 8).toUpperCase()}
             </p>
             <p className="text-base font-bold text-muted-foreground">
-              {displayStatusLabel(lastOrder)} · {paymentLabel(lastOrder.paymentStatus)}
+              {displayStatusLabel(lastOrder)} · {paymentDisplayLabel(lastOrder)}
             </p>
             <p className="mt-1 text-sm font-semibold text-muted-foreground">
               Assim que o pagamento for confirmado, o pedido entra em preparação

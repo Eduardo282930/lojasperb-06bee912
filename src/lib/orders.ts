@@ -26,7 +26,34 @@ export type Order = {
   paymentMethod?: string;
   paymentUrl?: string | null;
   receiptUrl?: string | null;
+  paymentProvider?: string;
+  paymentDeadlineAt?: string | null;
+  refundState?: string;
+  refundProofUrl?: string | null;
 };
+
+/** Pagamento na entrega tem rótulo próprio, nunca aparece só como "Pago". */
+export function paymentDisplayLabel(order: {
+  paymentStatus: string;
+  paymentMethod?: string;
+}): string {
+  if (order.paymentStatus === "paid" && order.paymentMethod === "delivery") {
+    return "Pagamento na entrega";
+  }
+  return paymentLabel(order.paymentStatus);
+}
+
+/** Minutos restantes do prazo de pagamento (0 quando não há prazo). */
+export function minutesLeftToPay(order: {
+  paymentStatus: string;
+  status: string;
+  paymentDeadlineAt?: string | null;
+}): number {
+  if (order.paymentStatus === "paid" || order.status === "canceled") return 0;
+  const t = order.paymentDeadlineAt ? Date.parse(order.paymentDeadlineAt) : NaN;
+  if (!Number.isFinite(t)) return 0;
+  return Math.max(0, Math.ceil((t - Date.now()) / 60000));
+}
 
 /* ------------------------- Status do pedido ---------------------------- */
 
@@ -55,6 +82,7 @@ export function displayStatusLabel(order: {
 }): string {
   // Reembolso feito no Loyverse: o cliente vê cancelado e reembolsado.
   if (order.paymentStatus === "refunded") return "Reembolsado e cancelado";
+  if (order.status === "canceled") return "Cancelado";
   if (order.status === "sent" && order.paymentStatus !== "paid") {
     return "Aguardando pagamento";
   }
@@ -139,6 +167,11 @@ export async function fetchOrders(): Promise<Order[]> {
     paymentMethod: (r as { payment_method?: string }).payment_method ?? "",
     paymentUrl: (r as { payment_url?: string | null }).payment_url ?? null,
     receiptUrl: (r as { payment_receipt_url?: string | null }).payment_receipt_url ?? null,
+    paymentProvider: (r as { payment_provider?: string }).payment_provider ?? "",
+    paymentDeadlineAt:
+      (r as { payment_deadline_at?: string | null }).payment_deadline_at ?? null,
+    refundState: (r as { refund_state?: string }).refund_state ?? "none",
+    refundProofUrl: (r as { refund_proof_url?: string | null }).refund_proof_url ?? null,
   }));
 }
 
@@ -162,6 +195,12 @@ export async function fetchMyOrders(phone: string): Promise<Order[]> {
     total: num(r.total),
     status: r.status,
     paymentStatus: r.payment_status ?? "pending",
+    paymentMethod: (r as { payment_method?: string }).payment_method ?? "",
+    paymentProvider: (r as { payment_provider?: string }).payment_provider ?? "",
+    paymentDeadlineAt:
+      (r as { payment_deadline_at?: string | null }).payment_deadline_at ?? null,
+    refundState: (r as { refund_state?: string }).refund_state ?? "none",
+    refundProofUrl: (r as { refund_proof_url?: string | null }).refund_proof_url ?? null,
   }));
 }
 
@@ -216,6 +255,36 @@ export async function setPayOnDelivery(orderId: string): Promise<boolean> {
   const { data, error } = await call("admin_set_pay_on_delivery", { p_order_id: orderId });
   if (error) return false;
   return Boolean(data);
+}
+
+/** Admin-only: confirma o reembolso feito no InfinitePay e anexa o comprovante. */
+export async function confirmRefund(
+  orderId: string,
+  proofUrl: string,
+  amount?: number,
+): Promise<boolean> {
+  const call = supabase.rpc.bind(supabase) as unknown as (
+    name: string,
+    a: Record<string, unknown>,
+  ) => Promise<{ data?: unknown; error?: { message: string } | null }>;
+  const { data, error } = await call("admin_confirm_refund", {
+    p_order_id: orderId,
+    p_proof_url: proofUrl,
+    p_amount: amount ?? null,
+  });
+  if (error) return false;
+  return Boolean(data);
+}
+
+/** Cancela pedidos online que passaram dos 60 minutos e libera as reservas. */
+export async function cancelExpiredUnpaidOrders(): Promise<number> {
+  const call = supabase.rpc.bind(supabase) as unknown as (
+    name: string,
+    a: Record<string, unknown>,
+  ) => Promise<{ data?: unknown; error?: { message: string } | null }>;
+  const { data, error } = await call("cancel_expired_unpaid_orders", {});
+  if (error) return 0;
+  return Number(data ?? 0);
 }
 
 /**

@@ -42,11 +42,14 @@ import {
   onlyDigits,
   setOrderStatus,
   setPayOnDelivery,
+  confirmRefund,
+  cancelExpiredUnpaidOrders,
+  paymentDisplayLabel,
   canChangeStatus,
   fetchDuplicates,
   resolveDuplicate,
   statusLabel,
-  paymentLabel,
+  minutesLeftToPay,
   ORDER_STATUSES,
   type Order,
 } from "@/lib/orders";
@@ -1235,6 +1238,15 @@ function TestCleanupButton({ onDone }: { onDone: () => void }) {
   );
 }
 
+/** Há quanto tempo o pedido do WhatsApp espera pagamento. */
+function waitingLabel(iso: string): string {
+  const mins = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60000));
+  if (mins < 60) return `${mins} min`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h`;
+  return `${Math.floor(hours / 24)} dias`;
+}
+
 function OrdersPanel() {
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["admin-orders"],
@@ -1250,8 +1262,9 @@ function OrdersPanel() {
     let alive = true;
     void (async () => {
       try {
+        const expired = await cancelExpiredUnpaidOrders();
         const res = await quickSync({});
-        if (alive && res.ok && (res.refundsApplied > 0 || res.resynced > 0)) {
+        if (alive && (expired > 0 || (res.ok && (res.refundsApplied > 0 || res.resynced > 0)))) {
           void refetch();
         }
       } catch {
@@ -1278,6 +1291,19 @@ function OrdersPanel() {
     if (ok) await syncReceipt({ data: { orderId: o.id } }).catch(() => null);
     setBusy(null);
     if (!ok) window.alert("Não foi possível marcar o pagamento na entrega.");
+    void refetch();
+  }
+
+  async function markRefunded(o: Order) {
+    const proof = window.prompt(
+      "Link do comprovante do reembolso no InfinitePay (opcional):",
+      "",
+    );
+    if (proof === null) return;
+    setBusy(o.id);
+    const ok = await confirmRefund(o.id, proof.trim());
+    setBusy(null);
+    if (!ok) window.alert("Não foi possível registrar o reembolso.");
     void refetch();
   }
 
@@ -1345,22 +1371,59 @@ function OrdersPanel() {
                 </option>
               ))}
             </select>
-            {o.paymentStatus !== "paid" && o.status !== "canceled" && (
+            {o.paymentStatus !== "paid" &&
+              o.status !== "canceled" &&
+              o.paymentProvider !== "infinitepay" && (
+                <button
+                  type="button"
+                  disabled={busy === o.id}
+                  onClick={() => void payOnDelivery(o)}
+                  className="rounded-xl px-3 py-2 text-base font-black text-white"
+                  style={{ backgroundColor: GREEN }}
+                >
+                  Pagamento na entrega
+                </button>
+              )}
+            {o.status === "canceled" && o.refundState !== "refunded" && (
               <button
                 type="button"
                 disabled={busy === o.id}
-                onClick={() => void payOnDelivery(o)}
+                onClick={() => void markRefunded(o)}
                 className="rounded-xl border-2 border-border bg-background px-3 py-2 text-base font-black text-foreground"
               >
-                Pagamento na entrega
+                Confirmar reembolso
               </button>
             )}
             <span className="text-sm font-bold text-muted-foreground">
-              {statusLabel(o.status)} · {paymentLabel(o.paymentStatus)}
-              {o.paymentMethod
-                ? ` · ${o.paymentMethod === "pix" ? "Pix" : o.paymentMethod === "delivery" ? "Pagamento na entrega" : "Cartão"}`
+              {statusLabel(o.status)} · {paymentDisplayLabel(o)}
+              {o.paymentMethod && o.paymentMethod !== "delivery"
+                ? ` · ${o.paymentMethod === "pix" ? "Pix" : "Cartão"}`
                 : ""}
             </span>
+            {o.paymentStatus !== "paid" && o.status !== "canceled" && (
+              <span className="text-sm font-black" style={{ color: BLUE }}>
+                {o.paymentDeadlineAt
+                  ? `Aguardando pagamento · ${minutesLeftToPay(o)} min restantes`
+                  : `Aguardando pagamento há ${waitingLabel(o.createdAt)}`}
+              </span>
+            )}
+            {o.refundState === "refunded" && (
+              <span className="text-sm font-black" style={{ color: GREEN }}>
+                Reembolsado
+                {o.refundProofUrl ? "" : " (sem comprovante)"}
+              </span>
+            )}
+            {o.refundProofUrl && (
+              <a
+                href={o.refundProofUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="text-sm font-black underline"
+                style={{ color: GREEN }}
+              >
+                Comprovante do reembolso
+              </a>
+            )}
             {o.receiptUrl && (
               <a
                 href={o.receiptUrl}
