@@ -1,53 +1,68 @@
-# Diagnóstico completo da SPERB (sem alterações ainda)
+# Revisão geral da SPERB — diagnóstico e plano de correção
 
-## O que foi verificado agora
+## O que foi verificado
 
-- Servidor de desenvolvimento: `/` responde 200, `/pedidos` responde 307 (redirecionamento normal que só acrescenta `?status=topay` — não é erro).
+- `/` responde 200; `/pedidos` responde 307 (redirecionamento normal que só acrescenta `?status=topay`).
 - Verificação de tipos (`tsgo --noEmit`): sem erros.
-- Log do servidor: sem exceções; apenas avisos de API antiga (`inputValidator` em vez de `validator`) e um aviso de CSRF. Nada disso derruba o app.
-- HTML gerado pelo servidor: o CSS é incluído corretamente uma única vez.
-- Nenhum service worker registrado no projeto (então o problema de CSS no celular não vem de service worker).
+- Log do servidor: sem exceções — apenas avisos (`inputValidator` obsoleto e CSRF).
+- HTML do servidor: CSS incluído corretamente, uma vez.
+- Não existe service worker no projeto.
+- Mapeamento de todos os elementos `fixed`/`sticky` e seus `z-index` (lista abaixo).
 
-## Erros e riscos encontrados
+## Problemas encontrados e causa
 
 ### 1. Tela branca / RUNTIME_ERROR na home
-Causa provável (dois fatores somados):
-- A home depende do Loyverse já na renderização do servidor. Se o token do Loyverse faltar ou a API demorar, o servidor devolve a vitrine vazia enquanto o aparelho já tem uma cópia local salva. Essa diferença entre o que o servidor mandou e o que o aparelho monta gera erro de hidratação — resultado visível: tela branca.
-- A cópia local é lida no momento em que o arquivo da home é carregado (fora do ciclo do React), o que torna esse descompasso mais provável.
-- Além disso a chamada ao Loyverse não tem tempo limite: em rede ruim o servidor pode ficar pendurado até o gateway cortar a resposta.
+A home lê a cópia local do catálogo no carregamento do módulo, fora do ciclo do React. Quando o servidor devolve vitrine vazia (Loyverse indisponível/lento) e o aparelho já tem cópia local, o conteúdo montado no aparelho difere do enviado pelo servidor → erro de hidratação → tela branca.
 
-### 2. Vitrine sem CSS no celular (funciona nos outros aparelhos)
-Causa provável: o celular guardou em cache o HTML de uma versão anterior do site. Esse HTML aponta para um arquivo de CSS com nome versionado que não existe mais no deployment atual → o CSS retorna 404 e a página aparece "crua". As páginas HTML hoje saem sem instrução de "não guardar em cache", o que permite exatamente esse descasamento entre HTML velho e arquivos novos.
+### 2. Sem tempo limite no Loyverse
+A busca do catálogo no servidor não tem timeout: em rede ruim a resposta fica pendurada até o gateway cortar.
 
-### 3. Cópia local do catálogo sem controle de versão
-A chave `sperb-catalog-v1` nunca muda. Se o formato dos produtos mudar entre versões, um aparelho com cópia antiga (válida por 24h) pode quebrar ao ler campos que não existem — falha que aparece só em alguns aparelhos, como no caso relatado.
+### 3. Celular sem CSS/Tailwind
+As páginas HTML saem sem instrução de cache. Um celular que guardou o HTML de um deployment anterior continua pedindo um CSS versionado que não existe mais → 404 → página "crua". Nos outros aparelhos, sem HTML velho em cache, funciona.
 
-### 4. Pontos menores (sem impacto atual)
-- `<link>` de CSS repetido manualmente no shell além do automático (redundante).
-- Avisos de `inputValidator` obsoleto e de CSRF nas funções de servidor.
+### 4. Cópia local do catálogo sem versão
+A chave `sperb-catalog-v1` nunca muda e vale 24h. Se o formato dos produtos mudar entre versões, aparelhos com cópia antiga podem quebrar.
 
-## Correções propostas
+### 5. Carrinho flutuante sobrepondo cabeçalhos (confirmado)
+`FloatingCart` usa `fixed top-3 right-4 z-40`, enquanto os cabeçalhos das telas são `sticky top-0` com `z-10`/`z-20`. Em `/pedidos`, `/produto/$id`, `/eu`, `/cupons`, `/moedas` e `/admin` ele fica por cima do cabeçalho e pode cobrir título e botão voltar em telas estreitas.
+
+### 6. Escala de z-index inconsistente
+Cabeçalhos usam `z-10` em algumas telas e `z-20` em outras; barras inferiores fixas usam `z-20`; carrinho `z-30`/`z-40`; modais `z-50`. Sem uma escala única, sobreposições reaparecem a cada mudança.
+
+### 7. Áreas seguras (notch / barra inferior) não tratadas
+Nenhuma tela usa `env(safe-area-inset-*)`. As barras fixas inferiores de `/sacola` e `/confirmar` e o botão flutuante da home podem ficar sob a barra de gestos do celular.
+
+### 8. Conteúdo atrás de barras fixas
+Onde há barra inferior fixa, o espaçamento inferior do conteúdo é fixo em px e pode não cobrir a altura real da barra em telas pequenas, escondendo o último item.
+
+## Correções (arquivos e mudanças)
 
 | Arquivo | O que muda |
 | --- | --- |
-| `src/routes/index.tsx` | Ler a cópia local dentro do ciclo do React (não mais no carregamento do módulo) e usar os dados do servidor na primeira renderização, atualizando com a cópia local só depois da hidratação. Elimina a tela branca por descompasso. |
-| `src/lib/loyverse.functions.ts` | Tempo limite na chamada ao Loyverse durante a renderização no servidor, devolvendo vitrine vazia em vez de travar a resposta. |
-| `src/server.ts` | Enviar `cache-control: no-store` apenas para as páginas HTML (não para os arquivos versionados). Assim o celular nunca reabre um HTML velho apontando para CSS que não existe mais. |
-| `src/routes/__root.tsx` | Remover o `<link>` de CSS duplicado e adicionar uma verificação leve: se a folha de estilos não carregar, o app recarrega uma única vez sozinho (autocorreção para aparelhos com cache preso). |
-| `src/lib/catalog-cache.ts` | Chave versionada + validação do formato antes de usar a cópia local; formato antigo é descartado silenciosamente. |
+| `src/routes/index.tsx` | Cópia local lida dentro do ciclo do React (fim do erro de hidratação); revisão do cabeçalho/busca/categorias/cards para telas estreitas (grid com `min-w-0`, `truncate`, ícones `shrink-0`), badges e botões de adicionar/compartilhar sem sobreposição, espaçamento inferior suficiente e botão flutuante com área segura. |
+| `src/lib/loyverse.functions.ts` | Tempo limite na chamada ao Loyverse no servidor; em caso de estouro, vitrine vazia e nova tentativa no aparelho (sem alterar regras de produto/estoque). |
+| `src/server.ts` | `cache-control: no-store` só para páginas HTML; arquivos versionados mantêm cache longo. Fim do descasamento HTML velho × CSS novo. |
+| `src/routes/__root.tsx` | Remover o `<link>` de CSS duplicado; autocorreção única (recarrega uma vez) se a folha de estilos não carregar; `viewport-fit=cover` mantido para áreas seguras. |
+| `src/lib/catalog-cache.ts` | Chave versionada e validação de formato; cópia antiga descartada silenciosamente. |
+| `src/components/floating-cart.tsx` | Carrinho deixa de flutuar sobre cabeçalhos: passa a ficar ancorado no canto inferior direito, acima das barras inferiores fixas, respeitando área segura, e some nas telas onde o carrinho já existe no cabeçalho ou onde há barra de ação inferior. Correção estrutural, não por z-index. |
+| `src/styles.css` | Escala única de camadas (conteúdo < cabeçalho < barra fixa < flutuante < modal) e utilitários de área segura, para as telas usarem os mesmos valores. |
+| `src/routes/pedidos.tsx` | Somente ajuste visual: cabeçalho/abas sem sobreposição e sem corte de texto. Lógica de abas, arraste e barra azul intocada. |
+| `src/routes/sacola.tsx`, `src/routes/confirmar.tsx` | Barras inferiores fixas com área segura e espaçamento inferior do conteúdo calculado, para nada ficar escondido. |
+| `src/routes/eu.tsx`, `src/routes/cupons.tsx`, `src/routes/moedas.tsx`, `src/routes/produto.$id.tsx`, `src/routes/admin.tsx` | Cabeçalhos na mesma camada, títulos com truncamento, alvos de toque mínimos de 44px, tabelas/listas do admin com rolagem própria para acabar com a rolagem horizontal da página. |
 
-Sem alterações em `pedidos.tsx`, nas regras de pedidos, estoque, cupons, moedas, Loyverse ou InfinitePay.
+Nenhuma mudança em pedidos, pagamentos, InfinitePay, estoque, reservas, Loyverse, cupons, moedas, reembolsos, sincronização ou dados de clientes. Se algo aparecer errado nessas áreas durante os testes, será relatado antes de qualquer alteração.
 
-## Como será testado
+## Validação
 
-1. `tsgo --noEmit` limpo.
-2. Home, `/pedidos`, `/sacola`, `/confirmar`, `/eu`, `/produto/$id` e `/admin` abertos via navegador automatizado em viewport de celular e de tablet, conferindo status 200, ausência de erros no console e CSS aplicado.
-3. Home aberta com token do Loyverse indisponível para confirmar que aparece a vitrine (e não tela branca).
-4. Verificação dos cabeçalhos: HTML com `no-store`, arquivos de CSS/JS ainda com cache longo.
-5. Em "Minhas compras": tocar em cada aba leva direto a ela, o arraste entre abas continua funcionando e a barra azul acompanha o arraste — conferido manualmente no navegador automatizado.
+1. `tsgo --noEmit` limpo e build de produção sem erros.
+2. Navegador automatizado percorrendo `/`, `/pedidos`, `/sacola`, `/confirmar`, `/eu`, `/cupons`, `/moedas`, `/produto/$id` e `/admin` em três larguras (celular 390, tablet 820, desktop 1440), com capturas de tela.
+3. Verificação automática em cada rota/largura: ausência de rolagem horizontal, nenhum elemento ultrapassando a largura, nenhum elemento fixo cobrindo cabeçalho ou botão, console sem erros, CSS aplicado, nenhum 404 de arquivo.
+4. Home aberta com Loyverse indisponível para confirmar vitrine em vez de tela branca.
+5. Cabeçalhos: HTML `no-store`, arquivos versionados com cache longo.
+6. "Minhas compras": tocar em cada aba leva direto a ela (sem duplo toque), o arraste funciona e a barra azul acompanha — verificado manualmente no navegador automatizado.
 
-## Impacto em funcionalidades que já funcionam
+## Riscos
 
-- "Minhas compras" (toque nas abas, arraste, barra azul): intocado.
-- Fluxo de pedido/pagamento/estoque/reembolso: intocado.
-- Único efeito colateral esperado: aparelhos com cópia antiga do catálogo farão um carregamento inicial a mais (a cópia velha é descartada uma vez).
+- Mudança de posição do carrinho flutuante é visível ao usuário (é o objetivo).
+- Aparelhos com cópia antiga do catálogo farão um carregamento extra uma única vez.
+- Ajustes de layout podem alterar levemente espaçamentos já existentes; nada de comportamento.
