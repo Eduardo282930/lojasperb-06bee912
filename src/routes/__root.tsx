@@ -18,11 +18,18 @@ function NotFoundComponent() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
-        <h1 className="text-7xl font-bold text-foreground">404</h1>
-        <h2 className="mt-4 text-xl font-semibold text-foreground">Page not found</h2>
+        <h1 className="text-7xl font-bold text-foreground">
+          404
+        </h1>
+
+        <h2 className="mt-4 text-xl font-semibold text-foreground">
+          Page not found
+        </h2>
+
         <p className="mt-2 text-sm text-muted-foreground">
           The page you're looking for doesn't exist or has been moved.
         </p>
+
         <div className="mt-6">
           <Link
             to="/"
@@ -36,11 +43,21 @@ function NotFoundComponent() {
   );
 }
 
-function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
+function ErrorComponent({
+  error,
+  reset,
+}: {
+  error: Error;
+  reset: () => void;
+}) {
   console.error(error);
+
   const router = useRouter();
+
   useEffect(() => {
-    reportLovableError(error, { boundary: "tanstack_root_error_component" });
+    reportLovableError(error, {
+      boundary: "tanstack_root_error_component",
+    });
   }, [error]);
 
   return (
@@ -49,11 +66,14 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
         <h1 className="text-xl font-semibold tracking-tight text-foreground">
           This page didn't load
         </h1>
+
         <p className="mt-2 text-sm text-muted-foreground">
           Something went wrong on our end. You can try refreshing or head back home.
         </p>
+
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button
+            type="button"
             onClick={() => {
               router.invalidate();
               reset();
@@ -62,6 +82,7 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
           >
             Try again
           </button>
+
           <a
             href="/"
             className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
@@ -74,48 +95,132 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   );
 }
 
-export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
+export const Route = createRootRouteWithContext<{
+  queryClient: QueryClient;
+}>()({
   head: () => ({
     meta: [
-      { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "SPERB" },
-      { name: "application-name", content: "SPERB" },
-      { name: "apple-mobile-web-app-title", content: "SPERB" },
-      { name: "apple-mobile-web-app-capable", content: "yes" },
-      { name: "description", content: "Catálogo SPERB. Escolha seus produtos e envie o pedido pelo WhatsApp." },
-      { property: "og:title", content: "SPERB" },
-      { property: "og:description", content: "Catálogo SPERB. Escolha seus produtos e envie o pedido pelo WhatsApp." },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:title", content: "SPERB" },
-      { name: "twitter:description", content: "Catálogo SPERB. Escolha seus produtos e envie o pedido pelo WhatsApp." },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/e110b080-dcdf-4710-ac8d-dfb63680bcde/id-preview-2b496283--50628d9d-ee67-4887-b808-5e0452dad905.lovable.app-1784287422036.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/e110b080-dcdf-4710-ac8d-dfb63680bcde/id-preview-2b496283--50628d9d-ee67-4887-b808-5e0452dad905.lovable.app-1784287422036.png" },
+      {
+        charSet: "utf-8",
+      },
+      {
+        name: "viewport",
+        content:
+          "width=device-width, initial-scale=1, viewport-fit=cover",
+      },
+      {
+        title: "SPERB",
+      },
+      {
+        name: "application-name",
+        content: "SPERB",
+      },
+      {
+        name: "apple-mobile-web-app-title",
+        content: "SPERB",
+      },
+      {
+        name: "apple-mobile-web-app-capable",
+        content: "yes",
+      },
+      {
+        name: "description",
+        content:
+          "Catálogo SPERB. Escolha seus produtos e envie o pedido pelo WhatsApp.",
+      },
+      {
+        property: "og:title",
+        content: "SPERB",
+      },
+      {
+        property: "og:description",
+        content:
+          "Catálogo SPERB. Escolha seus produtos e envie o pedido pelo WhatsApp.",
+      },
+      {
+        property: "og:type",
+        content: "website",
+      },
+      {
+        name: "twitter:card",
+        content: "summary_large_image",
+      },
+      {
+        name: "twitter:title",
+        content: "SPERB",
+      },
+      {
+        name: "twitter:description",
+        content:
+          "Catálogo SPERB. Escolha seus produtos e envie o pedido pelo WhatsApp.",
+      },
+      {
+        property: "og:image",
+        content:
+          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/e110b080-dcdf-4710-ac8d-dfb63680bcde/id-preview-2b496283--50628d9d-ee67-4887-b808-5e0452dad905.lovable.app-1784287422036.png",
+      },
+      {
+        name: "twitter:image",
+        content:
+          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/e110b080-dcdf-4710-ac8d-dfb63680bcde/id-preview-2b496283--50628d9d-ee67-4887-b808-5e0452dad905.lovable.app-1784287422036.png",
+      },
     ],
+
     links: [
       {
         rel: "stylesheet",
         href: appCss,
       },
-      { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
-      { rel: "manifest", href: "/api/public/manifest" },
-      // Imagens do catálogo abrem praticamente na hora.
-      { rel: "preconnect", href: "https://api.loyverse.com", crossOrigin: "" },
+
+      {
+        rel: "icon",
+        href: "/favicon.svg",
+        type: "image/svg+xml",
+      },
+
+      {
+        rel: "manifest",
+        href: "/api/public/manifest",
+      },
+
+      {
+        rel: "preconnect",
+        href: "https://api.loyverse.com",
+        crossOrigin: "",
+      },
     ],
   }),
+
   shellComponent: RootShell,
   component: RootComponent,
   notFoundComponent: NotFoundComponent,
   errorComponent: ErrorComponent,
 });
 
-function RootShell({ children }: { children: ReactNode }) {
+function RootShell({
+  children,
+}: {
+  children: ReactNode;
+}) {
   return (
-    <html lang="en">
+    <html lang="pt-BR">
       <head>
         <HeadContent />
+
+        {/*
+         * Reforça o carregamento do CSS global.
+         *
+         * O app usa Tailwind 4 e o CSS é gerado pelo Vite.
+         * O link abaixo continua usando o arquivo versionado
+         * gerado pelo build, evitando depender de cache antigo
+         * do navegador.
+         */}
+        <link
+          rel="stylesheet"
+          href={appCss}
+        />
       </head>
+
       <body>
         {children}
         <Scripts />
@@ -125,11 +230,12 @@ function RootShell({ children }: { children: ReactNode }) {
 }
 
 /**
- * Inner component that uses favicon sync hook
- * Must be placed INSIDE QueryClientProvider to avoid context errors
+ * Inner component that uses favicon sync hook.
+ * Must be placed INSIDE QueryClientProvider to avoid context errors.
  */
 function FaviconSyncWrapper() {
   useFaviconSync();
+
   return (
     <>
       <Outlet />
@@ -143,7 +249,6 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <FaviconSyncWrapper />
     </QueryClientProvider>
   );
