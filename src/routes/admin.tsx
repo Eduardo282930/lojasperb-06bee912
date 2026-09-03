@@ -1371,9 +1371,7 @@ function OrdersPanel() {
                 </option>
               ))}
             </select>
-            {o.paymentStatus !== "paid" &&
-              o.status !== "canceled" &&
-              o.paymentProvider !== "infinitepay" && (
+            {o.paymentStatus !== "paid" && o.status !== "canceled" && (
                 <button
                   type="button"
                   disabled={busy === o.id}
