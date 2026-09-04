@@ -50,11 +50,16 @@ AS $$
          o.refund_state, o.refund_proof_url, o.refund_confirmed_at,
          o.subtotal, o.discount, o.total, o.coupon_code, o.customer_name, o.items
   FROM public.orders o
-  WHERE CASE
-          WHEN public.only_digits(coalesce(p_phone, '')) <> ''
-            THEN public.only_digits(o.customer_phone) = public.only_digits(p_phone)
-          ELSE coalesce(p_device_id, '') <> '' AND o.device_id = p_device_id
-        END
+  WHERE
+    CASE
+      WHEN public.only_digits(coalesce(p_phone, '')) <> '' THEN
+        right(public.only_digits(o.customer_phone), 8)
+          = right(public.only_digits(p_phone), 8)
+      ELSE
+        coalesce(p_device_id, '') <> ''
+        AND o.device_id = p_device_id
+        AND public.only_digits(o.customer_phone) = ''
+    END
   ORDER BY o.created_at DESC
   LIMIT 100;
 $$;
