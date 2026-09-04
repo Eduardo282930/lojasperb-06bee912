@@ -265,24 +265,8 @@ function Home() {
                 </button>
               )}
             </div>
+            {/* O carrinho é único e fica fixo no canto superior direito. */}
 
-            {/* Carrinho sempre visível, separado da busca e alinhado no fundo. */}
-            <Link
-              id="cart-anchor"
-              to="/sacola"
-              aria-label={
-                totalQty > 0 ? `Ver carrinho com ${totalQty} itens` : "Ver carrinho"
-              }
-              className="relative grid h-11 w-11 shrink-0 place-items-center rounded-2xl border-2 border-border bg-card text-foreground shadow-sm active:scale-95"
-            >
-              <ShoppingCart className="h-6 w-6" />
-              {totalQty > 0 && (
-                <span className="absolute -right-1.5 -top-1.5 min-w-5 rounded-full bg-[oklch(0.62_0.19_145)] px-1 text-center text-xs font-black text-white">
-                  {totalQty}
-                </span>
-              )}
-            </Link>
-          </div>
 
 
           <div className="mt-2 flex items-start gap-2">
