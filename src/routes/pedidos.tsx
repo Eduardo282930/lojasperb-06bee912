@@ -431,7 +431,9 @@ function PedidosPage() {
   const [activeIndex, setActiveIndex] = useState(() =>
     Math.max(
       0,
-      SECTIONS.findIndex((item) => item.value === status),
+      SECTIONS.findIndex(
+        (item) => item.value === status,
+      ),
     ),
   );
 
@@ -440,34 +442,51 @@ function PedidosPage() {
     width: 0,
   });
 
-  const trackRef = useRef<HTMLDivElement>(null);
-  const tabsRef = useRef<HTMLDivElement>(null);
+  const trackRef =
+    useRef<HTMLDivElement>(null);
+
+  const tabsRef =
+    useRef<HTMLDivElement>(null);
 
   const tabRefs = useRef<
     Array<HTMLButtonElement | null>
   >([]);
 
-  const rafRef = useRef<number | null>(null);
+  const rafRef =
+    useRef<number | null>(null);
 
-  const scrollStopRef = useRef<
-    ReturnType<typeof setTimeout> | null
-  >(null);
+  const scrollStopRef =
+    useRef<ReturnType<typeof setTimeout> | null>(
+      null,
+    );
 
-  const initialTrackSyncRef = useRef(false);
+  const initialTrackSyncRef =
+    useRef(false);
 
-  const autoPickedRef = useRef(false);
+  const autoPickedRef =
+    useRef(false);
 
-  const { data, isLoading, refetch } = useQuery({
-    queryKey: ["my-orders", profile.phone],
+  // Impede que o onScroll sobrescreva uma troca
+  // feita diretamente pelo clique em uma aba.
+  const programmaticScrollRef =
+    useRef(false);
 
-    queryFn: () => fetchMyOrders(profile.phone),
+  const { data, isLoading, refetch } =
+    useQuery({
+      queryKey: ["my-orders", profile.phone],
 
-    staleTime: 30 * 1000,
+      queryFn: () =>
+        fetchMyOrders(profile.phone),
 
-    refetchInterval: checkout ? 5000 : false,
-  });
+      staleTime: 30 * 1000,
 
-  const quickSync = useServerFn(runLoyverseQuickSync);
+      refetchInterval: checkout
+        ? 5000
+        : false,
+    });
+
+  const quickSync =
+    useServerFn(runLoyverseQuickSync);
 
   useEffect(() => {
     let alive = true;
@@ -477,7 +496,8 @@ function PedidosPage() {
         const expired =
           await cancelExpiredUnpaidOrders();
 
-        const result = await quickSync({});
+        const result =
+          await quickSync({});
 
         if (
           alive &&
@@ -502,16 +522,22 @@ function PedidosPage() {
     return () => {
       alive = false;
     };
-  }, [quickSync, refetch]);
+  }, [
+    quickSync,
+    refetch,
+  ]);
 
   const orders = data ?? [];
 
   const lastOrder = orders.find(
-    (order) => order.id === lastOrderId,
+    (order) =>
+      order.id === lastOrderId,
   );
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
+    if (
+      typeof window !== "undefined"
+    ) {
       setLastOrderId(
         window.localStorage.getItem(
           "sperb-last-order",
@@ -521,30 +547,38 @@ function PedidosPage() {
   }, []);
 
   useEffect(() => {
-    const foundIndex = SECTIONS.findIndex(
-      (item) => item.value === status,
-    );
+    const foundIndex =
+      SECTIONS.findIndex(
+        (item) =>
+          item.value === status,
+      );
 
     const index = Math.max(
       0,
-      foundIndex === -1 ? 0 : foundIndex,
+      foundIndex === -1
+        ? 0
+        : foundIndex,
     );
 
-    const track = trackRef.current;
+    const track =
+      trackRef.current;
 
     if (
       track &&
       track.clientWidth > 0
     ) {
       const targetLeft =
-        index * track.clientWidth;
+        index *
+        track.clientWidth;
 
       if (
         Math.abs(
-          track.scrollLeft - targetLeft,
+          track.scrollLeft -
+            targetLeft,
         ) > 1
       ) {
-        track.scrollLeft = targetLeft;
+        track.scrollLeft =
+          targetLeft;
       }
     }
 
@@ -554,7 +588,8 @@ function PedidosPage() {
   useEffect(() => {
     if (
       checkout &&
-      lastOrder?.paymentStatus === "paid" &&
+      lastOrder?.paymentStatus ===
+        "paid" &&
       status !== "preparing"
     ) {
       void navigate({
@@ -571,37 +606,49 @@ function PedidosPage() {
     navigate,
   ]);
 
-  function bucket(order: Order): StatusValue {
+  function bucket(
+    order: Order,
+  ): StatusValue {
     if (
       order.status === "canceled" ||
-      order.paymentStatus === "refunded"
+      order.paymentStatus ===
+        "refunded"
     ) {
       return "canceled";
     }
 
-    if (order.status === "delivered") {
+    if (
+      order.status === "delivered"
+    ) {
       return "delivered";
     }
 
-    if (order.paymentStatus !== "paid") {
+    if (
+      order.paymentStatus !==
+      "paid"
+    ) {
       return "topay";
     }
 
-    if (order.status === "shipping") {
+    if (
+      order.status === "shipping"
+    ) {
       return "shipping";
     }
 
     return "preparing";
   }
 
-  const groups = SECTIONS.map((section) => ({
-    ...section,
+  const groups =
+    SECTIONS.map((section) => ({
+      ...section,
 
-    list: orders.filter(
-      (order) =>
-        bucket(order) === section.value,
-    ),
-  }));
+      list: orders.filter(
+        (order) =>
+          bucket(order) ===
+          section.value,
+      ),
+    }));
 
   useEffect(() => {
     if (
@@ -612,56 +659,70 @@ function PedidosPage() {
       return;
     }
 
-    const currentIndex = Math.max(
-      0,
-      SECTIONS.findIndex(
-        (item) => item.value === status,
-      ),
-    );
+    const currentIndex =
+      Math.max(
+        0,
+        SECTIONS.findIndex(
+          (item) =>
+            item.value === status,
+        ),
+      );
 
     const currentGroup =
       groups[currentIndex];
 
     if (
       currentGroup &&
-      currentGroup.list.length > 0
+      currentGroup.list
+        .length > 0
     ) {
-      autoPickedRef.current = true;
+      autoPickedRef.current =
+        true;
+
       return;
     }
 
-    const priority: StatusValue[] = [
-      "topay",
-      "preparing",
-      "shipping",
-      "delivered",
-    ];
+    const priority: StatusValue[] =
+      [
+        "topay",
+        "preparing",
+        "shipping",
+        "delivered",
+      ];
 
     const firstPopulated =
       priority.find(
         (value) =>
           groups.find(
             (group) =>
-              group.value === value,
+              group.value ===
+              value,
           )?.list.length > 0,
       );
 
     if (!firstPopulated) {
-      autoPickedRef.current = true;
+      autoPickedRef.current =
+        true;
+
       return;
     }
 
-    if (firstPopulated !== status) {
-      autoPickedRef.current = true;
+    if (
+      firstPopulated !== status
+    ) {
+      autoPickedRef.current =
+        true;
 
       void navigate({
         search: {
-          status: firstPopulated,
+          status:
+            firstPopulated,
         },
         replace: true,
       });
     } else {
-      autoPickedRef.current = true;
+      autoPickedRef.current =
+        true;
     }
   }, [
     groups,
@@ -672,7 +733,11 @@ function PedidosPage() {
   ]);
 
   useEffect(() => {
-    if (initialTrackSyncRef.current) return;
+    if (
+      initialTrackSyncRef.current
+    ) {
+      return;
+    }
 
     if (
       isLoading ||
@@ -681,123 +746,161 @@ function PedidosPage() {
       return;
     }
 
-    const foundIndex = SECTIONS.findIndex(
-      (item) => item.value === status,
-    );
+    const foundIndex =
+      SECTIONS.findIndex(
+        (item) =>
+          item.value === status,
+      );
 
     const index = Math.max(
       0,
-      foundIndex === -1 ? 0 : foundIndex,
+      foundIndex === -1
+        ? 0
+        : foundIndex,
     );
 
-    const syncInitialTrack = () => {
-      const track = trackRef.current;
+    const syncInitialTrack =
+      () => {
+        const track =
+          trackRef.current;
 
-      if (
-        !track ||
-        track.clientWidth <= 0
-      ) {
-        return false;
-      }
+        if (
+          !track ||
+          track.clientWidth <= 0
+        ) {
+          return false;
+        }
 
-      track.scrollLeft =
-        index * track.clientWidth;
+        track.scrollLeft =
+          index *
+          track.clientWidth;
 
-      setActiveIndex(index);
+        setActiveIndex(index);
 
-      return true;
-    };
+        return true;
+      };
 
-    requestAnimationFrame(() => {
-      if (syncInitialTrack()) {
-        initialTrackSyncRef.current = true;
-      } else {
-        requestAnimationFrame(() => {
-          if (syncInitialTrack()) {
-            initialTrackSyncRef.current = true;
-          }
-        });
-      }
-    });
+    requestAnimationFrame(
+      () => {
+        if (
+          syncInitialTrack()
+        ) {
+          initialTrackSyncRef.current =
+            true;
+        } else {
+          requestAnimationFrame(
+            () => {
+              if (
+                syncInitialTrack()
+              ) {
+                initialTrackSyncRef.current =
+                  true;
+              }
+            },
+          );
+        }
+      },
+    );
   }, [
     isLoading,
     orders.length,
     status,
   ]);
 
-  const updateIndicator = useCallback(
-    (progressIndex = activeIndex) => {
-      const tabs = tabsRef.current;
+  const updateIndicator =
+    useCallback(
+      (
+        progressIndex = activeIndex,
+      ) => {
+        const tabs =
+          tabsRef.current;
 
-      if (!tabs) return;
+        if (!tabs) return;
 
-      const buttons = tabRefs.current;
+        const buttons =
+          tabRefs.current;
 
-      const floorIndex = Math.max(
-        0,
-        Math.min(
-          SECTIONS.length - 1,
-          Math.floor(progressIndex),
-        ),
-      );
+        const floorIndex =
+          Math.max(
+            0,
+            Math.min(
+              SECTIONS.length -
+                1,
+              Math.floor(
+                progressIndex,
+              ),
+            ),
+          );
 
-      const ceilIndex = Math.max(
-        0,
-        Math.min(
-          SECTIONS.length - 1,
-          Math.ceil(progressIndex),
-        ),
-      );
+        const ceilIndex =
+          Math.max(
+            0,
+            Math.min(
+              SECTIONS.length -
+                1,
+              Math.ceil(
+                progressIndex,
+              ),
+            ),
+          );
 
-      const current =
-        buttons[floorIndex];
+        const current =
+          buttons[floorIndex];
 
-      const next =
-        buttons[ceilIndex];
+        const next =
+          buttons[ceilIndex];
 
-      if (!current || !next) return;
+        if (
+          !current ||
+          !next
+        ) {
+          return;
+        }
 
-      const tabsRect =
-        tabs.getBoundingClientRect();
+        const tabsRect =
+          tabs.getBoundingClientRect();
 
-      const currentRect =
-        current.getBoundingClientRect();
+        const currentRect =
+          current.getBoundingClientRect();
 
-      const nextRect =
-        next.getBoundingClientRect();
+        const nextRect =
+          next.getBoundingClientRect();
 
-      const progress =
-        progressIndex -
-        Math.floor(progressIndex);
+        const progress =
+          progressIndex -
+          Math.floor(
+            progressIndex,
+          );
 
-      const currentLeft =
-        currentRect.left -
-        tabsRect.left +
-        tabs.scrollLeft;
+        const currentLeft =
+          currentRect.left -
+          tabsRect.left +
+          tabs.scrollLeft;
 
-      const nextLeft =
-        nextRect.left -
-        tabsRect.left +
-        tabs.scrollLeft;
+        const nextLeft =
+          nextRect.left -
+          tabsRect.left +
+          tabs.scrollLeft;
 
-      const left =
-        currentLeft +
-        (nextLeft - currentLeft) *
-          progress;
+        const left =
+          currentLeft +
+          (nextLeft -
+            currentLeft) *
+            progress;
 
-      const width =
-        currentRect.width +
-        (nextRect.width -
-          currentRect.width) *
-          progress;
+        const width =
+          currentRect.width +
+          (nextRect.width -
+            currentRect.width) *
+            progress;
 
-      setIndicator({
-        left,
-        width,
-      });
-    },
-    [activeIndex],
-  );
+        setIndicator({
+          left,
+          width,
+        });
+      },
+      [activeIndex],
+    );
 
   useEffect(() => {
     updateIndicator();
@@ -822,7 +925,9 @@ function PedidosPage() {
     groups.length,
   ]);
 
-  function setStatus(next: StatusValue) {
+  function setStatus(
+    next: StatusValue,
+  ) {
     void navigate({
       search: {
         status: next,
@@ -831,8 +936,11 @@ function PedidosPage() {
     });
   }
 
-  function selectTab(index: number) {
-    const track = trackRef.current;
+  function selectTab(
+    index: number,
+  ) {
+    const track =
+      trackRef.current;
 
     if (!track) return;
 
@@ -842,6 +950,9 @@ function PedidosPage() {
       clearTimeout(
         scrollStopRef.current,
       );
+
+      scrollStopRef.current =
+        null;
     }
 
     if (
@@ -850,10 +961,14 @@ function PedidosPage() {
       cancelAnimationFrame(
         rafRef.current,
       );
+
+      rafRef.current = null;
     }
 
-    const left =
-      index * track.clientWidth;
+    // Marca esta movimentação como sendo
+    // causada pelo clique, não pelo usuário.
+    programmaticScrollRef.current =
+      true;
 
     setActiveIndex(index);
 
@@ -861,16 +976,33 @@ function PedidosPage() {
       SECTIONS[index].value,
     );
 
-    track.scrollTo({
-      left,
-      behavior: "auto",
-    });
+    track.scrollLeft =
+      index *
+      track.clientWidth;
 
     updateIndicator(index);
+
+    // Depois que o navegador terminar de
+    // disparar os eventos de scroll dessa
+    // movimentação, libera novamente o scroll manual.
+    window.setTimeout(() => {
+      programmaticScrollRef.current =
+        false;
+    }, 250);
   }
 
   function onTrackScroll() {
-    const track = trackRef.current;
+    // Se o movimento foi causado por um clique
+    // em uma aba, não deixa o onScroll mudar
+    // novamente a seção escolhida.
+    if (
+      programmaticScrollRef.current
+    ) {
+      return;
+    }
+
+    const track =
+      trackRef.current;
 
     if (
       !track ||
@@ -897,10 +1029,12 @@ function PedidosPage() {
     }
 
     rafRef.current =
-      requestAnimationFrame(() => {
-        setActiveIndex(raw);
-        updateIndicator(raw);
-      });
+      requestAnimationFrame(
+        () => {
+          setActiveIndex(raw);
+          updateIndicator(raw);
+        },
+      );
 
     if (
       scrollStopRef.current
@@ -917,23 +1051,27 @@ function PedidosPage() {
 
         if (
           !currentTrack ||
-          currentTrack.clientWidth === 0
+          currentTrack.clientWidth ===
+            0
         ) {
           return;
         }
 
-        const nearest = Math.max(
-          0,
-          Math.min(
-            SECTIONS.length - 1,
-            Math.round(
-              currentTrack.scrollLeft /
-                currentTrack.clientWidth,
+        const nearest =
+          Math.max(
+            0,
+            Math.min(
+              SECTIONS.length - 1,
+              Math.round(
+                currentTrack.scrollLeft /
+                  currentTrack.clientWidth,
+              ),
             ),
-          ),
-        );
+          );
 
-        setActiveIndex(nearest);
+        setActiveIndex(
+          nearest,
+        );
 
         setStatus(
           SECTIONS[nearest].value,
@@ -979,10 +1117,13 @@ function PedidosPage() {
           {groups.map(
             (group, index) => (
               <button
-                key={group.value}
+                key={
+                  group.value
+                }
                 ref={(element) => {
-                  tabRefs.current[index] =
-                    element;
+                  tabRefs.current[
+                    index
+                  ] = element;
                 }}
                 type="button"
                 onClick={() =>
@@ -999,14 +1140,20 @@ function PedidosPage() {
                 }}
               >
                 <span className="mb-0.5 flex h-4 items-center justify-center">
-                  {group.list.length > 0 ? (
+                  {group.list.length >
+                  0 ? (
                     <span
                       className="grid h-4 min-w-4 place-items-center rounded-full px-1 text-[10px] font-bold leading-none text-white"
                       style={{
-                        backgroundColor: BLUE,
+                        backgroundColor:
+                          BLUE,
                       }}
                     >
-                      {group.list.length}
+                      {
+                        group
+                          .list
+                          .length
+                      }
                     </span>
                   ) : (
                     <span
@@ -1017,7 +1164,9 @@ function PedidosPage() {
                 </span>
 
                 <span className="leading-5">
-                  {group.label}
+                  {
+                    group.label
+                  }
                 </span>
               </button>
             ),
@@ -1027,35 +1176,39 @@ function PedidosPage() {
             aria-hidden="true"
             className="pointer-events-none absolute bottom-0 h-0.5 rounded-full"
             style={{
-              left: indicator.left,
-              width: indicator.width,
-              backgroundColor: BLUE,
+              left:
+                indicator.left,
+              width:
+                indicator.width,
+              backgroundColor:
+                BLUE,
             }}
           />
         </div>
       </header>
 
       <main className="mx-auto max-w-3xl pt-4">
-        {checkout && lastOrder && (
-          <div className="mx-4 mb-4 rounded-2xl border border-green-200 bg-green-50 p-4 dark:border-green-900/40 dark:bg-green-950/20">
-            <p className="text-base font-semibold text-foreground">
-              Pedido nº{" "}
-              {lastOrder.id
-                .slice(0, 8)
-                .toUpperCase()}
-            </p>
+        {checkout &&
+          lastOrder && (
+            <div className="mx-4 mb-4 rounded-2xl border border-green-200 bg-green-50 p-4 dark:border-green-900/40 dark:bg-green-950/20">
+              <p className="text-base font-semibold text-foreground">
+                Pedido nº{" "}
+                {lastOrder.id
+                  .slice(0, 8)
+                  .toUpperCase()}
+              </p>
 
-            <p className="mt-1 text-sm text-muted-foreground">
-              {displayStatusLabel(
-                lastOrder,
-              )}{" "}
-              ·{" "}
-              {paymentDisplayLabel(
-                lastOrder,
-              )}
-            </p>
-          </div>
-        )}
+              <p className="mt-1 text-sm text-muted-foreground">
+                {displayStatusLabel(
+                  lastOrder,
+                )}{" "}
+                ·{" "}
+                {paymentDisplayLabel(
+                  lastOrder,
+                )}
+              </p>
+            </div>
+          )}
 
         {isLoading && (
           <p className="px-4 text-base text-muted-foreground">
@@ -1064,7 +1217,8 @@ function PedidosPage() {
         )}
 
         {!isLoading &&
-          orders.length === 0 && (
+          orders.length ===
+            0 && (
             <div className="mx-4 flex min-h-[360px] flex-col items-center justify-center px-6 text-center">
               <div className="grid h-24 w-24 place-items-center rounded-3xl bg-muted/50">
                 <ClipboardList
@@ -1087,7 +1241,8 @@ function PedidosPage() {
                 href="/"
                 className="mt-5 rounded-xl px-5 py-3 text-base font-semibold text-white"
                 style={{
-                  backgroundColor: BLUE,
+                  backgroundColor:
+                    BLUE,
                 }}
               >
                 Ver produtos
@@ -1096,39 +1251,53 @@ function PedidosPage() {
           )}
 
         {!isLoading &&
-          orders.length > 0 && (
+          orders.length >
+            0 && (
             <div
               ref={trackRef}
-              onScroll={onTrackScroll}
+              onScroll={
+                onTrackScroll
+              }
               className="flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
               style={{
-                scrollbarWidth: "none",
+                scrollbarWidth:
+                  "none",
               }}
             >
               {groups.map(
                 (group) => (
                   <section
-                    key={group.value}
+                    key={
+                      group.value
+                    }
                     className="w-full shrink-0 snap-start px-4"
                   >
                     <div className="mb-3 flex items-center justify-between">
                       <h2 className="text-xl font-semibold text-foreground">
-                        {group.label}
+                        {
+                          group.label
+                        }
                       </h2>
 
                       <span className="text-sm font-medium text-muted-foreground">
-                        {group.list.length}
+                        {
+                          group
+                            .list
+                            .length
+                        }
                       </span>
                     </div>
 
-                    {group.list.length ===
+                    {group.list
+                      .length ===
                     0 ? (
                       <div className="flex min-h-[300px] flex-col items-center justify-center px-6 text-center">
                         <div className="grid h-20 w-20 place-items-center rounded-3xl bg-muted/50">
                           <ClipboardList
                             className="h-10 w-10"
                             style={{
-                              color: BLUE,
+                              color:
+                                BLUE,
                             }}
                           />
                         </div>
@@ -1144,7 +1313,9 @@ function PedidosPage() {
                     ) : (
                       <ul className="flex flex-col gap-3">
                         {group.list.map(
-                          (order) => (
+                          (
+                            order,
+                          ) => (
                             <OrderCard
                               key={
                                 order.id
