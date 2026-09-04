@@ -178,7 +178,7 @@ function AdminPage() {
   const current = SECTIONS.find((s) => s.id === section);
 
   return (
-    <div className="min-h-screen bg-background pb-16">
+    <div className="min-h-screen bg-background pb-28">
       <header className="layer-header safe-top sticky top-0 border-b-2 border-border bg-background/95 backdrop-blur">
         <div className="mx-auto flex max-w-4xl items-center gap-3 px-4 py-3">
           {section === "home" ? (
