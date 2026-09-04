@@ -263,19 +263,21 @@ function EuPage() {
           <div className="mt-3 grid grid-cols-2 gap-2 border-t-2 border-border pt-3">
             <Link
               to="/moedas"
-              className="flex flex-col items-center gap-1 rounded-2xl bg-muted py-3 active:scale-95"
+              className="flex flex-col items-center justify-center gap-1 rounded-2xl bg-muted px-2 py-3 text-center active:scale-95"
             >
               <Coins className="h-8 w-8 text-[oklch(0.72_0.17_75)]" strokeWidth={2.5} />
               <span className="text-base font-black text-foreground">Moedas</span>
-              <span className="text-sm font-bold text-[oklch(0.72_0.17_75)]">
-                {balance.toLocaleString("pt-BR")} moedas ={" "}
-                {formatPrice(coinsToBRL(balance))}
+              <span className="flex flex-col items-center text-sm font-bold leading-tight text-[oklch(0.72_0.17_75)]">
+                <span>{balance.toLocaleString("pt-BR")} moedas</span>
+                <span>= {formatPrice(coinsToBRL(balance))}</span>
               </span>
             </Link>
+
             <Link
               to="/cupons"
-              className="flex flex-col items-center gap-1 rounded-2xl bg-muted py-3 active:scale-95"
+              className="flex flex-col items-center justify-center gap-1 rounded-2xl bg-muted px-2 py-3 text-center active:scale-95"
             >
+
               <Ticket className="h-8 w-8 text-[oklch(0.55_0.22_255)]" strokeWidth={2.5} />
               <span className="text-base font-black text-foreground">Cupons</span>
               <span className="text-sm font-bold text-[oklch(0.55_0.22_255)]">

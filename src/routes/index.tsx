@@ -3,7 +3,6 @@ import { useSuspenseQuery, queryOptions, useQueryClient } from "@tanstack/react-
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Plus,
-  ShoppingCart,
   ImageOff,
   RefreshCw,
   Search,
@@ -114,7 +113,6 @@ function Home() {
   const { data } = useSuspenseQuery(catalogQuery);
   const queryClient = useQueryClient();
   const cart = useCart();
-  const totalQty = cart.reduce((s, c) => s + c.qty, 0);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<string>("todos");
   const [showAllCategories, setShowAllCategories] = useState(false);
@@ -236,7 +234,7 @@ function Home() {
   return (
     <div className="min-h-screen bg-background pb-28">
       <header className="layer-header safe-top sticky top-0 border-b border-border bg-background/95 backdrop-blur">
-        <div className="mx-auto max-w-5xl px-3 py-2">
+        <div className="mx-auto max-w-5xl px-3 py-2 pr-16">
           <div className="flex items-center gap-2">
             <Link to="/" aria-label="SPERB" className="shrink-0">
               <StoreLogoWithFallback
@@ -265,24 +263,11 @@ function Home() {
                 </button>
               )}
             </div>
-
-            {/* Carrinho sempre visível, separado da busca e alinhado no fundo. */}
-            <Link
-              id="cart-anchor"
-              to="/sacola"
-              aria-label={
-                totalQty > 0 ? `Ver carrinho com ${totalQty} itens` : "Ver carrinho"
-              }
-              className="relative grid h-11 w-11 shrink-0 place-items-center rounded-2xl border-2 border-border bg-card text-foreground shadow-sm active:scale-95"
-            >
-              <ShoppingCart className="h-6 w-6" />
-              {totalQty > 0 && (
-                <span className="absolute -right-1.5 -top-1.5 min-w-5 rounded-full bg-[oklch(0.62_0.19_145)] px-1 text-center text-xs font-black text-white">
-                  {totalQty}
-                </span>
-              )}
-            </Link>
+            {/* O carrinho é único e fica fixo no canto superior direito. */}
           </div>
+
+
+
 
 
           <div className="mt-2 flex items-start gap-2">
