@@ -275,8 +275,9 @@ function EuPage() {
 
             <Link
               to="/cupons"
-              className="flex flex-col items-center gap-1 rounded-2xl bg-muted py-3 active:scale-95"
+              className="flex flex-col items-center justify-center gap-1 rounded-2xl bg-muted px-2 py-3 text-center active:scale-95"
             >
+
               <Ticket className="h-8 w-8 text-[oklch(0.55_0.22_255)]" strokeWidth={2.5} />
               <span className="text-base font-black text-foreground">Cupons</span>
               <span className="text-sm font-bold text-[oklch(0.55_0.22_255)]">
