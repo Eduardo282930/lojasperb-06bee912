@@ -1,7 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronDown, Package } from "lucide-react";
+import {
+  ChevronDown,
+  ClipboardList,
+  Package,
+  ShoppingCart,
+} from "lucide-react";
 import { BackButton } from "@/components/back-button";
 import { useProfile } from "@/lib/coupons";
 import { useServerFn } from "@tanstack/react-start";
@@ -210,6 +215,7 @@ function OrderCard({
   return (
     <li className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
       <div className="p-4">
+        {/* Cabeçalho do pedido */}
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-xs font-medium text-muted-foreground">
@@ -239,8 +245,10 @@ function OrderCard({
           </div>
         </div>
 
+        {/* Progresso da entrega */}
         <Progress status={order.status} />
 
+        {/* Produtos */}
         <div className="mt-4 rounded-xl bg-muted/50 p-3">
           <p className="mb-2 text-sm font-semibold text-foreground">
             Produtos do pedido
@@ -286,6 +294,7 @@ function OrderCard({
           </ul>
         </div>
 
+        {/* Desconto */}
         {order.discount > 0 && (
           <div className="mt-3 flex items-center justify-between text-sm">
             <span className="text-muted-foreground">
@@ -301,6 +310,7 @@ function OrderCard({
           </div>
         )}
 
+        {/* Prazo de pagamento */}
         {unpaid && minutesLeft > 0 && (
           <div className="mt-3 rounded-xl bg-blue-50 px-3 py-2.5 text-sm text-foreground dark:bg-blue-950/30">
             <span className="font-semibold">
@@ -311,6 +321,7 @@ function OrderCard({
           </div>
         )}
 
+        {/* Botão de pagamento */}
         {unpaid && (
           <button
             type="button"
@@ -325,6 +336,7 @@ function OrderCard({
           </button>
         )}
 
+        {/* Reembolso pendente */}
         {refundText && (
           <div className="mt-3 rounded-xl border border-orange-200 bg-orange-50 p-3 dark:border-orange-900/40 dark:bg-orange-950/20">
             <p className="text-sm font-medium leading-5 text-foreground">
@@ -333,6 +345,7 @@ function OrderCard({
           </div>
         )}
 
+        {/* Reembolso confirmado */}
         {refunded && (
           <div className="mt-3 flex items-center justify-between gap-3 rounded-xl bg-green-50 px-3 py-2.5 dark:bg-green-950/20">
             <span
@@ -356,6 +369,7 @@ function OrderCard({
           </div>
         )}
 
+        {/* Detalhes */}
         <button
           type="button"
           onClick={() => setOpen((value) => !value)}
@@ -424,6 +438,16 @@ function PedidosPage() {
 
   const [lastOrderId, setLastOrderId] = useState("");
 
+  /*
+   * activeIndex pode ser decimal.
+   *
+   * 0 = A pagar
+   * 0.5 = entre A pagar e Preparando
+   * 1 = Preparando
+   *
+   * Isso permite que a linha azul acompanhe
+   * o movimento do dedo durante o arraste.
+   */
   const [activeIndex, setActiveIndex] = useState(() =>
     Math.max(
       0,
@@ -449,13 +473,23 @@ function PedidosPage() {
     ReturnType<typeof setTimeout> | null
   >(null);
 
+  const initialTrackSyncRef = useRef(false);
+
+  const autoPickedRef = useRef(false);
+
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["my-orders", profile.phone],
+
     queryFn: () => fetchMyOrders(profile.phone),
+
     staleTime: 30 * 1000,
+
     refetchInterval: checkout ? 5000 : false,
   });
 
+  /*
+   * Sincronização complementar com o Loyverse.
+   */
   const quickSync = useServerFn(runLoyverseQuickSync);
 
   useEffect(() => {
@@ -484,8 +518,10 @@ function PedidosPage() {
           void refetch();
         }
       } catch {
-        // O webhook continua sendo a principal fonte
-        // de atualização.
+        /*
+         * O webhook continua sendo a principal
+         * fonte de atualização.
+         */
       }
     })();
 
@@ -511,7 +547,8 @@ function PedidosPage() {
   }, []);
 
   /*
-   * Sincroniza o painel com o status vindo da URL.
+   * Se o usuário chegar aqui vindo do pagamento,
+   * mantém a seção correta.
    */
   useEffect(() => {
     const foundIndex = SECTIONS.findIndex(
@@ -601,34 +638,34 @@ function PedidosPage() {
   }));
 
   /*
-   * Abertura automática inicial.
+   * Quando a tela é aberta, se a seção atual estiver
+   * vazia, abre automaticamente a primeira seção que
+   * tiver pedidos.
    *
    * Prioridade:
    * 1. A pagar
    * 2. Preparando
    * 3. A caminho
    * 4. Finalizado
-   *
-   * Se a URL já estiver em uma seção que possui pedidos,
-   * mantém essa seção.
-   *
-   * Se a URL estiver em uma seção vazia, procura a primeira
-   * seção com pedidos seguindo a prioridade acima.
    */
-  const autoPickedRef = useRef(false);
-
   useEffect(() => {
-    if (autoPickedRef.current) return;
-    if (isLoading) return;
-
-    if (orders.length === 0) {
-      autoPickedRef.current = true;
+    if (
+      autoPickedRef.current ||
+      isLoading ||
+      orders.length === 0
+    ) {
       return;
     }
 
-    const currentGroup = groups.find(
-      (group) => group.value === status,
+    const currentIndex = Math.max(
+      0,
+      SECTIONS.findIndex(
+        (item) => item.value === status,
+      ),
     );
+
+    const currentGroup =
+      groups[currentIndex];
 
     if (
       currentGroup &&
@@ -645,45 +682,53 @@ function PedidosPage() {
       "delivered",
     ];
 
-    const preferred = priority.find(
-      (value) =>
-        groups.find(
-          (group) => group.value === value,
-        )?.list.length > 0,
-    );
+    const firstPopulated =
+      priority.find(
+        (value) =>
+          groups.find(
+            (group) =>
+              group.value === value,
+          )?.list.length > 0,
+      );
 
-    autoPickedRef.current = true;
-
-    if (!preferred || preferred === status) {
+    if (!firstPopulated) {
+      autoPickedRef.current = true;
       return;
     }
 
-    void navigate({
-      search: {
-        status: preferred,
-      },
-      replace: true,
-    });
+    if (firstPopulated !== status) {
+      autoPickedRef.current = true;
+
+      void navigate({
+        search: {
+          status: firstPopulated,
+        },
+        replace: true,
+      });
+    } else {
+      autoPickedRef.current = true;
+    }
   }, [
-    isLoading,
-    orders.length,
     groups,
-    status,
+    isLoading,
     navigate,
+    orders.length,
+    status,
   ]);
 
   /*
-   * Correção da inicialização:
-   *
-   * Quando a página termina de carregar e a seção inicial
-   * é definida, garante que o painel inferior acompanhe
-   * a mesma seção já na primeira abertura.
+   * Garante que, na primeira abertura da página,
+   * o painel inferior fique alinhado com a aba escolhida.
    */
-  const initialTrackSyncRef = useRef(false);
-
   useEffect(() => {
     if (initialTrackSyncRef.current) return;
-    if (isLoading || orders.length === 0) return;
+
+    if (
+      isLoading ||
+      orders.length === 0
+    ) {
+      return;
+    }
 
     const foundIndex = SECTIONS.findIndex(
       (item) => item.value === status,
@@ -729,6 +774,9 @@ function PedidosPage() {
     status,
   ]);
 
+  /*
+   * Calcula exatamente onde a linha azul deve ficar.
+   */
   const updateIndicator = useCallback(
     (progressIndex = activeIndex) => {
       const tabs = tabsRef.current;
@@ -737,24 +785,27 @@ function PedidosPage() {
 
       const buttons = tabRefs.current;
 
-      const safeIndex = Math.max(
+      const floorIndex = Math.max(
         0,
         Math.min(
           SECTIONS.length - 1,
-          progressIndex,
+          Math.floor(progressIndex),
         ),
       );
 
-      const floorIndex = Math.floor(
-        safeIndex,
+      const ceilIndex = Math.max(
+        0,
+        Math.min(
+          SECTIONS.length - 1,
+          Math.ceil(progressIndex),
+        ),
       );
 
-      const ceilIndex = Math.ceil(
-        safeIndex,
-      );
+      const current =
+        buttons[floorIndex];
 
-      const current = buttons[floorIndex];
-      const next = buttons[ceilIndex];
+      const next =
+        buttons[ceilIndex];
 
       if (!current || !next) return;
 
@@ -768,7 +819,8 @@ function PedidosPage() {
         next.getBoundingClientRect();
 
       const progress =
-        safeIndex - floorIndex;
+        progressIndex -
+        Math.floor(progressIndex);
 
       const currentLeft =
         currentRect.left -
@@ -787,7 +839,8 @@ function PedidosPage() {
 
       const width =
         currentRect.width +
-        (nextRect.width - currentRect.width) *
+        (nextRect.width -
+          currentRect.width) *
           progress;
 
       setIndicator({
@@ -799,21 +852,21 @@ function PedidosPage() {
   );
 
   useEffect(() => {
-    const update = () => {
+    updateIndicator();
+
+    const onResize = () => {
       updateIndicator();
     };
 
-    update();
-
     window.addEventListener(
       "resize",
-      update,
+      onResize,
     );
 
     return () => {
       window.removeEventListener(
         "resize",
-        update,
+        onResize,
       );
     };
   }, [
@@ -831,81 +884,50 @@ function PedidosPage() {
   }
 
   /*
-   * Clique na aba:
-   *
-   * - troca o status imediatamente;
-   * - pula diretamente para o painel;
-   * - não usa animação;
-   * - não interfere no arraste.
+   * Clique em uma aba:
+   * muda imediatamente e leva o painel inferior
+   * diretamente para a seção escolhida.
    */
   function selectTab(index: number) {
     const track = trackRef.current;
 
     if (!track) return;
 
-    const safeIndex = Math.max(
-      0,
-      Math.min(
-        SECTIONS.length - 1,
-        index,
-      ),
-    );
-
-    if (scrollStopRef.current) {
+    if (
+      scrollStopRef.current
+    ) {
       clearTimeout(
         scrollStopRef.current,
       );
-      scrollStopRef.current = null;
     }
 
-    if (rafRef.current !== null) {
+    if (
+      rafRef.current !== null
+    ) {
       cancelAnimationFrame(
         rafRef.current,
       );
-      rafRef.current = null;
     }
 
     const left =
-      safeIndex * track.clientWidth;
+      index * track.clientWidth;
 
-    setActiveIndex(safeIndex);
+    setActiveIndex(index);
 
     setStatus(
-      SECTIONS[safeIndex].value,
+      SECTIONS[index].value,
     );
 
-    /*
-     * Salto direto.
-     * Não usa scrollTo nem smooth.
-     */
-    track.scrollLeft = left;
+    track.scrollTo({
+      left,
+      behavior: "auto",
+    });
 
-    /*
-     * Mantém a aba escolhida visível.
-     * Auto evita animação e evita interferência
-     * com o painel horizontal.
-     */
-    const selectedTab =
-      tabRefs.current[safeIndex];
-
-    if (selectedTab) {
-      selectedTab.scrollIntoView({
-        behavior: "auto",
-        block: "nearest",
-        inline: "center",
-      });
-    }
-
-    updateIndicator(safeIndex);
+    updateIndicator(index);
   }
 
   /*
-   * Arraste horizontal.
-   *
-   * Durante o movimento:
-   * - o conteúdo se move;
-   * - a linha azul acompanha;
-   * - o status da URL só muda quando o movimento termina.
+   * Arraste horizontal dos painéis inferiores.
    */
   function onTrackScroll() {
     const track = trackRef.current;
@@ -926,7 +948,9 @@ function PedidosPage() {
       ),
     );
 
-    if (rafRef.current !== null) {
+    if (
+      rafRef.current !== null
+    ) {
       cancelAnimationFrame(
         rafRef.current,
       );
@@ -936,10 +960,11 @@ function PedidosPage() {
       requestAnimationFrame(() => {
         setActiveIndex(raw);
         updateIndicator(raw);
-        rafRef.current = null;
       });
 
-    if (scrollStopRef.current) {
+    if (
+      scrollStopRef.current
+    ) {
       clearTimeout(
         scrollStopRef.current,
       );
@@ -973,20 +998,22 @@ function PedidosPage() {
         setStatus(
           SECTIONS[nearest].value,
         );
-
-        scrollStopRef.current = null;
       }, 120);
   }
 
   useEffect(() => {
     return () => {
-      if (rafRef.current !== null) {
+      if (
+        rafRef.current !== null
+      ) {
         cancelAnimationFrame(
           rafRef.current,
         );
       }
 
-      if (scrollStopRef.current) {
+      if (
+        scrollStopRef.current
+      ) {
         clearTimeout(
           scrollStopRef.current,
         );
@@ -995,9 +1022,10 @@ function PedidosPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-background pb-28">
-      <header className="layer-header safe-top sticky top-0 border-b border-border bg-background/95 backdrop-blur">
-        <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-3 pr-16">
+    <div className="min-h-screen bg-background pb-16">
+      {/* Cabeçalho */}
+      <header className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur">
+        <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-3 pr-20">
           <BackButton fallback="/eu" />
 
           <h1 className="text-2xl font-semibold text-foreground">
@@ -1005,6 +1033,30 @@ function PedidosPage() {
           </h1>
         </div>
 
+        {/* Carrinho fixo no canto superior direito */}
+        <Link
+          to="/"
+          aria-label="Continuar comprando"
+          className="fixed right-4 top-4 z-50 grid h-12 w-12 place-items-center rounded-full border border-border bg-background text-foreground shadow-md transition-transform active:scale-95"
+        >
+          <ShoppingCart
+            className="h-6 w-6"
+            style={{
+              color: BLUE,
+            }}
+          />
+
+          <span
+            className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full px-1 text-[10px] font-bold leading-none text-white"
+            style={{
+              backgroundColor: BLUE,
+            }}
+          >
+            1
+          </span>
+        </Link>
+
+        {/* Abas */}
         <div
           ref={tabsRef}
           className="relative mx-auto flex max-w-3xl overflow-hidden px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
@@ -1021,7 +1073,7 @@ function PedidosPage() {
                 onClick={() =>
                   selectTab(index)
                 }
-                className="relative min-w-0 flex-1 whitespace-nowrap px-1 pb-3 pt-2 text-[13px] font-medium transition-colors sm:px-2 sm:text-sm"
+                className="relative flex min-w-0 flex-1 flex-col items-center justify-end whitespace-nowrap px-1 pb-3 pt-1 text-[13px] font-medium transition-colors sm:px-2 sm:text-sm"
                 style={{
                   color:
                     Math.round(
@@ -1031,17 +1083,33 @@ function PedidosPage() {
                       : "var(--muted-foreground)",
                 }}
               >
-                {group.label}
+                {/* Badge acima do nome */}
+                <span className="mb-0.5 flex h-4 items-center justify-center">
+                  {group.list.length > 0 ? (
+                    <span
+                      className="grid h-4 min-w-4 place-items-center rounded-full px-1 text-[10px] font-bold leading-none text-white"
+                      style={{
+                        backgroundColor: BLUE,
+                      }}
+                    >
+                      {group.list.length}
+                    </span>
+                  ) : (
+                    <span
+                      aria-hidden="true"
+                      className="h-4"
+                    />
+                  )}
+                </span>
 
-                {group.list.length > 0 && (
-                  <span className="ml-0.5 text-xs sm:ml-1 sm:text-sm">
-                    {group.list.length}
-                  </span>
-                )}
+                <span className="leading-5">
+                  {group.label}
+                </span>
               </button>
             ),
           )}
 
+          {/* Linha azul */}
           <span
             aria-hidden="true"
             className="pointer-events-none absolute bottom-0 h-0.5 rounded-full"
@@ -1055,6 +1123,7 @@ function PedidosPage() {
       </header>
 
       <main className="mx-auto max-w-3xl pt-4">
+        {/* Retorno do pagamento */}
         {checkout && lastOrder && (
           <div className="mx-4 mb-4 rounded-2xl border border-green-200 bg-green-50 p-4 dark:border-green-900/40 dark:bg-green-950/20">
             <p className="text-base font-semibold text-foreground">
@@ -1076,24 +1145,37 @@ function PedidosPage() {
           </div>
         )}
 
+        {/* Carregando */}
         {isLoading && (
           <p className="px-4 text-base text-muted-foreground">
             Carregando suas compras…
           </p>
         )}
 
+        {/* Nenhuma compra em nenhuma seção */}
         {!isLoading &&
           orders.length === 0 && (
-            <div className="mx-4 rounded-2xl border border-dashed border-border p-8 text-center">
-              <Package className="mx-auto h-12 w-12 text-muted-foreground" />
+            <div className="mx-4 flex min-h-[360px] flex-col items-center justify-center px-6 text-center">
+              <div className="grid h-24 w-24 place-items-center rounded-3xl bg-muted/50">
+                <ClipboardList
+                  className="h-12 w-12"
+                  style={{
+                    color: BLUE,
+                  }}
+                />
+              </div>
 
-              <p className="mt-3 text-base font-semibold text-foreground">
-                Você ainda não fez nenhuma compra.
+              <p className="mt-5 text-lg font-semibold text-foreground">
+                Ainda não há pedidos
+              </p>
+
+              <p className="mt-1 max-w-xs text-sm leading-5 text-muted-foreground">
+                Quando você fizer uma compra, seus pedidos aparecerão aqui.
               </p>
 
               <Link
                 to="/"
-                className="mt-4 inline-block rounded-xl px-5 py-3 text-base font-semibold text-white"
+                className="mt-5 rounded-xl px-5 py-3 text-base font-semibold text-white"
                 style={{
                   backgroundColor: BLUE,
                 }}
@@ -1103,6 +1185,7 @@ function PedidosPage() {
             </div>
           )}
 
+        {/* Painéis horizontais */}
         {!isLoading &&
           orders.length > 0 && (
             <div
@@ -1131,11 +1214,22 @@ function PedidosPage() {
 
                     {group.list.length ===
                     0 ? (
-                      <div className="rounded-2xl border border-dashed border-border p-7 text-center">
-                        <Package className="mx-auto h-10 w-10 text-muted-foreground" />
+                      <div className="flex min-h-[300px] flex-col items-center justify-center px-6 text-center">
+                        <div className="grid h-20 w-20 place-items-center rounded-3xl bg-muted/50">
+                          <ClipboardList
+                            className="h-10 w-10"
+                            style={{
+                              color: BLUE,
+                            }}
+                          />
+                        </div>
 
-                        <p className="mt-2 text-sm text-muted-foreground">
-                          Nenhuma compra aqui.
+                        <p className="mt-4 text-base font-semibold text-foreground">
+                          Ainda não há pedidos
+                        </p>
+
+                        <p className="mt-1 max-w-xs text-sm leading-5 text-muted-foreground">
+                          Nenhum pedido está nesta seção no momento.
                         </p>
                       </div>
                     ) : (
