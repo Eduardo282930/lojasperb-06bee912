@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronDown, Package, ShoppingBag } from "lucide-react";
+import { ChevronDown, Package } from "lucide-react";
 import { BackButton } from "@/components/back-button";
 import { useProfile } from "@/lib/coupons";
 import { useServerFn } from "@tanstack/react-start";
@@ -870,23 +870,13 @@ function PedidosPage() {
   return (
     <div className="min-h-screen bg-background pb-28">
       <header className="layer-header safe-top sticky top-0 border-b border-border bg-background/95 backdrop-blur">
-        <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-3">
+        <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-3 pr-16">
           <BackButton fallback="/eu" />
 
           <h1 className="text-2xl font-semibold text-foreground">
             Minhas compras
           </h1>
 
-          <Link
-            to="/"
-            aria-label="Continuar comprando"
-            className="ml-auto grid h-11 w-11 place-items-center rounded-full text-white shadow-sm"
-            style={{
-              backgroundColor: GREEN,
-            }}
-          >
-            <ShoppingBag className="h-6 w-6" />
-          </Link>
         </div>
 
         <div

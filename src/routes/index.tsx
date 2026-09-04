@@ -3,7 +3,6 @@ import { useSuspenseQuery, queryOptions, useQueryClient } from "@tanstack/react-
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Plus,
-  ShoppingCart,
   ImageOff,
   RefreshCw,
   Search,
@@ -114,7 +113,6 @@ function Home() {
   const { data } = useSuspenseQuery(catalogQuery);
   const queryClient = useQueryClient();
   const cart = useCart();
-  const totalQty = cart.reduce((s, c) => s + c.qty, 0);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<string>("todos");
   const [showAllCategories, setShowAllCategories] = useState(false);
@@ -236,7 +234,7 @@ function Home() {
   return (
     <div className="min-h-screen bg-background pb-28">
       <header className="layer-header safe-top sticky top-0 border-b border-border bg-background/95 backdrop-blur">
-        <div className="mx-auto max-w-5xl px-3 py-2">
+        <div className="mx-auto max-w-5xl px-3 py-2 pr-16">
           <div className="flex items-center gap-2">
             <Link to="/" aria-label="SPERB" className="shrink-0">
               <StoreLogoWithFallback
