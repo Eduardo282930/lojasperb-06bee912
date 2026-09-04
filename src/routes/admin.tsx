@@ -1405,26 +1405,26 @@ function OrdersPanel() {
                 >
                   Reembolso pendente de confirmação
                 </span>
-                {(o.receiptUrl ||
-                  o.paymentTransactionNsu ||
-                  o.paymentSlug) && (
+                {isInfinitePayPaid(o) ? (
                   <button
                     type="button"
-                    onClick={() => openInfinitePaySale(o)}
+                    disabled={busy === o.id}
+                    onClick={() => void refundWithInfinitePay(o)}
                     className="rounded-xl px-3 py-2 text-base font-black text-white"
                     style={{ backgroundColor: BLUE }}
                   >
-                    Abrir venda na InfinitePay
+                    💳 Devolver dinheiro com InfinitePay
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={busy === o.id}
+                    onClick={() => void markRefunded(o)}
+                    className="rounded-xl border-2 border-border bg-background px-3 py-2 text-base font-black text-foreground"
+                  >
+                    Confirmar reembolso
                   </button>
                 )}
-                <button
-                  type="button"
-                  disabled={busy === o.id}
-                  onClick={() => void markRefunded(o)}
-                  className="rounded-xl border-2 border-border bg-background px-3 py-2 text-base font-black text-foreground"
-                >
-                  Confirmar reembolso
-                </button>
               </>
             )}
             <span className="text-sm font-bold text-muted-foreground">
