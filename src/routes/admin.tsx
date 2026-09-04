@@ -1370,14 +1370,34 @@ function OrdersPanel() {
                 </button>
               )}
             {o.status === "canceled" && o.refundState !== "refunded" && (
-              <button
-                type="button"
-                disabled={busy === o.id}
-                onClick={() => void markRefunded(o)}
-                className="rounded-xl border-2 border-border bg-background px-3 py-2 text-base font-black text-foreground"
-              >
-                Confirmar reembolso
-              </button>
+              <>
+                <span
+                  className="text-sm font-black"
+                  style={{ color: "oklch(0.72 0.17 62)" }}
+                >
+                  Reembolso pendente de confirmação
+                </span>
+                {(o.receiptUrl ||
+                  o.paymentTransactionNsu ||
+                  o.paymentSlug) && (
+                  <button
+                    type="button"
+                    onClick={() => openInfinitePaySale(o)}
+                    className="rounded-xl px-3 py-2 text-base font-black text-white"
+                    style={{ backgroundColor: BLUE }}
+                  >
+                    Abrir venda na InfinitePay
+                  </button>
+                )}
+                <button
+                  type="button"
+                  disabled={busy === o.id}
+                  onClick={() => void markRefunded(o)}
+                  className="rounded-xl border-2 border-border bg-background px-3 py-2 text-base font-black text-foreground"
+                >
+                  Confirmar reembolso
+                </button>
+              </>
             )}
             <span className="text-sm font-bold text-muted-foreground">
               {statusLabel(o.status)} · {paymentDisplayLabel(o)}
@@ -1394,7 +1414,7 @@ function OrdersPanel() {
             )}
             {o.refundState === "refunded" && (
               <span className="text-sm font-black" style={{ color: GREEN }}>
-                Reembolsado
+                ✅ Reembolso realizado
                 {o.refundProofUrl ? "" : " (sem comprovante)"}
               </span>
             )}
