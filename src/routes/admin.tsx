@@ -1263,7 +1263,7 @@ function OrdersPanel() {
   async function markRefunded(o: Order) {
     const proof = window.prompt(
       "Link do comprovante do reembolso no InfinitePay (opcional):",
-      "",
+      o.receiptUrl ?? "",
     );
     if (proof === null) return;
     setBusy(o.id);
@@ -1271,6 +1271,31 @@ function OrdersPanel() {
     setBusy(null);
     if (!ok) window.alert("Não foi possível registrar o reembolso.");
     void refetch();
+  }
+
+  /**
+   * A InfinitePay não publica API nem deep link para abrir uma venda
+   * específica: a documentação oficial só tem /links e /payment_check.
+   * O que existe oficialmente é o comprovante (receipt_url) da transação —
+   * é ele que abrimos, junto com os identificadores da venda.
+   */
+  function openInfinitePaySale(o: Order) {
+    const ids = [
+      o.paymentTransactionNsu ? `transaction_nsu: ${o.paymentTransactionNsu}` : "",
+      o.paymentSlug ? `slug: ${o.paymentSlug}` : "",
+      o.paymentOrderNsu ? `order_nsu: ${o.paymentOrderNsu}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n");
+    if (o.receiptUrl) {
+      window.open(o.receiptUrl, "_blank", "noopener");
+      return;
+    }
+    window.alert(
+      ids
+        ? `Abra o app InfinitePay em Vendas e localize a venda:\n\n${ids}`
+        : "Sem identificadores da InfinitePay para este pedido.",
+    );
   }
 
   if (isLoading) {
