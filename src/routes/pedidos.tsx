@@ -510,66 +510,6 @@ function PedidosPage() {
     }
   }, []);
 
-  /*
-   * Sincroniza o painel com o status vindo da URL.
-   * Não usa animação aqui para evitar qualquer movimento
-   * intermediário que possa disparar uma troca de aba.
-   */
-  useEffect(() => {
-    const foundIndex = SECTIONS.findIndex(
-      (item) => item.value === status,
-    );
-
-    const index = Math.max(
-      0,
-      foundIndex === -1 ? 0 : foundIndex,
-    );
-
-    const track = trackRef.current;
-
-    if (
-      track &&
-      track.clientWidth > 0
-    ) {
-      const targetLeft =
-        index * track.clientWidth;
-
-      if (
-        Math.abs(
-          track.scrollLeft - targetLeft,
-        ) > 1
-      ) {
-        track.scrollLeft = targetLeft;
-      }
-    }
-
-    setActiveIndex(index);
-  }, [status]);
-
-  /*
-   * Depois do pagamento confirmado,
-   * vai automaticamente para Preparando.
-   */
-  useEffect(() => {
-    if (
-      checkout &&
-      lastOrder?.paymentStatus === "paid" &&
-      status !== "preparing"
-    ) {
-      void navigate({
-        search: {
-          status: "preparing",
-        },
-        replace: true,
-      });
-    }
-  }, [
-    checkout,
-    lastOrder?.paymentStatus,
-    status,
-    navigate,
-  ]);
-
   function bucket(order: Order): StatusValue {
     if (
       order.status === "canceled" ||
@@ -603,6 +543,117 @@ function PedidosPage() {
   }));
 
   /*
+   * Função central para posicionar o painel inferior.
+   *
+   * Importante:
+   * - usa a largura REAL do painel;
+   * - não usa smooth;
+   * - é executada depois que o DOM já foi atualizado;
+   * - garante que a barra e o conteúdo fiquem no mesmo índice.
+   */
+  const moveTrackToIndex = useCallback(
+    (index: number) => {
+      const track = trackRef.current;
+
+      if (!track) return;
+
+      if (track.clientWidth <= 0) return;
+
+      const safeIndex = Math.max(
+        0,
+        Math.min(
+          SECTIONS.length - 1,
+          index,
+        ),
+      );
+
+      const targetLeft =
+        safeIndex * track.clientWidth;
+
+      track.scrollLeft = targetLeft;
+    },
+    [],
+  );
+
+  /*
+   * Sincroniza o painel inferior com o status da URL.
+   *
+   * O requestAnimationFrame é importante aqui:
+   * primeiro o React troca a aba/estado;
+   * depois o painel inferior é reposicionado.
+   *
+   * Isso corrige o problema em que no primeiro clique
+   * somente a barra mudava.
+   */
+  useEffect(() => {
+    const foundIndex = SECTIONS.findIndex(
+      (item) => item.value === status,
+    );
+
+    const index = Math.max(
+      0,
+      foundIndex === -1 ? 0 : foundIndex,
+    );
+
+    setActiveIndex(index);
+
+    if (rafRef.current !== null) {
+      cancelAnimationFrame(
+        rafRef.current,
+      );
+    }
+
+    rafRef.current =
+      requestAnimationFrame(() => {
+        moveTrackToIndex(index);
+
+        /*
+         * Uma segunda execução garante o posicionamento
+         * mesmo quando a largura do painel acabou de ser
+         * calculada pelo navegador.
+         */
+        requestAnimationFrame(() => {
+          moveTrackToIndex(index);
+        });
+
+        rafRef.current = null;
+      });
+
+    return () => {
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(
+          rafRef.current,
+        );
+        rafRef.current = null;
+      }
+    };
+  }, [status, moveTrackToIndex]);
+
+  /*
+   * Depois do pagamento confirmado,
+   * vai automaticamente para Preparando.
+   */
+  useEffect(() => {
+    if (
+      checkout &&
+      lastOrder?.paymentStatus === "paid" &&
+      status !== "preparing"
+    ) {
+      void navigate({
+        search: {
+          status: "preparing",
+        },
+        replace: true,
+      });
+    }
+  }, [
+    checkout,
+    lastOrder?.paymentStatus,
+    status,
+    navigate,
+  ]);
+
+  /*
    * Abertura automática inicial.
    *
    * Prioridade:
@@ -610,14 +661,6 @@ function PedidosPage() {
    * 2. Preparando
    * 3. A caminho
    * 4. Finalizado
-   *
-   * Se a URL já estiver em uma seção que possui pedidos,
-   * mantém essa seção.
-   *
-   * Se a URL estiver em uma seção vazia, procura a primeira
-   * seção com pedidos seguindo a prioridade acima.
-   *
-   * Essa lógica roda apenas uma vez por entrada na página.
    */
   const autoPickedRef = useRef(false);
 
@@ -625,10 +668,6 @@ function PedidosPage() {
     if (autoPickedRef.current) return;
     if (isLoading) return;
 
-    /*
-     * Ainda não há pedidos carregados.
-     * Não toma nenhuma decisão antes do carregamento terminar.
-     */
     if (orders.length === 0) {
       autoPickedRef.current = true;
       return;
@@ -639,18 +678,17 @@ function PedidosPage() {
     );
 
     /*
-     * Se a aba atual possui pedidos, ela é válida.
-     * Não altera a escolha do cliente.
+     * Se a aba atual possui pedidos,
+     * mantém essa aba.
      */
-    if (currentGroup && currentGroup.list.length > 0) {
+    if (
+      currentGroup &&
+      currentGroup.list.length > 0
+    ) {
       autoPickedRef.current = true;
       return;
     }
 
-    /*
-     * A aba atual está vazia.
-     * Escolhe automaticamente a primeira seção com pedidos.
-     */
     const priority: StatusValue[] = [
       "topay",
       "preparing",
@@ -789,15 +827,13 @@ function PedidosPage() {
   /*
    * Clique na aba:
    *
-   * - troca o status imediatamente;
-   * - pula diretamente para o painel;
-   * - não usa animação;
-   * - não interfere no arraste.
+   * 1. atualiza imediatamente a aba;
+   * 2. atualiza a URL;
+   * 3. posiciona o painel inferior;
+   * 4. depois do render, confirma novamente a posição.
    */
   function selectTab(index: number) {
     const track = trackRef.current;
-
-    if (!track) return;
 
     const safeIndex = Math.max(
       0,
@@ -821,26 +857,39 @@ function PedidosPage() {
       rafRef.current = null;
     }
 
-    const left =
-      safeIndex * track.clientWidth;
-
     setActiveIndex(safeIndex);
 
-    setStatus(
-      SECTIONS[safeIndex].value,
-    );
+    const nextStatus =
+      SECTIONS[safeIndex].value;
+
+    setStatus(nextStatus);
 
     /*
-     * Salto direto.
-     * Não usa scrollTo nem smooth.
+     * Primeiro posicionamento imediato.
      */
-    track.scrollLeft = left;
+    if (
+      track &&
+      track.clientWidth > 0
+    ) {
+      track.scrollLeft =
+        safeIndex *
+        track.clientWidth;
+    }
 
     /*
-     * Mantém a aba escolhida visível.
-     * Auto evita animação e evita interferência
-     * com o painel horizontal.
+     * Confirma depois do React atualizar o DOM.
      */
+    rafRef.current =
+      requestAnimationFrame(() => {
+        moveTrackToIndex(safeIndex);
+
+        requestAnimationFrame(() => {
+          moveTrackToIndex(safeIndex);
+        });
+
+        rafRef.current = null;
+      });
+
     const selectedTab =
       tabRefs.current[safeIndex];
 
@@ -857,11 +906,6 @@ function PedidosPage() {
 
   /*
    * Arraste horizontal.
-   *
-   * Durante o movimento:
-   * - o conteúdo se move;
-   * - a linha azul acompanha;
-   * - o status da URL só muda quando o movimento termina.
    */
   function onTrackScroll() {
     const track = trackRef.current;
@@ -1114,7 +1158,7 @@ function PedidosPage() {
                       </ul>
                     )}
                   </section>
-                ),
+                )}
               )}
             </div>
           )}
