@@ -1007,7 +1007,7 @@ function PedidosPage() {
 
         <div
           ref={tabsRef}
-          className="relative mx-auto flex max-w-3xl overflow-x-auto px-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          className="relative mx-auto flex max-w-3xl overflow-hidden px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
           {groups.map(
             (group, index) => (
@@ -1021,7 +1021,7 @@ function PedidosPage() {
                 onClick={() =>
                   selectTab(index)
                 }
-                className="relative shrink-0 whitespace-nowrap px-4 pb-3 pt-2 text-base font-medium transition-colors"
+                className="relative min-w-0 flex-1 whitespace-nowrap px-1 pb-3 pt-2 text-[13px] font-medium transition-colors sm:px-2 sm:text-sm"
                 style={{
                   color:
                     Math.round(
@@ -1034,7 +1034,7 @@ function PedidosPage() {
                 {group.label}
 
                 {group.list.length > 0 && (
-                  <span className="ml-1 text-sm">
+                  <span className="ml-0.5 text-xs sm:ml-1 sm:text-sm">
                     {group.list.length}
                   </span>
                 )}
