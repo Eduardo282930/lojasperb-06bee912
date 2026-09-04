@@ -512,8 +512,6 @@ function PedidosPage() {
 
   /*
    * Sincroniza o painel com o status vindo da URL.
-   *
-   * Mantém exatamente o comportamento original.
    */
   useEffect(() => {
     const foundIndex = SECTIONS.findIndex(
@@ -547,14 +545,75 @@ function PedidosPage() {
   }, [status]);
 
   /*
-   * CORREÇÃO SOMENTE DA INICIALIZAÇÃO:
+   * Depois do pagamento confirmado,
+   * vai automaticamente para Preparando.
+   */
+  useEffect(() => {
+    if (
+      checkout &&
+      lastOrder?.paymentStatus === "paid" &&
+      status !== "preparing"
+    ) {
+      void navigate({
+        search: {
+          status: "preparing",
+        },
+        replace: true,
+      });
+    }
+  }, [
+    checkout,
+    lastOrder?.paymentStatus,
+    status,
+    navigate,
+  ]);
+
+  function bucket(order: Order): StatusValue {
+    if (
+      order.status === "canceled" ||
+      order.paymentStatus === "refunded"
+    ) {
+      return "canceled";
+    }
+
+    if (order.status === "delivered") {
+      return "delivered";
+    }
+
+    if (order.paymentStatus !== "paid") {
+      return "topay";
+    }
+
+    if (order.status === "shipping") {
+      return "shipping";
+    }
+
+    return "preparing";
+  }
+
+  const groups = SECTIONS.map((section) => ({
+    ...section,
+
+    list: orders.filter(
+      (order) =>
+        bucket(order) === section.value,
+    ),
+  }));
+
+  /*
+   * Abertura automática inicial.
    *
-   * Quando a página acaba de carregar e a seção inicial
-   * é escolhida automaticamente, garante que o painel
-   * inferior acompanhe a aba.
+   * Prioridade:
+   * 1. A pagar
+   * 2. Preparando
+   * 3. A caminho
+   * 4. Finalizado
    *
-   * Isso evita o problema do primeiro clique em que
-   * somente a barra azul mudava.
+   * Se a URL já estiver em uma seção que possui pedidos,
+   * mantém essa seção.
+   *
+   * Se a URL estiver em uma seção vazia, procura a primeira
+   * seção com pedidos seguindo a prioridade acima.
    */
   const autoPickedRef = useRef(false);
 
@@ -614,11 +673,11 @@ function PedidosPage() {
   ]);
 
   /*
-   * NOVO: depois que a seleção inicial for concluída,
-   * força o painel inferior para o mesmo índice.
+   * Correção da inicialização:
    *
-   * Não altera cliques nem arraste.
-   * É apenas para a primeira inicialização.
+   * Quando a página termina de carregar e a seção inicial
+   * é definida, garante que o painel inferior acompanhe
+   * a mesma seção já na primeira abertura.
    */
   const initialTrackSyncRef = useRef(false);
 
@@ -645,17 +704,14 @@ function PedidosPage() {
         return false;
       }
 
-      const targetLeft =
+      track.scrollLeft =
         index * track.clientWidth;
 
-      track.scrollLeft = targetLeft;
+      setActiveIndex(index);
 
       return true;
     };
 
-    /*
-     * Espera o painel estar realmente montado.
-     */
     requestAnimationFrame(() => {
       if (syncInitialTrack()) {
         initialTrackSyncRef.current = true;
@@ -672,62 +728,6 @@ function PedidosPage() {
     orders.length,
     status,
   ]);
-
-  /*
-   * Depois do pagamento confirmado,
-   * vai automaticamente para Preparando.
-   */
-  useEffect(() => {
-    if (
-      checkout &&
-      lastOrder?.paymentStatus === "paid" &&
-      status !== "preparing"
-    ) {
-      void navigate({
-        search: {
-          status: "preparing",
-        },
-        replace: true,
-      });
-    }
-  }, [
-    checkout,
-    lastOrder?.paymentStatus,
-    status,
-    navigate,
-  ]);
-
-  function bucket(order: Order): StatusValue {
-    if (
-      order.status === "canceled" ||
-      order.paymentStatus === "refunded"
-    ) {
-      return "canceled";
-    }
-
-    if (order.status === "delivered") {
-      return "delivered";
-    }
-
-    if (order.paymentStatus !== "paid") {
-      return "topay";
-    }
-
-    if (order.status === "shipping") {
-      return "shipping";
-    }
-
-    return "preparing";
-  }
-
-  const groups = SECTIONS.map((section) => ({
-    ...section,
-
-    list: orders.filter(
-      (order) =>
-        bucket(order) === section.value,
-    ),
-  }));
 
   const updateIndicator = useCallback(
     (progressIndex = activeIndex) => {
