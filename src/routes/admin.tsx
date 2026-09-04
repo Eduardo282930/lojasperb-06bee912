@@ -1260,10 +1260,38 @@ function OrdersPanel() {
     void refetch();
   }
 
+  /** Pedido pago pela InfinitePay (nunca pagamento na entrega/dinheiro). */
+  function isInfinitePayPaid(o: Order): boolean {
+    if (o.paymentMethod === "delivery") return false;
+    const provider = `${o.paymentProvider ?? ""}`.toLowerCase();
+    return Boolean(
+      provider.includes("infinite") ||
+        o.paymentTransactionNsu ||
+        o.paymentSlug ||
+        o.paymentOrderNsu ||
+        o.receiptUrl,
+    );
+  }
+
+  /** Abre a venda na InfinitePay e depois registra o comprovante do estorno. */
+  async function refundWithInfinitePay(o: Order) {
+    openInfinitePaySale(o);
+    const proof = window.prompt(
+      "Depois de devolver o dinheiro na InfinitePay, cole aqui o link do comprovante do reembolso (opcional):",
+      o.receiptUrl ?? "",
+    );
+    if (proof === null) return;
+    setBusy(o.id);
+    const ok = await confirmRefund(o.id, proof.trim());
+    setBusy(null);
+    if (!ok) window.alert("Não foi possível registrar o reembolso.");
+    void refetch();
+  }
+
   async function markRefunded(o: Order) {
     const proof = window.prompt(
-      "Link do comprovante do reembolso no InfinitePay (opcional):",
-      o.receiptUrl ?? "",
+      "Link do comprovante do reembolso (opcional):",
+      "",
     );
     if (proof === null) return;
     setBusy(o.id);
