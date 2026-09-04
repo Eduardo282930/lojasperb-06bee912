@@ -234,8 +234,8 @@ function Home() {
 
 
   return (
-    <div className="min-h-screen bg-background pb-24">
-      <header className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur">
+    <div className="min-h-screen bg-background pb-28">
+      <header className="layer-header safe-top sticky top-0 border-b border-border bg-background/95 backdrop-blur">
         <div className="mx-auto max-w-5xl px-3 py-2">
           <div className="flex items-center gap-2">
             <Link to="/" aria-label="SPERB" className="shrink-0">
@@ -360,7 +360,7 @@ function Home() {
       <Link
         to="/eu"
         aria-label="Minha conta e cupons"
-        className="group fixed bottom-5 right-5 z-30 grid h-16 w-16 place-items-center rounded-full bg-gradient-to-br from-[oklch(0.62_0.22_300)] to-[oklch(0.55_0.22_255)] text-white shadow-[0_10px_25px_-5px_oklch(0.55_0.22_255/0.6)] ring-4 ring-white/70 transition-transform active:scale-95"
+        className="floating-bottom layer-floating group fixed right-5 grid h-16 w-16 place-items-center rounded-full bg-gradient-to-br from-[oklch(0.62_0.22_300)] to-[oklch(0.55_0.22_255)] text-white shadow-[0_10px_25px_-5px_oklch(0.55_0.22_255/0.6)] ring-4 ring-white/70 transition-transform active:scale-95"
       >
         <span className="absolute inset-0 animate-ping rounded-full bg-[oklch(0.55_0.22_255)] opacity-20" />
         <span className="relative flex flex-col items-center leading-none">
