@@ -480,9 +480,17 @@ function PedidosPage() {
 
       staleTime: 30 * 1000,
 
-      refetchInterval: checkout
-        ? 5000
-        : false,
+      refetchOnWindowFocus: true,
+
+      // Reembolso pendente: a tela vira "Reembolso realizado" sozinha.
+      refetchInterval: (query) => {
+        if (checkout) return 5000;
+        const list = (query.state.data ?? []) as Order[];
+        const waiting = list.some(
+          (o) => o.refundState === "money_pending",
+        );
+        return waiting ? 8000 : false;
+      },
     });
 
   const quickSync =
