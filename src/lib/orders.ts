@@ -212,6 +212,8 @@ export async function fetchMyOrders(phone: string): Promise<Order[]> {
     paymentProvider: (r as { payment_provider?: string }).payment_provider ?? "",
     paymentDeadlineAt:
       (r as { payment_deadline_at?: string | null }).payment_deadline_at ?? null,
+    receiptUrl:
+      (r as { payment_receipt_url?: string | null }).payment_receipt_url ?? null,
     refundState: (r as { refund_state?: string }).refund_state ?? "none",
     refundProofUrl: (r as { refund_proof_url?: string | null }).refund_proof_url ?? null,
   }));

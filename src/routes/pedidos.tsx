@@ -337,6 +337,25 @@ function OrderCard({
           </div>
         )}
 
+        {order.paymentStatus === "paid" &&
+          order.paymentMethod !== "delivery" &&
+          order.receiptUrl && (
+            <div className="mt-3 flex items-center justify-between gap-3 rounded-xl bg-blue-50 px-3 py-2.5 dark:bg-blue-950/30">
+              <span className="text-sm font-semibold text-foreground">
+                Pagamento confirmado
+              </span>
+              <a
+                href={order.receiptUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="text-sm font-semibold underline"
+                style={{ color: BLUE }}
+              >
+                Comprovante do pagamento
+              </a>
+            </div>
+          )}
+
         {refunded && (
           <div className="mt-3 flex items-center justify-between gap-3 rounded-xl bg-green-50 px-3 py-2.5 dark:bg-green-950/20">
             <span
