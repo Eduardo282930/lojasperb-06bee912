@@ -135,14 +135,14 @@ function refundMessage(order: Order): string | null {
     provider.includes("delivery");
 
   if (isInfinitePay) {
-    return "Pedido cancelado. O reembolso será processado pela InfinitePay. Você receberá a confirmação assim que for concluído.";
+    return "Pedido cancelado · Reembolso pendente de confirmação. Assim que a InfinitePay concluir o estorno, você verá aqui: Reembolso realizado.";
   }
 
   if (isWhatsApp) {
-    return "Pedido cancelado. O reembolso será tratado pelo atendimento da SPERB.";
+    return "Pedido cancelado · Reembolso pendente de confirmação pelo atendimento da SPERB.";
   }
 
-  return "Pedido cancelado. O reembolso está em processamento e você receberá a confirmação quando for concluído.";
+  return "Pedido cancelado · Reembolso pendente de confirmação. Você verá aqui quando for concluído.";
 }
 
 function OrderCard({
@@ -343,7 +343,7 @@ function OrderCard({
               className="text-sm font-semibold"
               style={{ color: GREEN }}
             >
-              Reembolso confirmado
+              ✅ Reembolso realizado
             </span>
 
             {order.refundProofUrl && (
