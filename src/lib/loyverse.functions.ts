@@ -244,6 +244,9 @@ function buildDescription(
   return parts.join("\n\n");
 }
 
+/** Tempo limite de cada chamada ao Loyverse (a resposta nunca fica pendurada). */
+const LOYVERSE_TIMEOUT_MS = 8_000;
+
 async function loyverseGet<T>(
   path: string,
   token: string,
@@ -256,9 +259,24 @@ async function loyverseGet<T>(
     url.searchParams.set("limit", "250");
     for (const [k, v] of Object.entries(extra ?? {})) url.searchParams.set(k, v);
     if (cursor) url.searchParams.set("cursor", cursor);
-    const res = await fetch(url.toString(), {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), LOYVERSE_TIMEOUT_MS);
+    let res: Response;
+    try {
+      res = await fetch(url.toString(), {
+        headers: { Authorization: `Bearer ${token}` },
+        signal: controller.signal,
+      });
+    } catch (err) {
+      if (controller.signal.aborted) {
+        throw new Error(`Loyverse ${path}: tempo limite de ${LOYVERSE_TIMEOUT_MS}ms`);
+      }
+      throw err;
+    } finally {
+      clearTimeout(timer);
+    }
+
     if (!res.ok) throw new Error(`Loyverse ${path} ${res.status}: ${await res.text()}`);
     const data = (await res.json()) as Record<string, unknown>;
     const key = Object.keys(data).find((k) => Array.isArray(data[k]));
