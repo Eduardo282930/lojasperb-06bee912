@@ -602,6 +602,42 @@ function PedidosPage() {
     ),
   }));
 
+  /*
+   * Abertura da tela: começa na primeira seção que tiver pedido,
+   * na ordem A pagar → Preparando → A caminho. Só acontece uma vez,
+   * e nunca depois que o cliente escolhe uma aba.
+   */
+  const autoPickedRef = useRef(false);
+
+  useEffect(() => {
+    if (autoPickedRef.current) return;
+    if (isLoading || orders.length === 0) return;
+
+    autoPickedRef.current = true;
+
+    const currentGroup = groups.find(
+      (group) => group.value === status,
+    );
+
+    if (currentGroup && currentGroup.list.length > 0) return;
+
+    const preferred = (
+      ["topay", "preparing", "shipping"] as StatusValue[]
+    ).find(
+      (value) =>
+        (groups.find((g) => g.value === value)?.list.length ?? 0) > 0,
+    );
+
+    if (!preferred || preferred === status) return;
+
+    void navigate({
+      search: { status: preferred },
+      replace: true,
+    });
+  }, [isLoading, orders.length, groups, status, navigate]);
+
+
+
   const updateIndicator = useCallback(
     (progressIndex = activeIndex) => {
       const tabs = tabsRef.current;
