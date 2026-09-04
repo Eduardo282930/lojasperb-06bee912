@@ -603,40 +603,87 @@ function PedidosPage() {
   }));
 
   /*
-   * Abertura da tela: começa na primeira seção que tiver pedido,
-   * na ordem A pagar → Preparando → A caminho. Só acontece uma vez,
-   * e nunca depois que o cliente escolhe uma aba.
+   * Abertura automática inicial.
+   *
+   * Prioridade:
+   * 1. A pagar
+   * 2. Preparando
+   * 3. A caminho
+   * 4. Finalizado
+   *
+   * Se a URL já estiver em uma seção que possui pedidos,
+   * mantém essa seção.
+   *
+   * Se a URL estiver em uma seção vazia, procura a primeira
+   * seção com pedidos seguindo a prioridade acima.
+   *
+   * Essa lógica roda apenas uma vez por entrada na página.
    */
   const autoPickedRef = useRef(false);
 
   useEffect(() => {
     if (autoPickedRef.current) return;
-    if (isLoading || orders.length === 0) return;
+    if (isLoading) return;
 
-    autoPickedRef.current = true;
+    /*
+     * Ainda não há pedidos carregados.
+     * Não toma nenhuma decisão antes do carregamento terminar.
+     */
+    if (orders.length === 0) {
+      autoPickedRef.current = true;
+      return;
+    }
 
     const currentGroup = groups.find(
       (group) => group.value === status,
     );
 
-    if (currentGroup && currentGroup.list.length > 0) return;
+    /*
+     * Se a aba atual possui pedidos, ela é válida.
+     * Não altera a escolha do cliente.
+     */
+    if (currentGroup && currentGroup.list.length > 0) {
+      autoPickedRef.current = true;
+      return;
+    }
 
-    const preferred = (
-      ["topay", "preparing", "shipping"] as StatusValue[]
-    ).find(
+    /*
+     * A aba atual está vazia.
+     * Escolhe automaticamente a primeira seção com pedidos.
+     */
+    const priority: StatusValue[] = [
+      "topay",
+      "preparing",
+      "shipping",
+      "delivered",
+    ];
+
+    const preferred = priority.find(
       (value) =>
-        (groups.find((g) => g.value === value)?.list.length ?? 0) > 0,
+        groups.find(
+          (group) => group.value === value,
+        )?.list.length > 0,
     );
 
-    if (!preferred || preferred === status) return;
+    autoPickedRef.current = true;
+
+    if (!preferred || preferred === status) {
+      return;
+    }
 
     void navigate({
-      search: { status: preferred },
+      search: {
+        status: preferred,
+      },
       replace: true,
     });
-  }, [isLoading, orders.length, groups, status, navigate]);
-
-
+  }, [
+    isLoading,
+    orders.length,
+    groups,
+    status,
+    navigate,
+  ]);
 
   const updateIndicator = useCallback(
     (progressIndex = activeIndex) => {
@@ -912,7 +959,6 @@ function PedidosPage() {
           <h1 className="text-2xl font-semibold text-foreground">
             Minhas compras
           </h1>
-
         </div>
 
         <div
