@@ -1,11 +1,10 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   ChevronDown,
   ClipboardList,
   Package,
-  ShoppingCart,
 } from "lucide-react";
 import { BackButton } from "@/components/back-button";
 import { useProfile } from "@/lib/coupons";
@@ -215,7 +214,6 @@ function OrderCard({
   return (
     <li className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
       <div className="p-4">
-        {/* Cabeçalho do pedido */}
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-xs font-medium text-muted-foreground">
@@ -245,10 +243,8 @@ function OrderCard({
           </div>
         </div>
 
-        {/* Progresso da entrega */}
         <Progress status={order.status} />
 
-        {/* Produtos */}
         <div className="mt-4 rounded-xl bg-muted/50 p-3">
           <p className="mb-2 text-sm font-semibold text-foreground">
             Produtos do pedido
@@ -294,7 +290,6 @@ function OrderCard({
           </ul>
         </div>
 
-        {/* Desconto */}
         {order.discount > 0 && (
           <div className="mt-3 flex items-center justify-between text-sm">
             <span className="text-muted-foreground">
@@ -310,7 +305,6 @@ function OrderCard({
           </div>
         )}
 
-        {/* Prazo de pagamento */}
         {unpaid && minutesLeft > 0 && (
           <div className="mt-3 rounded-xl bg-blue-50 px-3 py-2.5 text-sm text-foreground dark:bg-blue-950/30">
             <span className="font-semibold">
@@ -321,7 +315,6 @@ function OrderCard({
           </div>
         )}
 
-        {/* Botão de pagamento */}
         {unpaid && (
           <button
             type="button"
@@ -336,7 +329,6 @@ function OrderCard({
           </button>
         )}
 
-        {/* Reembolso pendente */}
         {refundText && (
           <div className="mt-3 rounded-xl border border-orange-200 bg-orange-50 p-3 dark:border-orange-900/40 dark:bg-orange-950/20">
             <p className="text-sm font-medium leading-5 text-foreground">
@@ -345,7 +337,6 @@ function OrderCard({
           </div>
         )}
 
-        {/* Reembolso confirmado */}
         {refunded && (
           <div className="mt-3 flex items-center justify-between gap-3 rounded-xl bg-green-50 px-3 py-2.5 dark:bg-green-950/20">
             <span
@@ -369,7 +360,6 @@ function OrderCard({
           </div>
         )}
 
-        {/* Detalhes */}
         <button
           type="button"
           onClick={() => setOpen((value) => !value)}
@@ -438,16 +428,6 @@ function PedidosPage() {
 
   const [lastOrderId, setLastOrderId] = useState("");
 
-  /*
-   * activeIndex pode ser decimal.
-   *
-   * 0 = A pagar
-   * 0.5 = entre A pagar e Preparando
-   * 1 = Preparando
-   *
-   * Isso permite que a linha azul acompanhe
-   * o movimento do dedo durante o arraste.
-   */
   const [activeIndex, setActiveIndex] = useState(() =>
     Math.max(
       0,
@@ -487,9 +467,6 @@ function PedidosPage() {
     refetchInterval: checkout ? 5000 : false,
   });
 
-  /*
-   * Sincronização complementar com o Loyverse.
-   */
   const quickSync = useServerFn(runLoyverseQuickSync);
 
   useEffect(() => {
@@ -518,10 +495,7 @@ function PedidosPage() {
           void refetch();
         }
       } catch {
-        /*
-         * O webhook continua sendo a principal
-         * fonte de atualização.
-         */
+        // O webhook continua sendo a principal fonte de atualização.
       }
     })();
 
@@ -546,10 +520,6 @@ function PedidosPage() {
     }
   }, []);
 
-  /*
-   * Se o usuário chegar aqui vindo do pagamento,
-   * mantém a seção correta.
-   */
   useEffect(() => {
     const foundIndex = SECTIONS.findIndex(
       (item) => item.value === status,
@@ -581,10 +551,6 @@ function PedidosPage() {
     setActiveIndex(index);
   }, [status]);
 
-  /*
-   * Depois do pagamento confirmado,
-   * vai automaticamente para Preparando.
-   */
   useEffect(() => {
     if (
       checkout &&
@@ -637,17 +603,6 @@ function PedidosPage() {
     ),
   }));
 
-  /*
-   * Quando a tela é aberta, se a seção atual estiver
-   * vazia, abre automaticamente a primeira seção que
-   * tiver pedidos.
-   *
-   * Prioridade:
-   * 1. A pagar
-   * 2. Preparando
-   * 3. A caminho
-   * 4. Finalizado
-   */
   useEffect(() => {
     if (
       autoPickedRef.current ||
@@ -716,10 +671,6 @@ function PedidosPage() {
     status,
   ]);
 
-  /*
-   * Garante que, na primeira abertura da página,
-   * o painel inferior fique alinhado com a aba escolhida.
-   */
   useEffect(() => {
     if (initialTrackSyncRef.current) return;
 
@@ -774,9 +725,6 @@ function PedidosPage() {
     status,
   ]);
 
-  /*
-   * Calcula exatamente onde a linha azul deve ficar.
-   */
   const updateIndicator = useCallback(
     (progressIndex = activeIndex) => {
       const tabs = tabsRef.current;
@@ -883,11 +831,6 @@ function PedidosPage() {
     });
   }
 
-  /*
-   * Clique em uma aba:
-   * muda imediatamente e leva o painel inferior
-   * diretamente para a seção escolhida.
-   */
   function selectTab(index: number) {
     const track = trackRef.current;
 
@@ -926,9 +869,6 @@ function PedidosPage() {
     updateIndicator(index);
   }
 
-  /*
-   * Arraste horizontal dos painéis inferiores.
-   */
   function onTrackScroll() {
     const track = trackRef.current;
 
@@ -1023,9 +963,8 @@ function PedidosPage() {
 
   return (
     <div className="min-h-screen bg-background pb-16">
-      {/* Cabeçalho */}
       <header className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur">
-        <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-3 pr-20">
+        <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-3">
           <BackButton fallback="/eu" />
 
           <h1 className="text-2xl font-semibold text-foreground">
@@ -1033,30 +972,6 @@ function PedidosPage() {
           </h1>
         </div>
 
-        {/* Carrinho fixo no canto superior direito */}
-        <Link
-          to="/"
-          aria-label="Continuar comprando"
-          className="fixed right-4 top-4 z-50 grid h-12 w-12 place-items-center rounded-full border border-border bg-background text-foreground shadow-md transition-transform active:scale-95"
-        >
-          <ShoppingCart
-            className="h-6 w-6"
-            style={{
-              color: BLUE,
-            }}
-          />
-
-          <span
-            className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full px-1 text-[10px] font-bold leading-none text-white"
-            style={{
-              backgroundColor: BLUE,
-            }}
-          >
-            1
-          </span>
-        </Link>
-
-        {/* Abas */}
         <div
           ref={tabsRef}
           className="relative mx-auto flex max-w-3xl overflow-hidden px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
@@ -1083,7 +998,6 @@ function PedidosPage() {
                       : "var(--muted-foreground)",
                 }}
               >
-                {/* Badge acima do nome */}
                 <span className="mb-0.5 flex h-4 items-center justify-center">
                   {group.list.length > 0 ? (
                     <span
@@ -1109,7 +1023,6 @@ function PedidosPage() {
             ),
           )}
 
-          {/* Linha azul */}
           <span
             aria-hidden="true"
             className="pointer-events-none absolute bottom-0 h-0.5 rounded-full"
@@ -1123,7 +1036,6 @@ function PedidosPage() {
       </header>
 
       <main className="mx-auto max-w-3xl pt-4">
-        {/* Retorno do pagamento */}
         {checkout && lastOrder && (
           <div className="mx-4 mb-4 rounded-2xl border border-green-200 bg-green-50 p-4 dark:border-green-900/40 dark:bg-green-950/20">
             <p className="text-base font-semibold text-foreground">
@@ -1145,14 +1057,12 @@ function PedidosPage() {
           </div>
         )}
 
-        {/* Carregando */}
         {isLoading && (
           <p className="px-4 text-base text-muted-foreground">
             Carregando suas compras…
           </p>
         )}
 
-        {/* Nenhuma compra em nenhuma seção */}
         {!isLoading &&
           orders.length === 0 && (
             <div className="mx-4 flex min-h-[360px] flex-col items-center justify-center px-6 text-center">
@@ -1173,19 +1083,18 @@ function PedidosPage() {
                 Quando você fizer uma compra, seus pedidos aparecerão aqui.
               </p>
 
-              <Link
-                to="/"
+              <a
+                href="/"
                 className="mt-5 rounded-xl px-5 py-3 text-base font-semibold text-white"
                 style={{
                   backgroundColor: BLUE,
                 }}
               >
                 Ver produtos
-              </Link>
+              </a>
             </div>
           )}
 
-        {/* Painéis horizontais */}
         {!isLoading &&
           orders.length > 0 && (
             <div
