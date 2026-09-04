@@ -266,6 +266,9 @@ function Home() {
               )}
             </div>
             {/* O carrinho é único e fica fixo no canto superior direito. */}
+          </div>
+
+
 
 
 
