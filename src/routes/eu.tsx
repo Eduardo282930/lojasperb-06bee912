@@ -126,7 +126,7 @@ function EuPage() {
 
   return (
     <div className="min-h-screen bg-background pb-16">
-      <header className="sticky top-0 z-10 border-b-2 border-border bg-background/95 backdrop-blur">
+      <header className="layer-header safe-top sticky top-0 border-b-2 border-border bg-background/95 backdrop-blur">
         <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-3">
           <Link
             to="/"
@@ -382,7 +382,7 @@ function ProfileSheet({ onClose }: { onClose: () => void }) {
 
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end bg-black/50 p-0 sm:items-center sm:justify-center sm:p-4">
+    <div className="layer-modal fixed inset-0 flex items-end bg-black/50 p-0 sm:items-center sm:justify-center sm:p-4">
       <div className="max-h-[90vh] w-full overflow-y-auto rounded-t-3xl border-2 border-border bg-card p-5 shadow-2xl sm:max-w-md sm:rounded-3xl">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-black text-foreground">Meus dados</h2>

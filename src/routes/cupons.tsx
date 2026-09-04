@@ -70,7 +70,7 @@ function CuponsPage() {
 
   return (
     <div className="min-h-screen bg-background pb-16">
-      <header className="sticky top-0 z-10 border-b-2 border-border bg-background/95 backdrop-blur">
+      <header className="layer-header safe-top sticky top-0 border-b-2 border-border bg-background/95 backdrop-blur">
         <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-3">
           <BackButton fallback="/eu" />
           <h1 className="flex items-center gap-2 text-2xl font-black text-foreground">
