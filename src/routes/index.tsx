@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
-import { useSuspenseQuery, queryOptions } from "@tanstack/react-query";
+import { useSuspenseQuery, queryOptions, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Plus,
@@ -34,8 +34,6 @@ import {
 
 const PAGE_SIZE = 30;
 
-const cached = typeof window === "undefined" ? null : loadCachedCatalog();
-
 export const catalogQuery = queryOptions({
   queryKey: ["catalog"],
   queryFn: async () => {
@@ -43,8 +41,6 @@ export const catalogQuery = queryOptions({
     saveCachedCatalog(catalog);
     return catalog;
   },
-  // Cópia local do aparelho: a vitrine aparece na hora e atualiza sozinha.
-  ...(cached ? { initialData: cached.catalog, initialDataUpdatedAt: cached.at } : {}),
   staleTime: 30 * 1000,
   gcTime: 30 * 60 * 1000,
   refetchInterval: 60 * 1000,
@@ -116,11 +112,25 @@ function ErrorView({ error }: { error: Error }) {
 
 function Home() {
   const { data } = useSuspenseQuery(catalogQuery);
+  const queryClient = useQueryClient();
   const cart = useCart();
   const totalQty = cart.reduce((s, c) => s + c.qty, 0);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<string>("todos");
   const [showAllCategories, setShowAllCategories] = useState(false);
+
+  /*
+   * Cópia local do aparelho: só entra DEPOIS da hidratação, para que a tela
+   * montada no aparelho seja igual à enviada pelo servidor (sem tela branca).
+   * Serve de rede de segurança quando o Loyverse não respondeu no servidor.
+   */
+  useEffect(() => {
+    if (data.products.length > 0) return;
+    const local = loadCachedCatalog();
+    if (local && local.catalog.products.length > 0) {
+      queryClient.setQueryData(catalogQuery.queryKey, local.catalog);
+    }
+  }, [data.products.length, queryClient]);
 
   // Vitrine comercial: destaques do admin, mais vendidos e estoque reservado.
   const merch = useQuery({
@@ -224,8 +234,8 @@ function Home() {
 
 
   return (
-    <div className="min-h-screen bg-background pb-24">
-      <header className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur">
+    <div className="min-h-screen bg-background pb-28">
+      <header className="layer-header safe-top sticky top-0 border-b border-border bg-background/95 backdrop-blur">
         <div className="mx-auto max-w-5xl px-3 py-2">
           <div className="flex items-center gap-2">
             <Link to="/" aria-label="SPERB" className="shrink-0">
@@ -350,7 +360,7 @@ function Home() {
       <Link
         to="/eu"
         aria-label="Minha conta e cupons"
-        className="group fixed bottom-5 right-5 z-30 grid h-16 w-16 place-items-center rounded-full bg-gradient-to-br from-[oklch(0.62_0.22_300)] to-[oklch(0.55_0.22_255)] text-white shadow-[0_10px_25px_-5px_oklch(0.55_0.22_255/0.6)] ring-4 ring-white/70 transition-transform active:scale-95"
+        className="floating-bottom layer-floating group fixed right-5 grid h-16 w-16 place-items-center rounded-full bg-gradient-to-br from-[oklch(0.62_0.22_300)] to-[oklch(0.55_0.22_255)] text-white shadow-[0_10px_25px_-5px_oklch(0.55_0.22_255/0.6)] ring-4 ring-white/70 transition-transform active:scale-95"
       >
         <span className="absolute inset-0 animate-ping rounded-full bg-[oklch(0.55_0.22_255)] opacity-20" />
         <span className="relative flex flex-col items-center leading-none">

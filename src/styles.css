@@ -137,8 +137,55 @@
     border-color: var(--color-border);
   }
 
+  html {
+    /* Nada pode criar rolagem lateral na loja. */
+    overflow-x: hidden;
+  }
+
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
+    overflow-x: hidden;
   }
 }
+
+/*
+ * Escala única de camadas da loja.
+ * conteúdo (0) < cabeçalho (30) < barra fixa (40) < flutuante (45) < modal (60)
+ */
+@utility layer-header {
+  z-index: 30;
+}
+
+@utility layer-bottombar {
+  z-index: 40;
+}
+
+@utility layer-floating {
+  z-index: 45;
+}
+
+@utility layer-modal {
+  z-index: 60;
+}
+
+/* Áreas seguras (notch e barra de gestos). */
+@utility safe-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+@utility safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Distância extra do fundo para elementos flutuantes. */
+@utility floating-bottom {
+  bottom: calc(1.25rem + env(safe-area-inset-bottom, 0px));
+}
+
+/* Alvo de toque confortável no celular. */
+@utility tap-target {
+  min-height: 44px;
+  min-width: 44px;
+}
+

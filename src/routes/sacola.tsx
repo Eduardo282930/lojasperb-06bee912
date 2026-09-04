@@ -78,7 +78,7 @@ function SacolaPage() {
 
   return (
     <div className="min-h-screen bg-background pb-28">
-      <header className="sticky top-0 z-10 border-b-2 border-border bg-background/95 backdrop-blur">
+      <header className="layer-header safe-top sticky top-0 border-b-2 border-border bg-background/95 backdrop-blur">
         <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-3">
           <BackButton
             fallback="/"
@@ -237,7 +237,7 @@ function SacolaPage() {
       </main>
 
       {cart.length > 0 && (
-        <div className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-background/95 backdrop-blur">
+        <div className="layer-bottombar safe-bottom fixed inset-x-0 bottom-0 border-t border-border bg-background/95 backdrop-blur">
           <div className="mx-auto max-w-3xl px-3 pb-3 pt-2">
             {erro && (
               <p className="mb-2 rounded-xl bg-destructive/10 px-3 py-2 text-sm font-bold text-destructive">

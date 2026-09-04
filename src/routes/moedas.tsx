@@ -87,9 +87,9 @@ function MoedasPage() {
   const doneDays = checkedToday ? nextDay : nextDay - 1;
 
   return (
-    <div className="min-h-screen bg-muted pb-16">
+    <div className="min-h-screen bg-muted pb-24">
       <header
-        className="px-4 pb-16 pt-4 text-white"
+        className="safe-top px-4 pb-16 pt-4 text-white"
         style={{ background: `linear-gradient(160deg, ${GOLD} 0%, ${GOLD_DARK} 100%)` }}
       >
         <div className="mx-auto flex max-w-3xl items-center gap-3">

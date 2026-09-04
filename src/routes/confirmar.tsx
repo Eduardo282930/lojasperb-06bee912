@@ -246,7 +246,7 @@ function ConfirmarPage() {
 
   return (
     <div className="min-h-screen bg-background pb-48">
-      <header className="sticky top-0 z-10 border-b-2 border-border bg-background/95 backdrop-blur">
+      <header className="layer-header safe-top sticky top-0 border-b-2 border-border bg-background/95 backdrop-blur">
         <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-3">
           <BackButton
             fallback="/sacola"
@@ -385,7 +385,7 @@ function ConfirmarPage() {
       </main>
 
       {picker && (
-        <div className="fixed inset-0 z-50 flex items-end bg-black/40">
+        <div className="layer-modal fixed inset-0 flex items-end bg-black/40">
           <div className="max-h-[80vh] w-full overflow-y-auto rounded-t-3xl border-t-2 border-border bg-background p-4">
             <h2 className="text-xl font-black text-foreground">Escolher cupom</h2>
             <ul className="mt-3 flex flex-col gap-2">
@@ -424,7 +424,7 @@ function ConfirmarPage() {
       )}
 
       {picked.length > 0 && (
-        <div className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-background/95 px-3 pb-3 pt-2 backdrop-blur">
+        <div className="layer-bottombar safe-bottom fixed inset-x-0 bottom-0 border-t border-border bg-background/95 px-3 pb-3 pt-2 backdrop-blur">
           <div className="mx-auto flex max-w-3xl flex-col gap-2">
             {erro && (
               <p className="rounded-xl bg-destructive/10 px-3 py-2 text-sm font-bold text-destructive">

@@ -197,6 +197,30 @@ export const Route = createRootRouteWithContext<{
   errorComponent: ErrorComponent,
 });
 
+/*
+ * Autocorreção de cache preso: se a folha de estilos não carregar (HTML antigo
+ * apontando para um arquivo que não existe mais), o app recarrega UMA vez
+ * ignorando o cache. Sem isso, o celular abre a loja sem estilo.
+ */
+const CSS_SELF_HEAL = `
+(function(){
+  try {
+    var key = 'sperb-css-reload';
+    window.addEventListener('load', function(){
+      var ok = false;
+      for (var i = 0; i < document.styleSheets.length; i++) {
+        try { if (document.styleSheets[i].cssRules && document.styleSheets[i].cssRules.length) { ok = true; break; } }
+        catch (e) { ok = true; break; }
+      }
+      if (ok) { sessionStorage.removeItem(key); return; }
+      if (sessionStorage.getItem(key)) return;
+      sessionStorage.setItem(key, '1');
+      location.reload();
+    });
+  } catch (e) {}
+})();
+`;
+
 function RootShell({
   children,
 }: {
@@ -206,19 +230,7 @@ function RootShell({
     <html lang="pt-BR">
       <head>
         <HeadContent />
-
-        {/*
-         * Reforça o carregamento do CSS global.
-         *
-         * O app usa Tailwind 4 e o CSS é gerado pelo Vite.
-         * O link abaixo continua usando o arquivo versionado
-         * gerado pelo build, evitando depender de cache antigo
-         * do navegador.
-         */}
-        <link
-          rel="stylesheet"
-          href={appCss}
-        />
+        <script dangerouslySetInnerHTML={{ __html: CSS_SELF_HEAL }} />
       </head>
 
       <body>

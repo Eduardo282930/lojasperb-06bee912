@@ -44,17 +44,41 @@ function isH3SwallowedErrorBody(body: string): boolean {
   }
 }
 
+/**
+ * Páginas HTML nunca podem ficar guardadas no cache do aparelho: um HTML antigo
+ * pede arquivos de CSS/JS versionados que já não existem no deployment novo, e
+ * a loja abre sem estilo. Os arquivos versionados continuam com cache longo.
+ */
+function withHtmlNoStore(response: Response): Response {
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!contentType.includes("text/html")) return response;
+  if (response.headers.get("cache-control")?.includes("no-store")) return response;
+
+  const headers = new Headers(response.headers);
+  headers.set("cache-control", "no-store, must-revalidate");
+  headers.set("pragma", "no-cache");
+
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
-      return await normalizeCatastrophicSsrResponse(response);
+      return withHtmlNoStore(await normalizeCatastrophicSsrResponse(response));
     } catch (error) {
       console.error(error);
       return new Response(renderErrorPage(), {
         status: 500,
-        headers: { "content-type": "text/html; charset=utf-8" },
+        headers: {
+          "content-type": "text/html; charset=utf-8",
+          "cache-control": "no-store, must-revalidate",
+        },
       });
     }
   },
