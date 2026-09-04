@@ -693,11 +693,11 @@ function PedidosPage() {
     const firstPopulated =
       priority.find(
         (value) =>
-          groups.find(
+          (groups.find(
             (group) =>
               group.value ===
               value,
-          )?.list.length > 0,
+          )?.list.length ?? 0) > 0,
       );
 
     if (!firstPopulated) {
