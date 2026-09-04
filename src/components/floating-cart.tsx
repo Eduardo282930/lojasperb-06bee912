@@ -3,16 +3,20 @@ import { ShoppingCart } from "lucide-react";
 import { useCart } from "@/lib/cart";
 
 /**
- * Carrinho flutuante disponível em todas as telas da loja — inclusive vazio.
- * Na tela inicial e no próprio carrinho ele não aparece: lá o carrinho já tem
- * lugar fixo no cabeçalho.
+ * Carrinho flutuante das telas internas.
+ *
+ * Fica ancorado no canto inferior direito (nunca sobre o cabeçalho) e respeita
+ * a área segura do aparelho. Não aparece onde o carrinho já existe no
+ * cabeçalho (home) nem onde há barra de ação fixa no rodapé (sacola e
+ * confirmação), evitando qualquer sobreposição.
  */
 export function FloatingCart() {
   const cart = useCart();
   const path = useRouterState({ select: (s) => s.location.pathname });
   const qty = cart.reduce((s, c) => s + c.qty, 0);
 
-  const hidden = path === "/" || path.startsWith("/sacola") || path.startsWith("/confirmar");
+  const hidden =
+    path === "/" || path.startsWith("/sacola") || path.startsWith("/confirmar");
   if (hidden) return null;
 
   return (
@@ -20,7 +24,7 @@ export function FloatingCart() {
       id="cart-anchor"
       to="/sacola"
       aria-label={qty > 0 ? `Ver carrinho com ${qty} itens` : "Ver carrinho"}
-      className="fixed right-4 top-3 z-40 grid h-12 w-12 place-items-center rounded-full bg-[oklch(0.62_0.19_145)] text-white shadow-lg active:scale-95"
+      className="floating-bottom layer-floating tap-target fixed right-4 grid h-14 w-14 place-items-center rounded-full bg-[oklch(0.62_0.19_145)] text-white shadow-lg active:scale-95"
     >
       <span className="relative">
         <ShoppingCart className="h-6 w-6" />
