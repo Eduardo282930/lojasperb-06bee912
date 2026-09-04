@@ -112,11 +112,25 @@ function ErrorView({ error }: { error: Error }) {
 
 function Home() {
   const { data } = useSuspenseQuery(catalogQuery);
+  const queryClient = useQueryClient();
   const cart = useCart();
   const totalQty = cart.reduce((s, c) => s + c.qty, 0);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<string>("todos");
   const [showAllCategories, setShowAllCategories] = useState(false);
+
+  /*
+   * Cópia local do aparelho: só entra DEPOIS da hidratação, para que a tela
+   * montada no aparelho seja igual à enviada pelo servidor (sem tela branca).
+   * Serve de rede de segurança quando o Loyverse não respondeu no servidor.
+   */
+  useEffect(() => {
+    if (data.products.length > 0) return;
+    const local = loadCachedCatalog();
+    if (local && local.catalog.products.length > 0) {
+      queryClient.setQueryData(catalogQuery.queryKey, local.catalog);
+    }
+  }, [data.products.length, queryClient]);
 
   // Vitrine comercial: destaques do admin, mais vendidos e estoque reservado.
   const merch = useQuery({
