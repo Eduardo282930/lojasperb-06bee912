@@ -1263,7 +1263,7 @@ function OrdersPanel() {
   async function markRefunded(o: Order) {
     const proof = window.prompt(
       "Link do comprovante do reembolso no InfinitePay (opcional):",
-      "",
+      o.receiptUrl ?? "",
     );
     if (proof === null) return;
     setBusy(o.id);
@@ -1271,6 +1271,31 @@ function OrdersPanel() {
     setBusy(null);
     if (!ok) window.alert("Não foi possível registrar o reembolso.");
     void refetch();
+  }
+
+  /**
+   * A InfinitePay não publica API nem deep link para abrir uma venda
+   * específica: a documentação oficial só tem /links e /payment_check.
+   * O que existe oficialmente é o comprovante (receipt_url) da transação —
+   * é ele que abrimos, junto com os identificadores da venda.
+   */
+  function openInfinitePaySale(o: Order) {
+    const ids = [
+      o.paymentTransactionNsu ? `transaction_nsu: ${o.paymentTransactionNsu}` : "",
+      o.paymentSlug ? `slug: ${o.paymentSlug}` : "",
+      o.paymentOrderNsu ? `order_nsu: ${o.paymentOrderNsu}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n");
+    if (o.receiptUrl) {
+      window.open(o.receiptUrl, "_blank", "noopener");
+      return;
+    }
+    window.alert(
+      ids
+        ? `Abra o app InfinitePay em Vendas e localize a venda:\n\n${ids}`
+        : "Sem identificadores da InfinitePay para este pedido.",
+    );
   }
 
   if (isLoading) {
@@ -1345,14 +1370,34 @@ function OrdersPanel() {
                 </button>
               )}
             {o.status === "canceled" && o.refundState !== "refunded" && (
-              <button
-                type="button"
-                disabled={busy === o.id}
-                onClick={() => void markRefunded(o)}
-                className="rounded-xl border-2 border-border bg-background px-3 py-2 text-base font-black text-foreground"
-              >
-                Confirmar reembolso
-              </button>
+              <>
+                <span
+                  className="text-sm font-black"
+                  style={{ color: "oklch(0.72 0.17 62)" }}
+                >
+                  Reembolso pendente de confirmação
+                </span>
+                {(o.receiptUrl ||
+                  o.paymentTransactionNsu ||
+                  o.paymentSlug) && (
+                  <button
+                    type="button"
+                    onClick={() => openInfinitePaySale(o)}
+                    className="rounded-xl px-3 py-2 text-base font-black text-white"
+                    style={{ backgroundColor: BLUE }}
+                  >
+                    Abrir venda na InfinitePay
+                  </button>
+                )}
+                <button
+                  type="button"
+                  disabled={busy === o.id}
+                  onClick={() => void markRefunded(o)}
+                  className="rounded-xl border-2 border-border bg-background px-3 py-2 text-base font-black text-foreground"
+                >
+                  Confirmar reembolso
+                </button>
+              </>
             )}
             <span className="text-sm font-bold text-muted-foreground">
               {statusLabel(o.status)} · {paymentDisplayLabel(o)}
@@ -1369,7 +1414,7 @@ function OrdersPanel() {
             )}
             {o.refundState === "refunded" && (
               <span className="text-sm font-black" style={{ color: GREEN }}>
-                Reembolsado
+                ✅ Reembolso realizado
                 {o.refundProofUrl ? "" : " (sem comprovante)"}
               </span>
             )}

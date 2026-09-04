@@ -30,6 +30,10 @@ export type Order = {
   paymentDeadlineAt?: string | null;
   refundState?: string;
   refundProofUrl?: string | null;
+  /** Identificadores oficiais da transação InfinitePay. */
+  paymentOrderNsu?: string | null;
+  paymentTransactionNsu?: string | null;
+  paymentSlug?: string | null;
 };
 
 /** Pagamento na entrega tem rótulo próprio, nunca aparece só como "Pago". */
@@ -172,6 +176,15 @@ export async function fetchOrders(): Promise<Order[]> {
       (r as { payment_deadline_at?: string | null }).payment_deadline_at ?? null,
     refundState: (r as { refund_state?: string }).refund_state ?? "none",
     refundProofUrl: (r as { refund_proof_url?: string | null }).refund_proof_url ?? null,
+    paymentOrderNsu:
+      (r as { payment_order_nsu?: string | null }).payment_order_nsu ??
+      (r as { payment_nsu?: string | null }).payment_nsu ??
+      null,
+    paymentTransactionNsu:
+      (r as { payment_transaction_nsu?: string | null }).payment_transaction_nsu ??
+      (r as { payment_id?: string | null }).payment_id ??
+      null,
+    paymentSlug: (r as { payment_slug?: string | null }).payment_slug ?? null,
   }));
 }
 

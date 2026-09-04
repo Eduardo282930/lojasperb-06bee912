@@ -56,6 +56,19 @@ export const Route = createFileRoute("/api/public/infinitepay-webhook")({
           return new Response("retry", { status: 400 });
         }
 
+        // Identificadores oficiais da transação — usados depois no reembolso.
+        const rpc = supabaseAdmin.rpc.bind(supabaseAdmin) as unknown as (
+          name: string,
+          args: Record<string, unknown>,
+        ) => Promise<{ error?: { message: string } | null }>;
+        await rpc("record_payment_identifiers", {
+          p_order_id: found.id,
+          p_order_nsu: orderNsu,
+          p_transaction_nsu: transactionNsu,
+          p_slug: slug,
+          p_receipt_url: String(payload["receipt_url"] ?? ""),
+        });
+
         // Pagamento confirmado: a reserva vira venda real no Loyverse.
         // Idempotente: se o recibo já existe, nada é criado de novo.
         try {
