@@ -34,8 +34,6 @@ import {
 
 const PAGE_SIZE = 30;
 
-const cached = typeof window === "undefined" ? null : loadCachedCatalog();
-
 export const catalogQuery = queryOptions({
   queryKey: ["catalog"],
   queryFn: async () => {
@@ -43,8 +41,6 @@ export const catalogQuery = queryOptions({
     saveCachedCatalog(catalog);
     return catalog;
   },
-  // Cópia local do aparelho: a vitrine aparece na hora e atualiza sozinha.
-  ...(cached ? { initialData: cached.catalog, initialDataUpdatedAt: cached.at } : {}),
   staleTime: 30 * 1000,
   gcTime: 30 * 60 * 1000,
   refetchInterval: 60 * 1000,
