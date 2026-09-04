@@ -30,6 +30,10 @@ export type Order = {
   paymentDeadlineAt?: string | null;
   refundState?: string;
   refundProofUrl?: string | null;
+  /** Identificadores oficiais da transação InfinitePay. */
+  paymentOrderNsu?: string | null;
+  paymentTransactionNsu?: string | null;
+  paymentSlug?: string | null;
 };
 
 /** Pagamento na entrega tem rótulo próprio, nunca aparece só como "Pago". */
