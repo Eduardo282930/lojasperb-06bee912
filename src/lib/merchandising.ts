@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import type { CatalogProduct } from "@/lib/loyverse.functions";
+import type { FeaturedItem } from "@/lib/merch-order";
 
 /** Seções de destaque da vitrine. */
 export const FEATURED_SECTIONS = [
@@ -10,7 +10,7 @@ export const FEATURED_SECTIONS = [
 
 export type FeaturedSection = (typeof FEATURED_SECTIONS)[number]["value"];
 
-export type { FeaturedItem } from "@/lib/merch-order";
+export type { FeaturedItem };
 
 export function sectionLabel(value: string): string {
   return FEATURED_SECTIONS.find((s) => s.value === value)?.label ?? "⭐ Destaques SPERB";
