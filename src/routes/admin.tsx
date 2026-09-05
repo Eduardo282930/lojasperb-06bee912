@@ -1065,10 +1065,10 @@ function StockPanel() {
         if (filter === "in") return p.stock > 0;
         if (filter === "out") return p.stock <= 0;
         if (filter === "low") {
-          // Estoque baixo da SPERB: qualquer variação com 1 unidade.
+          // Estoque baixo da SPERB: qualquer variação com 1 ou 2 unidades.
           // Se houver alguma variação zerada, o produto pertence a "Sem estoque".
           const hasOutOfStockVariant = p.variants.some((v) => v.stock <= 0);
-          return !hasOutOfStockVariant && p.variants.some((v) => v.stock < 2);
+          return !hasOutOfStockVariant && p.variants.some((v) => v.stock > 0 && v.stock <= 2);
         }
         return true;
       })
@@ -1091,9 +1091,10 @@ function StockPanel() {
         );
         const profit = saleValue - costValue;
         const hasOutOfStockVariant = p.variants.some((v) => v.stock <= 0);
-        const low = !hasOutOfStockVariant && p.variants.some((v) => v.stock < 2);
+        const low = !hasOutOfStockVariant && p.variants.some((v) => v.stock > 0 && v.stock <= 2);
+        const out = hasOutOfStockVariant;
         const active = p.variants.some((v) => v.availableForSale);
-        return { product: p, costValue, saleValue, profit, low, active };
+        return { product: p, costValue, saleValue, profit, low, out, active };
       });
   }, [products, search, filter]);
 
@@ -1122,7 +1123,7 @@ function StockPanel() {
     );
     const low = products.filter((p) => {
       const hasOutOfStockVariant = p.variants.some((v) => v.stock <= 0);
-      return !hasOutOfStockVariant && p.variants.some((v) => v.stock < 2);
+      return !hasOutOfStockVariant && p.variants.some((v) => v.stock > 0 && v.stock <= 2);
     }).length;
     const out = products.filter((p) => p.variants.some((v) => v.stock <= 0)).length;
     const active = products.filter((p) => p.variants.some((v) => v.availableForSale)).length;
@@ -1256,7 +1257,7 @@ function StockPanel() {
             <p className="mt-3 font-black text-foreground">Nenhum produto encontrado</p>
           </div>
         ) : (
-          rows.map(({ product, costValue, saleValue, profit, low, active }) => (
+          rows.map(({ product, costValue, saleValue, profit, low, out, active }) => (
             <div
               key={product.id}
               className="rounded-3xl border-2 border-border bg-card p-4 shadow-sm"
@@ -1286,11 +1287,15 @@ function StockPanel() {
                       >
                         {active ? "Ativo" : "Pausado"}
                       </span>
-                      {low && (
+                      {out ? (
+                        <span className="rounded-full bg-destructive px-2 py-1 text-[10px] font-black text-white">
+                          Sem estoque
+                        </span>
+                      ) : low ? (
                         <span className="rounded-full bg-[oklch(0.72_0.17_62)] px-2 py-1 text-[10px] font-black text-white">
                           Baixo
                         </span>
-                      )}
+                      ) : null}
                     </div>
                   </div>
                   <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
