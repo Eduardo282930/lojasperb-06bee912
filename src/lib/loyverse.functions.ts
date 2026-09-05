@@ -449,7 +449,8 @@ async function buildCatalog(token: string): Promise<Catalog> {
     });
   }
 
-  products.sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+  // Sem ordem alfabética aqui: a ordem final da vitrine (destaques, mais
+  // vendidos, estoque/foto) é aplicada no servidor logo antes de responder.
 
   const usedIds = new Set(products.map((p) => p.categoryId).filter(Boolean) as string[]);
   const categories: Category[] = [...usedIds]
@@ -512,12 +513,20 @@ async function getCatalog(): Promise<Catalog> {
 }
 
 export const fetchCatalog = createServerFn({ method: "GET" }).handler(
-  async (): Promise<Catalog> => getCatalog(),
+  async (): Promise<Catalog> => {
+    const catalog = await getCatalog();
+    const { orderCatalog } = await import("@/lib/merch-order.server");
+    return orderCatalog(catalog);
+  },
 );
 
 
 export const fetchProducts = createServerFn({ method: "GET" }).handler(
-  async (): Promise<CatalogProduct[]> => (await getCatalog()).products,
+  async (): Promise<CatalogProduct[]> => {
+    const catalog = await getCatalog();
+    const { orderCatalog } = await import("@/lib/merch-order.server");
+    return (await orderCatalog(catalog)).products;
+  },
 );
 
 export const fetchProduct = createServerFn({ method: "GET" })
