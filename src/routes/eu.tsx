@@ -15,7 +15,6 @@ import {
   X,
   Bell,
   BellRing,
-  Phone,
   BadgeCheck,
 } from "lucide-react";
 
@@ -36,14 +35,6 @@ import { fetchMyOrders } from "@/lib/orders";
 import { formatPrice } from "@/lib/cart";
 import { StoreLogoWithFallback } from "@/components/store-logo";
 import { useNotificationWatcher, useNotificationPermission } from "@/lib/notifications";
-
-/** (51) 99610-9657 */
-function prettyPhone(raw: string): string {
-  const d = (raw || "").replace(/\D/g, "").slice(-11);
-  if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
-  if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
-  return raw;
-}
 
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -145,49 +136,37 @@ function EuPage() {
       </header>
 
       <main className="mx-auto max-w-3xl px-4 pt-4">
-        {/* Cadastro só aparece resumido; o cliente digita uma única vez. */}
-        <section className="overflow-hidden rounded-2xl bg-gradient-to-br from-[oklch(0.55_0.22_255)] to-[oklch(0.45_0.2_290)] p-3.5 text-white shadow-lg">
+        {/* Boas-vindas: os dados pessoais ficam escondidos e aparecem somente ao tocar no botão. */}
+        <section className="rounded-3xl border-2 border-border bg-card px-4 py-4 shadow-sm">
           <div className="flex items-center gap-3">
-            <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-white/25 text-lg font-black ring-2 ring-white/25">
+            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-muted text-base font-black text-foreground">
               {initials(profile.name || "?")}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-[10px] font-black uppercase tracking-widest text-white/70">
-                {registered ? "Cliente SPERB" : "Bem-vindo"}
+              <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                Bem-vindo à SPERB 👋
               </p>
-              <p className="line-clamp-1 text-lg font-black leading-tight">
-                {profile.name.trim() || "Faça seu cadastro"}
+              <p className="mt-0.5 truncate text-lg font-black leading-tight text-foreground">
+                {registered ? profile.name.trim() : "Vamos começar?"}
               </p>
-              <p className="mt-0.5 flex items-center gap-1.5 text-sm font-bold text-white/85">
-                {registered ? (
-                  <>
-                    <Phone className="h-3.5 w-3.5 shrink-0" strokeWidth={2.5} />
-                    <span className="truncate">{prettyPhone(profile.phone)}</span>
-                    <BadgeCheck className="h-4 w-4 shrink-0 text-white" strokeWidth={2.5} />
-                  </>
-                ) : (
-                  "Toque no lápis para começar"
-                )}
+              <p className="mt-0.5 text-sm font-semibold text-muted-foreground">
+                {registered ? "Que bom ter você por aqui!" : "Complete seu cadastro para aproveitar tudo."}
               </p>
-              {registered && profile.email.trim() && (
-                <p className="mt-0.5 truncate text-xs font-semibold text-white/75">
-                  {profile.email.trim()}
-                </p>
-              )}
-
             </div>
             <button
+              type="button"
               onClick={() => setEditing(true)}
-              aria-label={registered ? "Alterar meus dados" : "Fazer cadastro"}
-              className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/20 active:scale-95"
+              aria-label={registered ? "Ver informações pessoais" : "Fazer cadastro"}
+              className="flex h-10 shrink-0 items-center gap-1.5 rounded-2xl bg-muted px-3 text-sm font-black text-foreground active:scale-95"
             >
-              <Pencil className="h-5 w-5" strokeWidth={2.5} />
+              <Pencil className="h-4 w-4" strokeWidth={2.5} />
+              <span className="hidden sm:inline">{registered ? "Meus dados" : "Cadastrar"}</span>
             </button>
           </div>
         </section>
 
         {notify.state === "granted" ? (
-          <div className="mt-3 flex items-center gap-3 rounded-2xl border-2 border-[oklch(0.62_0.19_145)] bg-[oklch(0.62_0.19_145/0.08)] px-4 py-3">
+          <div className="mt-4 flex items-center gap-3 rounded-3xl border-2 border-border bg-card px-4 py-3 shadow-sm">
             <BellRing
               className="h-6 w-6 shrink-0 text-[oklch(0.5_0.19_145)]"
               strokeWidth={2.5}
@@ -207,7 +186,7 @@ function EuPage() {
           notify.state !== "unsupported" && (
             <button
               onClick={() => void notify.request()}
-              className="mt-3 flex w-full items-center gap-3 rounded-2xl border-2 border-border bg-card px-4 py-3 text-left active:scale-[0.99]"
+              className="mt-4 flex w-full items-center gap-3 rounded-3xl border-2 border-border bg-card px-4 py-3 text-left shadow-sm active:scale-[0.99]"
             >
               <Bell
                 className="h-7 w-7 shrink-0 text-[oklch(0.72_0.17_75)]"
@@ -292,7 +271,7 @@ function EuPage() {
         {isAdmin ? (
           <Link
             to="/admin"
-            className="mt-6 block rounded-2xl bg-[oklch(0.55_0.22_255)] py-4 text-center text-xl font-black text-white shadow-md active:scale-[0.98]"
+            className="mt-4 block rounded-3xl border-2 border-border bg-card py-4 text-center text-xl font-black text-[oklch(0.55_0.22_255)] shadow-sm active:scale-[0.98]"
           >
             Abrir painel de administração
           </Link>
