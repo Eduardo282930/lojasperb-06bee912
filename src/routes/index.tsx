@@ -63,7 +63,7 @@ export const Route = createFileRoute("/")({
       as: "image",
       href: optimizedImage(src, CARD_WIDTHS[0], "webp"),
       type: "image/webp",
-      fetchpriority: "high",
+      fetchPriority: "high",
     })),
     meta: [
       { title: "SPERB — Catálogo online" },
