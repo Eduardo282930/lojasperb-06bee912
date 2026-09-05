@@ -1062,17 +1062,13 @@ function StockPanel() {
     const term = search.trim().toLowerCase();
     return products
       .filter((p) => {
-        const hasOutOfStockVariant = p.variants.some((v) => v.stock <= 0);
-        const hasLowStockVariant =
-          !hasOutOfStockVariant &&
-          p.variants.some(
-            (v) => v.lowStock !== null && v.stock <= v.lowStock,
-          );
-
-        if (filter === "out") return hasOutOfStockVariant;
-        if (filter === "low") return hasLowStockVariant;
-        if (filter === "in") {
-          return !hasOutOfStockVariant && !hasLowStockVariant && p.stock > 0;
+        if (filter === "in") return p.stock > 0;
+        if (filter === "out") return p.stock <= 0;
+        if (filter === "low") {
+          // Estoque baixo da SPERB: qualquer variação com 1 unidade.
+          // Se houver alguma variação zerada, o produto pertence a "Sem estoque".
+          const hasOutOfStockVariant = p.variants.some((v) => v.stock <= 0);
+          return !hasOutOfStockVariant && p.variants.some((v) => v.stock < 2);
         }
         return true;
       })
@@ -1095,11 +1091,7 @@ function StockPanel() {
         );
         const profit = saleValue - costValue;
         const hasOutOfStockVariant = p.variants.some((v) => v.stock <= 0);
-        const low =
-          !hasOutOfStockVariant &&
-          p.variants.some(
-            (v) => v.lowStock !== null && v.stock <= v.lowStock,
-          );
+        const low = !hasOutOfStockVariant && p.variants.some((v) => v.stock < 2);
         const active = p.variants.some((v) => v.availableForSale);
         return { product: p, costValue, saleValue, profit, low, active };
       });
@@ -1128,18 +1120,11 @@ function StockPanel() {
         ),
       0,
     );
-    const out = products.filter((p) =>
-      p.variants.some((v) => v.stock <= 0),
-    ).length;
     const low = products.filter((p) => {
       const hasOutOfStockVariant = p.variants.some((v) => v.stock <= 0);
-      return (
-        !hasOutOfStockVariant &&
-        p.variants.some(
-          (v) => v.lowStock !== null && v.stock <= v.lowStock,
-        )
-      );
+      return !hasOutOfStockVariant && p.variants.some((v) => v.stock < 2);
     }).length;
+    const out = products.filter((p) => p.variants.some((v) => v.stock <= 0)).length;
     const active = products.filter((p) => p.variants.some((v) => v.availableForSale)).length;
     return { totalUnits, costValue, saleValue, profit: saleValue - costValue, low, out, active };
   }, [products]);
