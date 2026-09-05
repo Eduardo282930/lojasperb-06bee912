@@ -113,6 +113,7 @@ type Section =
   | "clientes-area"
   | "vitrine"
   | "sistema"
+  | "estoque-area"
   | "pedidos"
   | "cupons"
   | "recibos"
@@ -122,14 +123,14 @@ type Section =
   | "duplicidades";
 
 type AdminItem = {
-  id: Exclude<Section, "home" | "operacao" | "clientes-area" | "vitrine" | "sistema">;
+  id: Exclude<Section, "home" | "operacao" | "clientes-area" | "vitrine" | "sistema" | "estoque-area">;
   label: string;
   hint: string;
   icon: React.ReactNode;
 };
 
 type AdminGroup = {
-  id: Extract<Section, "operacao" | "clientes-area" | "vitrine" | "sistema">;
+  id: Extract<Section, "operacao" | "clientes-area" | "vitrine" | "sistema" | "estoque-area">;
   label: string;
   hint: string;
   icon: React.ReactNode;
@@ -198,6 +199,13 @@ const ADMIN_GROUPS: AdminGroup[] = [
     ),
   },
   {
+    id: "estoque-area",
+    label: "Meu estoque",
+    hint: "Mercadoria, custos, valores e disponibilidade",
+    icon: <PackageSearch className="h-7 w-7" />,
+    items: SECTIONS.filter((item) => item.id === "estoque"),
+  },
+  {
     id: "clientes-area",
     label: "Clientes",
     hint: "Cadastros, histórico e revisão",
@@ -220,7 +228,7 @@ const ADMIN_GROUPS: AdminGroup[] = [
     label: "Sistema e registros",
     hint: "Loyverse e informações da operação",
     icon: <Receipt className="h-7 w-7" />,
-    items: SECTIONS.filter((item) => ["estoque", "recibos"].includes(item.id)),
+    items: SECTIONS.filter((item) => item.id === "recibos"),
   },
 ];
 
@@ -232,7 +240,7 @@ const SECTION_TO_GROUP: Record<AdminItem["id"], AdminGroup["id"]> = {
   destaques: "vitrine",
   cupons: "vitrine",
   recibos: "sistema",
-  estoque: "sistema",
+  estoque: "estoque-area",
 };
 
 function AdminPage() {
@@ -325,35 +333,55 @@ function AdminPage() {
       <main className="mx-auto max-w-5xl px-4 pt-5">
         {section === "home" && (
           <div className="space-y-5">
-            <div className="rounded-3xl border bg-card p-5 shadow-sm sm:p-6">
-              <div className="flex items-start gap-4">
-                <div
-                  className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl text-white"
-                  style={{ backgroundColor: BLUE }}
-                >
-                  <ClipboardList className="h-6 w-6" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs font-black uppercase tracking-[0.08em] text-muted-foreground">
-                    Central de controle
-                  </p>
-                  <h2 className="mt-1 text-xl font-black text-foreground sm:text-2xl">
-                    Administração SPERB
-                  </h2>
-                  <p className="mt-1 max-w-2xl text-sm leading-5 text-muted-foreground">
-                    Acesse cada parte do sistema por área, sem misturar as funções da loja.
-                  </p>
-                </div>
-              </div>
-            </div>
+            <section
+              className="relative overflow-hidden rounded-[2rem] p-5 text-white shadow-lg sm:p-7"
+              style={{ backgroundColor: BLUE }}
+            >
+              <div className="pointer-events-none absolute -right-10 -top-14 h-40 w-40 rounded-full bg-white/10" />
+              <div className="pointer-events-none absolute -bottom-20 right-16 h-44 w-44 rounded-full bg-white/5" />
 
-            <div>
+              <div className="relative">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="grid h-12 w-12 place-items-center rounded-2xl bg-white/15 backdrop-blur">
+                    <ClipboardList className="h-6 w-6" />
+                  </div>
+                  <span className="rounded-full bg-white/15 px-3 py-1.5 text-xs font-black backdrop-blur">
+                    PAINEL DO PROPRIETÁRIO
+                  </span>
+                </div>
+                <p className="mt-6 text-sm font-bold text-white/75">
+                  Administração SPERB
+                </p>
+                <h2 className="mt-1 text-3xl font-black tracking-tight sm:text-4xl">
+                  Controle sua loja.
+                </h2>
+                <p className="mt-1 max-w-xl text-base font-semibold text-white/80">
+                  Pedidos, estoque, clientes e vendas organizados em um só lugar.
+                </p>
+              </div>
+
+              <div className="relative mt-6 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {[
+                  ["8", "funções"],
+                  ["5", "áreas"],
+                  ["1", "estoque"],
+                  ["∞", "controle"],
+                ].map(([value, label]) => (
+                  <div key={label} className="rounded-2xl bg-white/10 p-3 backdrop-blur">
+                    <p className="text-xl font-black">{value}</p>
+                    <p className="text-xs font-bold text-white/70">{label}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section>
               <div className="mb-3 flex items-end justify-between gap-3 px-1">
                 <div>
-                  <h2 className="text-base font-black text-foreground">Áreas do sistema</h2>
-                  <p className="text-sm font-medium text-muted-foreground">
-                    Escolha uma área para ver as funções disponíveis.
+                  <p className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">
+                    Acesso rápido
                   </p>
+                  <h2 className="mt-1 text-xl font-black text-foreground">Áreas da loja</h2>
                 </div>
                 <span className="shrink-0 rounded-full bg-muted px-2.5 py-1 text-xs font-black text-muted-foreground">
                   {SECTIONS.length} funções
@@ -361,30 +389,37 @@ function AdminPage() {
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2">
-                {ADMIN_GROUPS.map((group) => (
+                {ADMIN_GROUPS.map((group, index) => (
                   <button
                     key={group.id}
                     type="button"
                     onClick={() => setSection(group.id)}
-                    className="group flex min-h-[146px] w-full flex-col justify-between rounded-3xl border bg-card p-5 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md active:scale-[0.99]"
+                    className={`group relative flex min-h-[154px] w-full flex-col justify-between overflow-hidden rounded-3xl border bg-card p-5 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.99] ${
+                      group.id === "estoque-area" ? "border-[oklch(0.72_0.18_75)]" : ""
+                    }`}
                   >
+                    {group.id === "estoque-area" && (
+                      <span className="absolute right-4 top-4 rounded-full bg-[oklch(0.95_0.09_85)] px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-[oklch(0.43_0.13_70)]">
+                        Patrimônio
+                      </span>
+                    )}
                     <div className="flex items-start justify-between gap-4">
                       <span
-                        className="grid h-12 w-12 place-items-center rounded-2xl text-white"
-                        style={{ backgroundColor: BLUE }}
+                        className="grid h-12 w-12 place-items-center rounded-2xl text-white shadow-sm"
+                        style={{ backgroundColor: group.id === "estoque-area" ? GREEN : BLUE }}
                       >
                         {group.icon}
                       </span>
-                      <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-black text-muted-foreground">
-                        {group.items.length} {group.items.length === 1 ? "função" : "funções"}
+                      <span className="grid h-9 w-9 place-items-center rounded-full bg-muted text-lg font-black text-muted-foreground transition-transform group-hover:translate-x-0.5">
+                        →
                       </span>
                     </div>
 
                     <div className="mt-5">
                       <div className="flex items-center gap-2">
                         <h3 className="text-lg font-black text-foreground">{group.label}</h3>
-                        <span className="text-lg font-black text-muted-foreground transition-transform group-hover:translate-x-0.5">
-                          →
+                        <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-black text-muted-foreground">
+                          {group.items.length}
                         </span>
                       </div>
                       <p className="mt-1 text-sm font-semibold leading-5 text-muted-foreground">
@@ -394,7 +429,7 @@ function AdminPage() {
                   </button>
                 ))}
               </div>
-            </div>
+            </section>
           </div>
         )}
 
@@ -1023,17 +1058,34 @@ function StockPanel() {
 
   const products = catalog.data?.products ?? [];
 
+  // O menor estoque entre as variações define a situação do produto.
+  // Assim, uma única variação zerada faz o produto entrar em "Sem estoque";
+  // se não houver zero, a menor quantidade que estiver em nível baixo define "Baixo".
+  const getStockStatus = useCallback((product: (typeof products)[number]) => {
+    const stocks = product.variants
+      .map((v) => (Number.isFinite(v.stock) ? v.stock : 0));
+    const minStock = stocks.length > 0 ? Math.min(...stocks) : product.stock;
+    const hasZero = stocks.some((stock) => stock <= 0);
+    const hasLow = product.variants.some(
+      (v) =>
+        v.stock > 0 &&
+        v.lowStock !== null &&
+        v.stock <= v.lowStock,
+    );
+
+    if (hasZero || minStock <= 0) return "out" as const;
+    if (hasLow) return "low" as const;
+    return "in" as const;
+  }, []);
+
   const rows = useMemo(() => {
     const term = search.trim().toLowerCase();
     return products
       .filter((p) => {
-        if (filter === "in") return p.stock > 0;
-        if (filter === "out") return p.variants.some((v) => Number.isFinite(v.stock) && v.stock <= 0);
-        if (filter === "low") {
-          return p.stock > 0 && p.variants.some(
-            (v) => v.lowStock !== null && v.stock <= v.lowStock,
-          );
-        }
+        const status = getStockStatus(p);
+        if (filter === "in") return status === "in";
+        if (filter === "out") return status === "out";
+        if (filter === "low") return status === "low";
         return true;
       })
       .filter((p) => {
@@ -1054,13 +1106,12 @@ function StockPanel() {
           0,
         );
         const profit = saleValue - costValue;
-        const low = p.variants.some(
-          (v) => v.stock > 0 && v.lowStock !== null && v.stock <= v.lowStock,
-        );
+        const status = getStockStatus(p);
+        const low = status === "low";
         const active = p.variants.some((v) => v.availableForSale);
-        return { product: p, costValue, saleValue, profit, low, active };
+        return { product: p, costValue, saleValue, profit, low, status, active };
       });
-  }, [products, search, filter]);
+  }, [products, search, filter, getStockStatus]);
 
   const totals = useMemo(() => {
     const totalUnits = products.reduce(
@@ -1085,14 +1136,8 @@ function StockPanel() {
         ),
       0,
     );
-    const low = products.filter((p) =>
-      p.variants.some(
-        (v) => v.stock > 0 && v.lowStock !== null && v.stock <= v.lowStock,
-      ),
-    ).length;
-    const out = products.filter((p) =>
-      p.variants.some((v) => Number.isFinite(v.stock) && v.stock <= 0),
-    ).length;
+    const low = products.filter((p) => getStockStatus(p) === "low").length;
+    const out = products.filter((p) => getStockStatus(p) === "out").length;
     const active = products.filter((p) => p.variants.some((v) => v.availableForSale)).length;
     return { totalUnits, costValue, saleValue, profit: saleValue - costValue, low, out, active };
   }, [products]);
@@ -1259,11 +1304,6 @@ function StockPanel() {
                           Baixo
                         </span>
                       )}
-                      {product.variants.some((v) => Number.isFinite(v.stock) && v.stock <= 0) && (
-                        <span className="rounded-full bg-destructive px-2 py-1 text-[10px] font-black text-white">
-                          Sem estoque
-                        </span>
-                      )}
                     </div>
                   </div>
                   <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -1294,21 +1334,11 @@ function StockPanel() {
                 <div className="mt-3 border-t pt-3">
                   <p className="mb-2 text-xs font-black text-muted-foreground">Variações</p>
                   <div className="flex flex-wrap gap-2">
-                    {product.variants.map((v) => {
-                      const variantOut = Number.isFinite(v.stock) && v.stock <= 0;
-                      return (
-                        <span
-                          key={v.id}
-                          className={`rounded-xl px-2.5 py-1.5 text-xs font-bold ${
-                            variantOut
-                              ? "border border-destructive/30 bg-destructive/10 text-destructive"
-                              : "bg-muted text-foreground"
-                          }`}
-                        >
-                          {v.label || "Única"}: {variantOut ? "Sem estoque" : `${v.stock} un`} · {formatPrice(v.price)}
-                        </span>
-                      );
-                    })}
+                    {product.variants.map((v) => (
+                      <span key={v.id} className="rounded-xl bg-muted px-2.5 py-1.5 text-xs font-bold text-foreground">
+                        {v.label || "Única"}: {Number.isFinite(v.stock) ? v.stock : "∞"} un · {formatPrice(v.price)}
+                      </span>
+                    ))}
                   </div>
                 </div>
               )}
