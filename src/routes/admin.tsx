@@ -1220,6 +1220,11 @@ function OrdersPanel() {
     staleTime: 30 * 1000,
   });
   const [busy, setBusy] = useState<string | null>(null);
+  // Painel de reembolso InfinitePay: "open" mostra o recibo, "sure" pergunta
+  // de novo. Só depois disso o pedido é marcado como reembolsado.
+  const [refundFor, setRefundFor] = useState<string | null>(null);
+  const [refundStep, setRefundStep] = useState<"open" | "sure">("open");
+  const [refundProof, setRefundProof] = useState("");
   const syncReceipt = useServerFn(retryLoyverseSync);
 
   // Abrir a lista já traz reembolsos e recibos recentes do Loyverse.
@@ -1273,18 +1278,28 @@ function OrdersPanel() {
     );
   }
 
-  /** Abre a venda na InfinitePay e depois registra o comprovante do estorno. */
-  async function refundWithInfinitePay(o: Order) {
-    openInfinitePaySale(o);
-    const proof = window.prompt(
-      "Depois de devolver o dinheiro na InfinitePay, cole aqui o link do comprovante do reembolso (opcional):",
-      o.receiptUrl ?? "",
-    );
-    if (proof === null) return;
+  /**
+   * Abrir a venda NÃO marca nada: só mostra o recibo/identificação da
+   * transação. O pedido só vira "Reembolso realizado" depois das duas
+   * confirmações feitas pelo administrador.
+   */
+  function refundWithInfinitePay(o: Order) {
+    setRefundFor(o.id);
+    setRefundStep("open");
+    setRefundProof(o.receiptUrl ?? "");
+  }
+
+  /** Grava o reembolso — só é chamado após a segunda confirmação. */
+  async function finishInfinitePayRefund(o: Order) {
     setBusy(o.id);
-    const ok = await confirmRefund(o.id, proof.trim());
+    const ok = await confirmRefund(o.id, refundProof.trim());
     setBusy(null);
-    if (!ok) window.alert("Não foi possível registrar o reembolso.");
+    if (!ok) {
+      window.alert("Não foi possível registrar o reembolso.");
+      return;
+    }
+    setRefundFor(null);
+    setRefundStep("open");
     void refetch();
   }
 
@@ -1409,7 +1424,7 @@ function OrdersPanel() {
                   <button
                     type="button"
                     disabled={busy === o.id}
-                    onClick={() => void refundWithInfinitePay(o)}
+                    onClick={() => refundWithInfinitePay(o)}
                     className="rounded-xl px-3 py-2 text-base font-black text-white"
                     style={{ backgroundColor: BLUE }}
                   >
@@ -1424,6 +1439,86 @@ function OrdersPanel() {
                   >
                     Confirmar reembolso
                   </button>
+                )}
+                {refundFor === o.id && (
+                  <div className="w-full rounded-2xl border-2 border-border bg-background p-3">
+                    <p className="text-base font-black text-foreground">
+                      Recibo / identificação da venda
+                    </p>
+                    <ul className="mt-1 flex flex-col gap-0.5 text-sm font-bold text-muted-foreground">
+                      {o.paymentTransactionNsu && (
+                        <li>transaction_nsu: {o.paymentTransactionNsu}</li>
+                      )}
+                      {o.paymentSlug && <li>slug: {o.paymentSlug}</li>}
+                      {o.paymentOrderNsu && <li>order_nsu: {o.paymentOrderNsu}</li>}
+                      {!o.paymentTransactionNsu &&
+                        !o.paymentSlug &&
+                        !o.paymentOrderNsu && <li>Sem identificadores da InfinitePay.</li>}
+                    </ul>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => openInfinitePaySale(o)}
+                        className="rounded-xl border-2 border-border bg-card px-3 py-2 text-base font-black text-foreground"
+                      >
+                        Ver recibo da venda
+                      </button>
+                      {refundStep === "open" ? (
+                        <button
+                          type="button"
+                          onClick={() => setRefundStep("sure")}
+                          className="rounded-xl px-3 py-2 text-base font-black text-white"
+                          style={{ backgroundColor: GREEN }}
+                        >
+                          Confirmar que fiz o reembolso
+                        </button>
+                      ) : null}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRefundFor(null);
+                          setRefundStep("open");
+                        }}
+                        className="rounded-xl px-3 py-2 text-base font-bold text-muted-foreground"
+                      >
+                        Fechar
+                      </button>
+                    </div>
+                    {refundStep === "sure" && (
+                      <div className="mt-3 rounded-2xl border-2 border-border bg-card p-3">
+                        <p className="text-base font-black text-foreground">
+                          Tem certeza de que você realizou o reembolso no InfinitePay?
+                        </p>
+                        <label className="mt-2 block text-sm font-bold text-muted-foreground">
+                          Link do comprovante do reembolso (opcional)
+                          <input
+                            value={refundProof}
+                            onChange={(e) => setRefundProof(e.target.value)}
+                            className="mt-1 w-full rounded-xl border-2 border-border bg-background px-3 py-2 text-base font-semibold text-foreground"
+                            placeholder="https://..."
+                          />
+                        </label>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            disabled={busy === o.id}
+                            onClick={() => void finishInfinitePayRefund(o)}
+                            className="rounded-xl px-3 py-2 text-base font-black text-white"
+                            style={{ backgroundColor: GREEN }}
+                          >
+                            Sim, já devolvi o dinheiro
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setRefundStep("open")}
+                            className="rounded-xl border-2 border-border bg-background px-3 py-2 text-base font-black text-foreground"
+                          >
+                            Ainda não
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 )}
               </>
             )}
