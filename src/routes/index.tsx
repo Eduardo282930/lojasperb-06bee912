@@ -54,7 +54,15 @@ export const catalogQuery = queryOptions({
 
 
 export const Route = createFileRoute("/")({
-  head: () => ({
+  head: ({ loaderData }) => ({
+    // Pré-carrega as primeiras fotos junto com o HTML (prioridade máxima).
+    links: (loaderData?.heroImages ?? []).map((src: string) => ({
+      rel: "preload",
+      as: "image",
+      href: optimizedImage(src, CARD_WIDTHS[0], "avif"),
+      type: "image/avif",
+      fetchpriority: "high",
+    })),
     meta: [
       { title: "SPERB — Catálogo online" },
       {
@@ -76,7 +84,13 @@ export const Route = createFileRoute("/")({
   // se o Loyverse falhar no SSR, a vitrine tenta de novo no aparelho.
   loader: async ({ context }) => {
     try {
-      await context.queryClient.ensureQueryData(catalogQuery);
+      const catalog = await context.queryClient.ensureQueryData(catalogQuery);
+      return {
+        heroImages: catalog.products
+          .filter((p) => p.image)
+          .slice(0, PRIORITY_COUNT)
+          .map((p) => p.image as string),
+      };
     } catch (err) {
       console.error("[Home] catálogo indisponível no SSR:", err);
       context.queryClient.setQueryData(catalogQuery.queryKey, {
@@ -84,6 +98,7 @@ export const Route = createFileRoute("/")({
         categories: [],
         storeLogo: null,
       });
+      return { heroImages: [] as string[] };
     }
   },
   component: Home,
