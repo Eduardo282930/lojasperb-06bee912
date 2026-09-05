@@ -27,11 +27,15 @@ import {
   fetchTopSelling,
   fetchReservedStock,
   applyReservations,
-  merchandiseOrder,
   badgeFor,
 } from "@/lib/merchandising";
+import { cardImageSources, optimizedImage, CARD_WIDTHS } from "@/lib/image-url";
 
 const PAGE_SIZE = 30;
+/** Fotos que começam a baixar junto com a página, com prioridade máxima. */
+const PRIORITY_COUNT = 8;
+/** Fotos carregadas de imediato (as primeiras telas), sem esperar a rolagem. */
+const EAGER_COUNT = 12;
 
 export const catalogQuery = queryOptions({
   queryKey: ["catalog"],
@@ -146,14 +150,14 @@ function Home() {
   });
 
   // Filter out system products (e.g., store logo)
+  /*
+   * O catálogo já chega do servidor na ordem final da vitrine (destaques e
+   * mais vendidos primeiro). Aqui só descontamos as reservas: nada de
+   * reordenar depois, para as primeiras fotos nunca serem trocadas.
+   */
   const commercialProducts = useMemo(() => {
     const base = filterCommercialProducts(data.products);
-    const withStock = merch.data
-      ? applyReservations(base, merch.data.reserved)
-      : base;
-    return merch.data
-      ? merchandiseOrder(withStock, merch.data.featured, merch.data.top)
-      : withStock;
+    return merch.data ? applyReservations(base, merch.data.reserved) : base;
   }, [data.products, merch.data]);
 
   const byCategory = useMemo(() => {
@@ -215,7 +219,8 @@ function Home() {
           setVisible((v) => (v < results.length ? v + PAGE_SIZE : v));
         }
       },
-      { rootMargin: "600px" },
+      // Antecipa o próximo lote bem antes de o cliente chegar no fim.
+      { rootMargin: "1400px" },
     );
     io.observe(el);
     return () => io.disconnect();
@@ -316,8 +321,14 @@ function Home() {
           <>
             {results.length > 0 && (
               <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-                {shownResults.map((p) => (
-                  <ProductCard key={p.id} product={p} badge={badgeOf(p.id)} />
+                {shownResults.map((p, i) => (
+                  <ProductCard
+                    key={p.id}
+                    product={p}
+                    badge={badgeOf(p.id)}
+                    priority={i < PRIORITY_COUNT}
+                    eager={i < EAGER_COUNT}
+                  />
                 ))}
               </ul>
             )}
@@ -384,9 +395,13 @@ function CategoryChip({
 function ProductCard({
   product,
   badge,
+  priority = false,
+  eager = false,
 }: {
   product: CatalogProduct;
   badge?: { label: string; tone: "featured" | "top" | "offer" } | null;
+  priority?: boolean;
+  eager?: boolean;
 }) {
   const navigate = useNavigate();
   const hasVariants = product.variants.length > 1;
@@ -432,14 +447,11 @@ function ProductCard({
       >
         <div className="relative aspect-square w-full overflow-hidden bg-muted">
           {product.image ? (
-            <img
+            <ProductImage
               src={product.image}
               alt={product.name}
-              className="h-full w-full object-cover"
-              loading="lazy"
-              decoding="async"
-              fetchPriority="low"
-              sizes="(max-width: 640px) 50vw, 220px"
+              priority={priority}
+              eager={eager}
             />
           ) : (
             <div className="grid h-full w-full place-items-center">
@@ -532,5 +544,40 @@ function ProductCard({
         </span>
       )}
     </li>
+  );
+}
+
+/**
+ * Foto do produto já otimizada na borda (AVIF, com WebP e JPEG de reserva)
+ * e no tamanho da vitrine. As primeiras fotos têm prioridade máxima.
+ */
+function ProductImage({
+  src,
+  alt,
+  priority,
+  eager,
+}: {
+  src: string;
+  alt: string;
+  priority: boolean;
+  eager: boolean;
+}) {
+  const { avif, webp, fallback, sizes } = cardImageSources(src);
+  return (
+    <picture>
+      {avif && <source type="image/avif" srcSet={avif} sizes={sizes} />}
+      {webp && <source type="image/webp" srcSet={webp} sizes={sizes} />}
+      <img
+        src={fallback}
+        alt={alt}
+        className="h-full w-full object-cover"
+        loading={priority || eager ? "eager" : "lazy"}
+        decoding={priority ? "sync" : "async"}
+        fetchPriority={priority ? "high" : "auto"}
+        sizes={sizes}
+        width={CARD_WIDTHS[0]}
+        height={CARD_WIDTHS[0]}
+      />
+    </picture>
   );
 }
