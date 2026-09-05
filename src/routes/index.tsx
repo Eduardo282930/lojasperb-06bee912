@@ -61,8 +61,8 @@ export const Route = createFileRoute("/")({
     ).map((src: string) => ({
       rel: "preload",
       as: "image",
-      href: optimizedImage(src, CARD_WIDTHS[0], "avif"),
-      type: "image/avif",
+      href: optimizedImage(src, CARD_WIDTHS[0], "webp"),
+      type: "image/webp",
       fetchpriority: "high",
     })),
     meta: [
@@ -579,10 +579,9 @@ function ProductImage({
   priority: boolean;
   eager: boolean;
 }) {
-  const { avif, webp, fallback, sizes } = cardImageSources(src);
+  const { webp, fallback, sizes } = cardImageSources(src);
   return (
     <picture>
-      {avif && <source type="image/avif" srcSet={avif} sizes={sizes} />}
       {webp && <source type="image/webp" srcSet={webp} sizes={sizes} />}
       <img
         src={fallback}

@@ -13,7 +13,12 @@
 
 const CDN = "https://wsrv.nl/";
 
-type Format = "avif" | "webp" | "jpg";
+/**
+ * O serviço de imagens na borda entrega WebP (muito menor que o original) e
+ * JPEG como reserva. AVIF foi testado e descartado: o serviço não gera AVIF e
+ * a alternativa testada devolveu arquivos MAIORES e mais lentos que o WebP.
+ */
+type Format = "webp" | "jpg";
 
 /** Larguras usadas na vitrine (telefone e tela grande). */
 export const CARD_WIDTHS = [400, 640] as const;
@@ -50,13 +55,11 @@ export function optimizedSrcSet(src: string, format: Format): string {
 
 /** Tudo o que um <picture> da vitrine precisa. */
 export function cardImageSources(src: string): {
-  avif: string;
   webp: string;
   fallback: string;
   sizes: string;
 } {
   return {
-    avif: optimizedSrcSet(src, "avif"),
     webp: optimizedSrcSet(src, "webp"),
     fallback: optimizedImage(src, CARD_WIDTHS[0], "jpg"),
     sizes: "(max-width: 640px) 50vw, 220px",
