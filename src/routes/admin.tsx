@@ -1058,34 +1058,17 @@ function StockPanel() {
 
   const products = catalog.data?.products ?? [];
 
-  // O menor estoque entre as variações define a situação do produto.
-  // Assim, uma única variação zerada faz o produto entrar em "Sem estoque";
-  // se não houver zero, a menor quantidade que estiver em nível baixo define "Baixo".
-  const getStockStatus = useCallback((product: (typeof products)[number]) => {
-    const stocks = product.variants
-      .map((v) => (Number.isFinite(v.stock) ? v.stock : 0));
-    const minStock = stocks.length > 0 ? Math.min(...stocks) : product.stock;
-    const hasZero = stocks.some((stock) => stock <= 0);
-    const hasLow = product.variants.some(
-      (v) =>
-        v.stock > 0 &&
-        v.lowStock !== null &&
-        v.stock <= v.lowStock,
-    );
-
-    if (hasZero || minStock <= 0) return "out" as const;
-    if (hasLow) return "low" as const;
-    return "in" as const;
-  }, []);
-
   const rows = useMemo(() => {
     const term = search.trim().toLowerCase();
     return products
       .filter((p) => {
-        const status = getStockStatus(p);
-        if (filter === "in") return status === "in";
-        if (filter === "out") return status === "out";
-        if (filter === "low") return status === "low";
+        if (filter === "in") return p.stock > 0;
+        if (filter === "out") return p.stock <= 0;
+        if (filter === "low") {
+          return p.stock > 0 && p.variants.some(
+            (v) => v.lowStock !== null && v.stock <= v.lowStock,
+          );
+        }
         return true;
       })
       .filter((p) => {
@@ -1106,12 +1089,13 @@ function StockPanel() {
           0,
         );
         const profit = saleValue - costValue;
-        const status = getStockStatus(p);
-        const low = status === "low";
+        const low = p.variants.some(
+          (v) => v.stock > 0 && v.lowStock !== null && v.stock <= v.lowStock,
+        );
         const active = p.variants.some((v) => v.availableForSale);
-        return { product: p, costValue, saleValue, profit, low, status, active };
+        return { product: p, costValue, saleValue, profit, low, active };
       });
-  }, [products, search, filter, getStockStatus]);
+  }, [products, search, filter]);
 
   const totals = useMemo(() => {
     const totalUnits = products.reduce(
@@ -1136,8 +1120,12 @@ function StockPanel() {
         ),
       0,
     );
-    const low = products.filter((p) => getStockStatus(p) === "low").length;
-    const out = products.filter((p) => getStockStatus(p) === "out").length;
+    const low = products.filter((p) =>
+      p.variants.some(
+        (v) => v.stock > 0 && v.lowStock !== null && v.stock <= v.lowStock,
+      ),
+    ).length;
+    const out = products.filter((p) => p.stock <= 0).length;
     const active = products.filter((p) => p.variants.some((v) => v.availableForSale)).length;
     return { totalUnits, costValue, saleValue, profit: saleValue - costValue, low, out, active };
   }, [products]);
