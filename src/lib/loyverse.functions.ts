@@ -5,6 +5,9 @@ export type ProductVariant = {
   label: string;
   price: number;
   stock: number;
+  cost: number;
+  lowStock: number | null;
+  availableForSale: boolean;
   sku: string;
   image?: string | null;
 };
@@ -60,7 +63,13 @@ type LoyverseVariant = {
   option2_value?: string | null;
   option3_value?: string | null;
   default_price?: number | null;
-  stores?: Array<{ price?: number | null }>;
+  cost?: number | null;
+  purchase_cost?: number | null;
+  stores?: Array<{
+    price?: number | null;
+    available_for_sale?: boolean | null;
+    low_stock?: number | null;
+  }>;
 };
 
 type LoyverseItem = {
@@ -355,11 +364,17 @@ async function buildCatalog(token: string): Promise<Catalog> {
     const key = `${normalize(baseName)}::${it.category_id ?? "none"}`;
 
     const variants: ProductVariant[] = itemVariants.map((v) => {
-      const rawPrice =
-        v.stores?.find((s) => typeof s.price === "number")?.price ??
-        v.default_price ??
-        0;
+      const store = v.stores?.find((s) =>
+        typeof s.price === "number" ||
+        typeof s.available_for_sale === "boolean" ||
+        typeof s.low_stock === "number",
+      );
+      const rawPrice = store?.price ?? v.default_price ?? 0;
       const stockNum = stockByVariant.get(v.variant_id);
+      const cost = Number(v.cost ?? v.purchase_cost ?? 0) || 0;
+      const lowStock =
+        typeof store?.low_stock === "number" ? Math.max(0, store.low_stock) : null;
+      const availableForSale = store?.available_for_sale !== false;
       return {
         id: v.variant_id,
         label: hasOptions
@@ -368,6 +383,9 @@ async function buildCatalog(token: string): Promise<Catalog> {
             ? split.label
             : "",
         price: Number(rawPrice) || 0,
+        cost,
+        lowStock,
+        availableForSale,
         stock: tracked
           ? Math.max(0, Math.floor(stockNum ?? 0))
           : Number.POSITIVE_INFINITY,
@@ -449,8 +467,7 @@ async function buildCatalog(token: string): Promise<Catalog> {
     });
   }
 
-  // Sem ordem alfabética aqui: a ordem final da vitrine (destaques, mais
-  // vendidos, estoque/foto) é aplicada no servidor logo antes de responder.
+  products.sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
 
   const usedIds = new Set(products.map((p) => p.categoryId).filter(Boolean) as string[]);
   const categories: Category[] = [...usedIds]
@@ -513,20 +530,12 @@ async function getCatalog(): Promise<Catalog> {
 }
 
 export const fetchCatalog = createServerFn({ method: "GET" }).handler(
-  async (): Promise<Catalog> => {
-    const catalog = await getCatalog();
-    const { orderCatalog } = await import("@/lib/merch-order.server");
-    return orderCatalog(catalog);
-  },
+  async (): Promise<Catalog> => getCatalog(),
 );
 
 
 export const fetchProducts = createServerFn({ method: "GET" }).handler(
-  async (): Promise<CatalogProduct[]> => {
-    const catalog = await getCatalog();
-    const { orderCatalog } = await import("@/lib/merch-order.server");
-    return (await orderCatalog(catalog)).products;
-  },
+  async (): Promise<CatalogProduct[]> => (await getCatalog()).products,
 );
 
 export const fetchProduct = createServerFn({ method: "GET" })
