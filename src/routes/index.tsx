@@ -56,7 +56,9 @@ export const catalogQuery = queryOptions({
 export const Route = createFileRoute("/")({
   head: ({ loaderData }) => ({
     // Pré-carrega as primeiras fotos junto com o HTML (prioridade máxima).
-    links: (loaderData?.heroImages ?? []).map((src: string) => ({
+    links: (
+      (loaderData as { heroImages?: string[] } | undefined)?.heroImages ?? []
+    ).map((src: string) => ({
       rel: "preload",
       as: "image",
       href: optimizedImage(src, CARD_WIDTHS[0], "avif"),
