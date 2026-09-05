@@ -15,7 +15,10 @@ export function FloatingCart() {
   const path = useRouterState({ select: (s) => s.location.pathname });
   const qty = cart.reduce((s, c) => s + c.qty, 0);
 
-  const hidden = path.startsWith("/sacola") || path.startsWith("/confirmar");
+  const hidden =
+    path.startsWith("/sacola") ||
+    path.startsWith("/confirmar") ||
+    path.startsWith("/admin");
   if (hidden) return null;
 
   return (
