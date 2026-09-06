@@ -30,7 +30,8 @@ Ao tocar em "Fazer pedido" e ao finalizar (WhatsApp ou Pix), o servidor consulta
 **Tempo real (catálogo Loyverse)**
 - Nova tabela leve `catalog_revision (store_key text pk, revision bigint, changed_at timestamptz)` + RPC `bump_catalog_revision()`, publicada em realtime (com GRANT para `anon`/`authenticated` no SELECT e política de leitura pública).
 - `src/routes/api/public/loyverse-webhook.ts`: após tratar o evento, chamar `syncCatalogFromLoyverse()` e `bump_catalog_revision()`.
-- `src/routes/api/public/sync-catalog.ts`: comparar o catálogo novo com o anterior (hash de id+preço+estoque+disponibilidade); só chamar `bump_catalog_revision()` quando o hash mudar. Continua servindo como agendador de segurança (~60s).
+- `src/routes/api/public/sync-catalog.ts`: comparar o catálogo novo com o anterior (impressão digital de id+preço+estoque+disponibilidade+variações); só chamar `bump_catalog_revision()` quando mudar.
+- **Agendador de verdade**: extensões `pg_cron` e `pg_net` ativadas no banco e um job de 1 em 1 minuto que chama essa rota sozinho. Não depende de ninguém abrir a página nem de reload.
 - `src/routes/index.tsx` e `src/routes/produto.$id.tsx`: assinar `catalog_revision`; ao mudar a revisão, invalidar `["catalog"]` / `["produto", id]` e regravar o cache local (`saveCachedCatalog`). Remove-se o `refetchInterval` de 5s do produto.
 - `src/lib/loyverse.functions.ts`: `FRESH_MS` cai para ~10s e `syncCatalogFromLoyverse` passa a devolver também se houve mudança, para alimentar o hash acima.
 
