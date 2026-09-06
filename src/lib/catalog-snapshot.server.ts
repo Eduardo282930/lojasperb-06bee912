@@ -122,8 +122,18 @@ export async function readCatalogSnapshot(): Promise<
 > {
   try {
     const supabase = await admin();
-    const { data, error } = await supabase
-      .from("catalog_snapshot")
+    type Row = { id: string; payload: unknown; updated_at: string };
+    const from = supabase.from.bind(supabase) as unknown as (
+      table: string,
+    ) => {
+      select: (cols: string) => {
+        limit: (n: number) => Promise<{
+          data: Row[] | null;
+          error: { message: string } | null;
+        }>;
+      };
+    };
+    const { data, error } = await from("catalog_snapshot")
       .select("id, payload, updated_at")
       .limit(5000);
     if (error || !data || data.length === 0) return null;
@@ -133,11 +143,8 @@ export async function readCatalogSnapshot(): Promise<
     let storeLogo: string | null = null;
     let updatedAt = 0;
 
-    for (const row of data as Array<{
-      id: string;
-      payload: unknown;
-      updated_at: string;
-    }>) {
+    for (const row of data) {
+
       const at = Date.parse(row.updated_at);
       if (Number.isFinite(at) && at > updatedAt) updatedAt = at;
       if (row.id === META_ID) {
