@@ -9,12 +9,24 @@ import { createServerFn } from "@tanstack/react-start";
  * mesma unidade e o Supabase não acumula produtos.
  */
 
-export type HoldInput = { id: string; name: string; qty: number };
+export type HoldInput = { id: string; name: string; qty: number; price?: number };
 
 export type HoldServerResult = {
   ok: boolean;
   holdId: string;
   problems: Array<{ id: string; name: string; requested: number; available: number }>;
+  /** Divergências encontradas no Loyverse (preço, disponibilidade, variação). */
+  changes: Array<{
+    id: string;
+    name: string;
+    kind: "missing" | "unavailable" | "price" | "stock";
+    requested: number;
+    expected: number;
+    actual: number;
+  }>;
+  /** Dados atuais do Loyverse para o aparelho corrigir o carrinho. */
+  fresh: Array<{ id: string; name: string; price: number; stock: number; available: boolean }>;
+  message: string;
 };
 
 function sanitize(items: unknown): HoldInput[] {
