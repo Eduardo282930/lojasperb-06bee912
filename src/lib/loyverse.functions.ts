@@ -29,6 +29,8 @@ export type CatalogProduct = {
   /** Name of the variation axis, e.g. "Tamanho", "Cor". Empty when single. */
   variantAxis: string;
   variants: ProductVariant[];
+  /** Selo comercial (Destaque/Oferta/Mais vendido), calculado no servidor. */
+  badge?: { label: string; tone: "featured" | "top" | "offer" } | null;
 };
 
 export type Category = {
