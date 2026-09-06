@@ -46,6 +46,16 @@ type CheckoutResult = {
   url: string | null;
   reason: string;
   orderId?: string;
+  /** Mensagem pronta para o cliente quando o carrinho mudou no Loyverse. */
+  message?: string;
+  /** Preço/estoque atuais do Loyverse, para corrigir o carrinho na tela. */
+  fresh?: Array<{
+    id: string;
+    name: string;
+    price: number;
+    stock: number;
+    available: boolean;
+  }>;
 };
 
 /**
