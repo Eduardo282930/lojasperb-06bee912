@@ -109,7 +109,10 @@ async function handle(request: Request): Promise<Response> {
   if (touchesStock) {
     try {
       const { syncCatalogFromLoyverse } = await import("@/lib/loyverse.functions");
-      await syncCatalogFromLoyverse();
+      const { publishCatalogRevision } = await import("@/lib/catalog-revision.server");
+      const catalog = await syncCatalogFromLoyverse();
+      // Avisa todos os aparelhos abertos (vitrine e produto atualizam sozinhos).
+      await publishCatalogRevision(catalog);
     } catch (err) {
       console.error("[loyverse-webhook] catálogo", err);
     }

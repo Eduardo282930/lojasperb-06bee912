@@ -132,6 +132,32 @@ export function syncCartPrices(
   if (changed || next.length !== cache.length) write(next);
 }
 
+/**
+ * Corrige o carrinho com o que o Loyverse respondeu na conferência da venda:
+ * preço novo, estoque restante e itens que saíram de venda.
+ */
+export function applyFreshCart(
+  fresh: Array<{ id: string; name: string; price: number; stock: number; available: boolean }>,
+): void {
+  ensureInit();
+  if (cache.length === 0 || fresh.length === 0) return;
+  const map = new Map(fresh.map((f) => [f.id, f]));
+  const next = cache
+    .map((c) => {
+      const f = map.get(c.id);
+      if (!f) return c;
+      if (!f.available || f.stock <= 0) return { ...c, qty: 0 };
+      const price = Number.isFinite(f.price) ? f.price : c.price;
+      const stock = Number.isFinite(f.stock) ? f.stock : c.stock;
+      const qty = Math.max(0, Math.min(c.qty, Math.floor(f.stock)));
+      return { ...c, price, stock, qty };
+    })
+    .filter((c) => c.qty > 0);
+  write(next);
+}
+
+
+
 
 const EMPTY: CartItem[] = [];
 

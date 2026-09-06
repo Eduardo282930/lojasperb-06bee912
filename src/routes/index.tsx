@@ -22,6 +22,7 @@ import { flyToCart } from "@/lib/fly";
 import { shareProduct } from "@/lib/share";
 import { filterCommercialProducts } from "@/lib/product-filters";
 import { StoreLogoWithFallback } from "@/components/store-logo";
+import { useLiveCatalog } from "@/lib/live";
 import {
   fetchFeatured,
   fetchTopSelling,
@@ -46,7 +47,9 @@ export const catalogQuery = queryOptions({
   },
   staleTime: 30 * 1000,
   gcTime: 30 * 60 * 1000,
-  refetchInterval: 60 * 1000,
+  // Atualiza sozinho quando o Loyverse muda (aviso em tempo real);
+  // este intervalo largo é apenas rede de segurança.
+  refetchInterval: 5 * 60 * 1000,
   refetchIntervalInBackground: false,
   refetchOnWindowFocus: true,
   retry: 1,
@@ -132,6 +135,8 @@ function ErrorView({ error }: { error: Error }) {
 
 function Home() {
   const { data } = useSuspenseQuery(catalogQuery);
+  // Mudou preço, estoque ou variação no Loyverse? A vitrine atualiza sozinha.
+  useLiveCatalog();
   const queryClient = useQueryClient();
   const cart = useCart();
   const [query, setQuery] = useState("");

@@ -5,13 +5,15 @@ import { ArrowLeft, ImageOff, Minus, Plus, ShoppingCart, Check, Share2 } from "l
 import { fetchProduct } from "@/lib/loyverse.functions";
 import { addToCart, useCart, formatPrice, cartQtyOf } from "@/lib/cart";
 import { shareProduct } from "@/lib/share";
+import { useLiveCatalog } from "@/lib/live";
 
 const productQuery = (id: string) =>
   queryOptions({
     queryKey: ["produto", id],
     queryFn: () => fetchProduct({ data: { id } }),
     staleTime: 5 * 1000,
-    refetchInterval: 5 * 1000,
+    // Rede de segurança; a atualização real chega pelo aviso do catálogo.
+    refetchInterval: 5 * 60 * 1000,
     refetchOnWindowFocus: true,
   });
 
@@ -58,6 +60,8 @@ function ProdutoPage() {
   const { id } = Route.useParams();
   const router = useRouter();
   const { data: product, isLoading } = useQuery(productQuery(id));
+  // Preço/estoque mudou no Loyverse? A tela se atualiza sozinha.
+  useLiveCatalog();
   const cart = useCart();
   const totalQty = cart.reduce((s, c) => s + c.qty, 0);
   const [selectedId, setSelectedId] = useState<string | null>(null);

@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Minus, Plus, Trash2, Check, ShoppingCart } from "lucide-react";
 import { StoreLogoWithFallback } from "@/components/store-logo";
 import { BackButton } from "@/components/back-button";
-import { useCart, updateQty, formatPrice, priceValue, clearCart } from "@/lib/cart";
+import { useCart, updateQty, formatPrice, priceValue, clearCart, applyFreshCart } from "@/lib/cart";
 import { SELECTION_KEY } from "@/lib/checkout-selection";
 import { createStockHold, releaseStockHold } from "@/lib/stock";
 
@@ -51,18 +51,26 @@ function SacolaPage() {
     try {
       await releaseStockHold();
       const hold = await createStockHold(
-        picked.map((c) => ({ id: c.id, name: c.name, qty: c.qty })),
+        picked.map((c) => ({
+          id: c.id,
+          name: c.name,
+          qty: c.qty,
+          price: priceValue(c.price),
+        })),
       );
       if (!hold.ok) {
+        // O Loyverse é a palavra final: corrige o carrinho e explica o que mudou.
+        if (hold.fresh.length > 0) applyFreshCart(hold.fresh);
         setErro(
-          hold.problems.length > 0
-            ? `Sem estoque suficiente: ${hold.problems
-                .map(
-                  (p) =>
-                    `${p.name || "produto"} (restam ${Math.max(0, Math.floor(p.available))})`,
-                )
-                .join(", ")}. Ajuste a quantidade para continuar.`
-            : "Não foi possível reservar o estoque agora. Tente novamente.",
+          hold.message ||
+            (hold.problems.length > 0
+              ? `Sem estoque suficiente: ${hold.problems
+                  .map(
+                    (p) =>
+                      `${p.name || "produto"} (restam ${Math.max(0, Math.floor(p.available))})`,
+                  )
+                  .join(", ")}. Ajuste a quantidade para continuar.`
+              : "Não foi possível reservar o estoque agora. Tente novamente."),
         );
         return;
       }

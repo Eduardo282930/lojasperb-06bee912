@@ -12,6 +12,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { createOrderCheckout } from "@/lib/payments.functions";
 import { runLoyverseQuickSync } from "@/lib/loyverse-reconcile.functions";
 import { formatPrice } from "@/lib/cart";
+import { useLiveInvalidate } from "@/lib/live";
 import {
   fetchMyOrders,
   fetchOrderTimeline,
@@ -441,6 +442,11 @@ function OrderCard({
 }
 
 function PedidosPage() {
+  // O que o Admin mudar (status, pagamento, reembolso) aparece na hora.
+  useLiveInvalidate([
+    { table: "orders", keys: [["my-orders"], ["order-timeline"]] },
+    { table: "order_status_history", keys: [["order-timeline"]] },
+  ]);
   const profile = useProfile();
   const { status, checkout } = Route.useSearch();
   const navigate = Route.useNavigate();

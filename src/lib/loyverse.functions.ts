@@ -481,7 +481,7 @@ async function buildCatalog(token: string): Promise<Catalog> {
 }
 
 /** Janela de cache em memória do servidor (evita estourar a API do Loyverse). */
-const FRESH_MS = 20_000;
+const FRESH_MS = 10_000;
 /** Até este limite servimos a cópia em memória e atualizamos em segundo plano. */
 const STALE_MS = 5 * 60_000;
 
