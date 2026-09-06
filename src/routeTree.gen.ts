@@ -18,6 +18,7 @@ import { Route as ConfirmarRouteImport } from './routes/confirmar'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ProdutoIdRouteImport } from './routes/produto.$id'
+import { Route as ApiPublicSyncStockRouteImport } from './routes/api/public/sync-stock'
 import { Route as ApiPublicSyncCatalogRouteImport } from './routes/api/public/sync-catalog'
 import { Route as ApiPublicManifestRouteImport } from './routes/api/public/manifest'
 import { Route as ApiPublicLoyverseWebhookRouteImport } from './routes/api/public/loyverse-webhook'
@@ -69,6 +70,11 @@ const IndexRoute = IndexRouteImport.update({
 const ProdutoIdRoute = ProdutoIdRouteImport.update({
   id: '/produto/$id',
   path: '/produto/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicSyncStockRoute = ApiPublicSyncStockRouteImport.update({
+  id: '/api/public/sync-stock',
+  path: '/api/public/sync-stock',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPublicSyncCatalogRoute = ApiPublicSyncCatalogRouteImport.update({
@@ -128,6 +134,7 @@ export interface FileRoutesByFullPath {
   '/api/public/loyverse-webhook': typeof ApiPublicLoyverseWebhookRoute
   '/api/public/manifest': typeof ApiPublicManifestRoute
   '/api/public/sync-catalog': typeof ApiPublicSyncCatalogRoute
+  '/api/public/sync-stock': typeof ApiPublicSyncStockRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -146,6 +153,7 @@ export interface FileRoutesByTo {
   '/api/public/loyverse-webhook': typeof ApiPublicLoyverseWebhookRoute
   '/api/public/manifest': typeof ApiPublicManifestRoute
   '/api/public/sync-catalog': typeof ApiPublicSyncCatalogRoute
+  '/api/public/sync-stock': typeof ApiPublicSyncStockRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -165,6 +173,7 @@ export interface FileRoutesById {
   '/api/public/loyverse-webhook': typeof ApiPublicLoyverseWebhookRoute
   '/api/public/manifest': typeof ApiPublicManifestRoute
   '/api/public/sync-catalog': typeof ApiPublicSyncCatalogRoute
+  '/api/public/sync-stock': typeof ApiPublicSyncStockRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -185,6 +194,7 @@ export interface FileRouteTypes {
     | '/api/public/loyverse-webhook'
     | '/api/public/manifest'
     | '/api/public/sync-catalog'
+    | '/api/public/sync-stock'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -203,6 +213,7 @@ export interface FileRouteTypes {
     | '/api/public/loyverse-webhook'
     | '/api/public/manifest'
     | '/api/public/sync-catalog'
+    | '/api/public/sync-stock'
   id:
     | '__root__'
     | '/'
@@ -221,6 +232,7 @@ export interface FileRouteTypes {
     | '/api/public/loyverse-webhook'
     | '/api/public/manifest'
     | '/api/public/sync-catalog'
+    | '/api/public/sync-stock'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -240,6 +252,7 @@ export interface RootRouteChildren {
   ApiPublicLoyverseWebhookRoute: typeof ApiPublicLoyverseWebhookRoute
   ApiPublicManifestRoute: typeof ApiPublicManifestRoute
   ApiPublicSyncCatalogRoute: typeof ApiPublicSyncCatalogRoute
+  ApiPublicSyncStockRoute: typeof ApiPublicSyncStockRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -305,6 +318,13 @@ declare module '@tanstack/react-router' {
       path: '/produto/$id'
       fullPath: '/produto/$id'
       preLoaderRoute: typeof ProdutoIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/sync-stock': {
+      id: '/api/public/sync-stock'
+      path: '/api/public/sync-stock'
+      fullPath: '/api/public/sync-stock'
+      preLoaderRoute: typeof ApiPublicSyncStockRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/sync-catalog': {
@@ -376,6 +396,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicLoyverseWebhookRoute: ApiPublicLoyverseWebhookRoute,
   ApiPublicManifestRoute: ApiPublicManifestRoute,
   ApiPublicSyncCatalogRoute: ApiPublicSyncCatalogRoute,
+  ApiPublicSyncStockRoute: ApiPublicSyncStockRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

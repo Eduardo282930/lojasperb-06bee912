@@ -98,9 +98,11 @@ async function handle(request: Request): Promise<Response> {
   }
 
   /*
-   * Estoque/vendas alterados direto no Loyverse: o catálogo é atualizado na
-   * hora para impedir que o app venda o que não existe mais.
+   * Estoque/vendas alterados direto no Loyverse: a cópia oficial é atualizada
+   * na hora e os aparelhos abertos trocam só os produtos que mudaram.
    */
+  const onlyStock =
+    Array.isArray(payload["inventory_levels"]) && !Array.isArray(payload["items"]);
   const touchesStock =
     receipts.length > 0 ||
     Array.isArray(payload["inventory_levels"]) ||
@@ -108,15 +110,18 @@ async function handle(request: Request): Promise<Response> {
 
   if (touchesStock) {
     try {
-      const { syncCatalogFromLoyverse } = await import("@/lib/loyverse.functions");
-      const { publishCatalogRevision } = await import("@/lib/catalog-revision.server");
-      const catalog = await syncCatalogFromLoyverse();
-      // Avisa todos os aparelhos abertos (vitrine e produto atualizam sozinhos).
-      await publishCatalogRevision(catalog);
+      if (onlyStock) {
+        const { syncStockFromLoyverse } = await import("@/lib/catalog-snapshot.server");
+        await syncStockFromLoyverse();
+      } else {
+        const { syncCatalogFromLoyverse } = await import("@/lib/loyverse.functions");
+        await syncCatalogFromLoyverse();
+      }
     } catch (err) {
       console.error("[loyverse-webhook] catálogo", err);
     }
   }
+
 
   return Response.json({ ok: true, receiptsHandled, refundsApplied });
 }

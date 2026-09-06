@@ -481,14 +481,30 @@ async function buildCatalog(token: string): Promise<Catalog> {
 }
 
 /** Janela de cache em memória do servidor (evita estourar a API do Loyverse). */
-const FRESH_MS = 10_000;
-/** Até este limite servimos a cópia em memória e atualizamos em segundo plano. */
-const STALE_MS = 5 * 60_000;
+const FRESH_MS = 5_000;
+/** Até este limite a cópia oficial do banco é aceita sem consultar o Loyverse. */
+const SNAPSHOT_MAX_AGE_MS = 3 * 60_000;
 
 let memoryCatalog: { at: number; catalog: Catalog } | null = null;
 let refreshing: Promise<Catalog> | null = null;
 
-/** Reconstrói o catálogo direto do Loyverse (fonte única de verdade). */
+/** Níveis de estoque por variação (leitura leve, usada pela conferência rápida). */
+export async function fetchInventoryLevels(
+  token: string,
+): Promise<Map<string, number>> {
+  const levels = await loyverseGet<InventoryLevel>("inventory", token);
+  const byVariant = new Map<string, number>();
+  for (const lvl of levels) {
+    const prev = byVariant.get(lvl.variant_id) ?? 0;
+    byVariant.set(lvl.variant_id, prev + (Number(lvl.in_stock) || 0));
+  }
+  for (const [id, value] of byVariant) {
+    byVariant.set(id, Math.max(0, Math.floor(value)));
+  }
+  return byVariant;
+}
+
+/** Reconstrói o catálogo direto do Loyverse e atualiza a cópia oficial. */
 export async function syncCatalogFromLoyverse(): Promise<Catalog> {
   if (refreshing) return refreshing;
   refreshing = (async () => {
@@ -496,6 +512,12 @@ export async function syncCatalogFromLoyverse(): Promise<Catalog> {
     if (!token) throw new Error("LOYVERSE_TOKEN ausente");
     const catalog = await buildCatalog(token);
     memoryCatalog = { at: Date.now(), catalog };
+    try {
+      const { writeCatalogSnapshot } = await import("@/lib/catalog-snapshot.server");
+      await writeCatalogSnapshot(catalog, true);
+    } catch (err) {
+      console.error("[Catalog] não foi possível gravar a cópia oficial:", err);
+    }
     return catalog;
   })();
   try {
@@ -505,19 +527,28 @@ export async function syncCatalogFromLoyverse(): Promise<Catalog> {
   }
 }
 
-/** O catálogo vem SOMENTE do Loyverse, com cache curto em memória. */
+/**
+ * O catálogo vem do Loyverse, mas quem responde o app é a cópia oficial no
+ * banco: ela é a mesma para todos os aparelhos e é atualizada pelo servidor
+ * (aviso do Loyverse + conferência de 5 em 5 segundos).
+ */
 async function getCatalog(): Promise<Catalog> {
   const age = memoryCatalog ? Date.now() - memoryCatalog.at : Infinity;
   if (memoryCatalog && age < FRESH_MS) {
     return memoryCatalog.catalog;
   }
-  // Resposta imediata com a cópia recente enquanto atualiza em segundo plano.
-  if (memoryCatalog && age < STALE_MS) {
-    void syncCatalogFromLoyverse().catch((err) =>
-      console.error("[Catalog] atualização em segundo plano falhou:", err),
-    );
-    return memoryCatalog.catalog;
+
+  try {
+    const { readCatalogSnapshot } = await import("@/lib/catalog-snapshot.server");
+    const snapshot = await readCatalogSnapshot();
+    if (snapshot && Date.now() - snapshot.updatedAt < SNAPSHOT_MAX_AGE_MS) {
+      memoryCatalog = { at: Date.now(), catalog: snapshot.catalog };
+      return snapshot.catalog;
+    }
+  } catch (err) {
+    console.error("[Catalog] cópia oficial indisponível:", err);
   }
+
   try {
     return await syncCatalogFromLoyverse();
   } catch (err) {
@@ -532,6 +563,20 @@ async function getCatalog(): Promise<Catalog> {
 export const fetchCatalog = createServerFn({ method: "GET" }).handler(
   async (): Promise<Catalog> => getCatalog(),
 );
+
+/** Só os produtos que mudaram (atualização cirúrgica da vitrine aberta). */
+export const fetchProductsByIds = createServerFn({ method: "GET" })
+  .inputValidator((data: { ids: string[] }) => ({
+    ids: Array.isArray(data?.ids) ? data.ids.filter(Boolean).slice(0, 200) : [],
+  }))
+  .handler(async ({ data }): Promise<CatalogProduct[]> => {
+    if (data.ids.length === 0) return [];
+    const wanted = new Set(data.ids);
+    const { products } = await getCatalog();
+    return products.filter((p) => wanted.has(p.id));
+  });
+
+
 
 
 export const fetchProducts = createServerFn({ method: "GET" }).handler(
