@@ -46,7 +46,9 @@ export const catalogQuery = queryOptions({
   },
   staleTime: 30 * 1000,
   gcTime: 30 * 60 * 1000,
-  refetchInterval: 60 * 1000,
+  // Atualiza sozinho quando o Loyverse muda (aviso em tempo real);
+  // este intervalo largo é apenas rede de segurança.
+  refetchInterval: 5 * 60 * 1000,
   refetchIntervalInBackground: false,
   refetchOnWindowFocus: true,
   retry: 1,
