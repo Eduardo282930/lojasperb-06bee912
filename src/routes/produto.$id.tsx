@@ -60,6 +60,8 @@ function ProdutoPage() {
   const { id } = Route.useParams();
   const router = useRouter();
   const { data: product, isLoading } = useQuery(productQuery(id));
+  // Preço/estoque mudou no Loyverse? A tela se atualiza sozinha.
+  useLiveCatalog();
   const cart = useCart();
   const totalQty = cart.reduce((s, c) => s + c.qty, 0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
