@@ -342,7 +342,7 @@ function Home() {
                   <ProductCard
                     key={p.id}
                     product={p}
-                    badge={badgeOf(p.id)}
+                    badge={badgeOf(p)}
                     priority={i < PRIORITY_COUNT}
                     eager={i < EAGER_COUNT}
                   />
