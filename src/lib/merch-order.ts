@@ -45,28 +45,24 @@ export function rotationValue(id: string, seed: number): number {
 
 /**
  * Ordem comercial:
- * 1) escolhas manuais do administrador (na ordem definida);
- * 2) mais vendidos dos últimos 90 dias;
- * 3) produtos com estoque e com foto primeiro;
- * 4) rotação estável (a vitrine varia ao longo do dia, sem "pular" na rolagem).
+ * 1) escolhas manuais do administrador (na ordem definida), sempre no início;
+ * 2) todo o resto em ordem aleatória, sorteada a cada abertura do app
+ *    (a semente muda por sessão, então nunca é a mesma vitrine e nunca é
+ *    ordem alfabética).
+ *
+ * `topSelling` continua servindo para os selos ("Mais vendido"), mas não
+ * manda mais na ordem.
  */
 export function merchandiseOrder(
   products: CatalogProduct[],
   featured: FeaturedItem[],
-  topSelling: Map<string, number>,
+  _topSelling: Map<string, number>,
   seed = 0,
 ): CatalogProduct[] {
   const manual = new Map<string, number>();
   featured.forEach((f, i) => {
     if (!manual.has(f.productKey)) manual.set(f.productKey, i);
   });
-
-  const score = (p: CatalogProduct) => {
-    let s = 0;
-    if (p.stock > 0) s += 2;
-    if (p.image) s += 1;
-    return s;
-  };
 
   return [...products].sort((a, b) => {
     const ma = manual.get(a.id);
@@ -76,12 +72,6 @@ export function merchandiseOrder(
       if (mb === undefined) return -1;
       return ma - mb;
     }
-    const sa = topSelling.get(a.id) ?? 0;
-    const sb = topSelling.get(b.id) ?? 0;
-    if (sa !== sb) return sb - sa;
-    const ca = score(a);
-    const cb = score(b);
-    if (ca !== cb) return cb - ca;
     return rotationValue(a.id, seed) - rotationValue(b.id, seed);
   });
 }
