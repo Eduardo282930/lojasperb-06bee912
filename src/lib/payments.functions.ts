@@ -323,6 +323,31 @@ export const startCheckout = createServerFn({ method: "POST" })
         "@/integrations/supabase/client.server"
       );
 
+      /*
+       * Conferência obrigatória no Loyverse antes de cobrar qualquer valor:
+       * preço, estoque, disponibilidade e variação. Se algo mudou, nenhum
+       * pedido é criado e o cliente vê o carrinho corrigido.
+       */
+      const { validateCartAgainstLoyverse, problemMessage } = await import(
+        "@/lib/checkout-validate.server"
+      );
+      const check = await validateCartAgainstLoyverse(data.items);
+      if (!check.ok) {
+        return {
+          url: null,
+          reason: "cart_changed",
+          message: problemMessage(check.problems),
+          fresh: check.items.map((i) => ({
+            id: i.id,
+            name: i.name,
+            price: i.price,
+            stock: i.stock,
+            available: i.available,
+          })),
+        };
+      }
+
+
       /* Libera reservas antigas antes de trabalhar com o novo checkout. */
       try {
         await supabaseAdmin.rpc("expire_stale_reservations");
