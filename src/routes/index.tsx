@@ -239,8 +239,8 @@ function Home() {
 
   const shownResults = results.slice(0, visible);
 
-  const badgeOf = (id: string) =>
-    merch.data ? badgeFor(id, merch.data.featured, merch.data.top) : null;
+  // O selo já vem pronto do servidor junto com cada produto.
+  const badgeOf = (p: CatalogProduct) => p.badge ?? null;
 
   const categoryChips = showAllCategories
     ? data.categories
