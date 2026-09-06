@@ -150,6 +150,13 @@ function ConfirmarPage() {
     setBusy("whats");
     setErro("");
     try {
+      // Conferência obrigatória no Loyverse antes de fechar o pedido.
+      const check = await checkCart({ data: { items: orderItems() } });
+      if (!check.ok) {
+        applyFreshCart(check.fresh);
+        setErro(check.message);
+        return;
+      }
       const url = `https://api.whatsapp.com/send?phone=${WHATSAPP_NUMBER}&text=${encodeURIComponent(whatsAppText())}`;
       window.open(url, "_blank");
       const created = await recordOrder({
