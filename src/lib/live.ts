@@ -13,6 +13,7 @@ import { useQueryClient, type QueryKey, type QueryClient } from "@tanstack/react
 import { supabase } from "@/integrations/supabase/client";
 import { fetchProductsByIds, type Catalog, type CatalogProduct } from "@/lib/loyverse.functions";
 import { saveCachedCatalog } from "@/lib/catalog-cache";
+import { STORE_LOGO_KEY } from "@/lib/store-logo";
 
 type Watch = {
   /** Tabela observada no banco. */
@@ -132,8 +133,13 @@ export function useLiveCatalog(extraKeys: QueryKey[] = []): void {
       { event: "*", schema: "public", table: "catalog_revision" },
       (payload) => {
         const row = payload.new as { changed_ids?: string[] } | null;
-        const ids = Array.isArray(row?.changed_ids) ? row.changed_ids : [];
-        if (ids.length === 0) {
+        const all = Array.isArray(row?.changed_ids) ? row.changed_ids : [];
+        // O logo da loja também chega na hora, sem recarregar a página.
+        if (all.includes("__logo__")) {
+          void qc.invalidateQueries({ queryKey: STORE_LOGO_KEY });
+        }
+        const ids = all.filter((id) => id !== "__logo__");
+        if (ids.length === 0 && all.length === 0) {
           void qc.invalidateQueries({ queryKey: ["catalog"] });
           void qc.invalidateQueries({ queryKey: ["produto"] });
         } else {
