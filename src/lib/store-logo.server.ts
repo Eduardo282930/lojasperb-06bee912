@@ -37,3 +37,25 @@ export async function fetchStoreLogoUrl(): Promise<string | null> {
 
   return null;
 }
+
+/**
+ * Confere o logo no Loyverse, salva no banco e avisa as telas abertas
+ * quando ele realmente mudou (troca instantânea, sem recarregar a página).
+ */
+export async function refreshStoreLogoAndAnnounce(): Promise<boolean> {
+  const { loadStoreLogoFromSupabase, persistStoreLogo, STORE_KEY } = await import(
+    "./catalog-cache.server"
+  );
+  const fresh = await fetchStoreLogoUrl();
+  if (!fresh) return false;
+  const saved = await loadStoreLogoFromSupabase();
+  if (saved === fresh) return false;
+
+  await persistStoreLogo(fresh);
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  await supabaseAdmin
+    .from("catalog_revision")
+    .update({ changed_ids: ["__logo__"], changed_at: new Date().toISOString() })
+    .eq("store_key", STORE_KEY);
+  return true;
+}
