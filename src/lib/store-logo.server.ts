@@ -53,7 +53,13 @@ export async function refreshStoreLogoAndAnnounce(): Promise<boolean> {
 
   await persistStoreLogo(fresh);
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  await supabaseAdmin
+  await (supabaseAdmin as unknown as {
+    from: (t: string) => {
+      update: (v: Record<string, unknown>) => {
+        eq: (c: string, v: string) => Promise<unknown>;
+      };
+    };
+  })
     .from("catalog_revision")
     .update({ changed_ids: ["__logo__"], changed_at: new Date().toISOString() })
     .eq("store_key", STORE_KEY);
