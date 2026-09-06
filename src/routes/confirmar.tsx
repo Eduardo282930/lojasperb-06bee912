@@ -67,6 +67,7 @@ function ConfirmarPage() {
   const [draftCouponId, setDraftCouponId] = useState<string | null>(null);
 
   const startPay = useServerFn(startCheckout);
+  const checkCart = useServerFn(checkCartBeforeOrder);
   const checkPayments = useServerFn(paymentsStatus);
 
   const logged = profile.phone.trim().length >= 8 && profile.name.trim().length > 0;
