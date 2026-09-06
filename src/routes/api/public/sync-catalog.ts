@@ -1,5 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 
+/** Reconfere os avisos do Loyverse no máximo a cada 30 minutos. */
+let lastWebhookCheck = 0;
+
+
 /**
  * Conferência completa Loyverse -> app (rede de segurança, 1x por minuto).
  *
