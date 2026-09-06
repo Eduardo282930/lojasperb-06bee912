@@ -21,15 +21,7 @@ import { fuzzyScore, STRONG_MATCH } from "@/lib/search";
 import { flyToCart } from "@/lib/fly";
 import { shareProduct } from "@/lib/share";
 import { filterCommercialProducts } from "@/lib/product-filters";
-import { StoreLogoWithFallback } from "@/components/store-logo";
 import { useLiveCatalog } from "@/lib/live";
-import {
-  fetchFeatured,
-  fetchTopSelling,
-  fetchReservedStock,
-  applyReservations,
-  badgeFor,
-} from "@/lib/merchandising";
 import { cardImageSources, optimizedImage, CARD_WIDTHS } from "@/lib/image-url";
 
 const PAGE_SIZE = 30;
@@ -156,25 +148,11 @@ function Home() {
     }
   }, [data.products.length, queryClient]);
 
-  // Vitrine comercial: destaques do admin, mais vendidos e estoque reservado.
-  const merch = useQuery({
-    queryKey: ["merchandising"],
-    queryFn: async () => {
-      const [featured, top, reserved] = await Promise.all([
-        fetchFeatured(),
-        fetchTopSelling(),
-        fetchReservedStock(),
-      ]);
-      return { featured, top, reserved };
-    },
-    staleTime: 60 * 1000,
-    retry: 0,
-  });
-
   /*
-   * A ordem comercial (destaques no início, resto sorteado a cada abertura)
-   * já vem pronta do servidor junto com a primeira tela — os destaques
-   * aparecem na hora, sem esperar nenhuma busca extra no aparelho.
+   * A vitrine já chega PRONTA do servidor: ordem final (destaques no
+   * início, resto sorteado a cada abertura), estoque com reservas
+   * descontadas e selos comerciais. Nada é buscado de novo ao abrir,
+   * então a tela não muda depois do primeiro desenho.
    * Guardamos a ordem da primeira montagem para que atualizações de
    * estoque/preço em tempo real nunca embaralhem a vitrine aberta.
    */
@@ -183,18 +161,15 @@ function Home() {
   // Filter out system products (e.g., store logo)
   const commercialProducts = useMemo(() => {
     const base = filterCommercialProducts(data.products);
-    const withStock = merch.data
-      ? applyReservations(base, merch.data.reserved)
-      : base;
-    if (orderRef.current.length === 0 && withStock.length > 0) {
-      orderRef.current = withStock.map((p) => p.id);
-      return withStock;
+    if (orderRef.current.length === 0 && base.length > 0) {
+      orderRef.current = base.map((p) => p.id);
+      return base;
     }
     const pos = new Map(orderRef.current.map((id, i) => [id, i]));
-    return [...withStock].sort(
+    return [...base].sort(
       (a, b) => (pos.get(a.id) ?? 1e9) - (pos.get(b.id) ?? 1e9),
     );
-  }, [data.products, merch.data]);
+  }, [data.products]);
 
   const byCategory = useMemo(() => {
     if (category === "todos") return commercialProducts;
