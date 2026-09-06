@@ -253,11 +253,17 @@ function Home() {
         <div className="mx-auto max-w-5xl px-3 py-2 pr-16">
           <div className="flex items-center gap-2">
             <Link to="/" aria-label="SPERB" className="shrink-0">
-              <StoreLogoWithFallback
-                storeName="SPERB"
-                className="h-9 w-auto max-w-24 object-contain"
-                fallbackClassName="text-lg font-black tracking-tight text-foreground"
-              />
+              {/* Só o logo, já na primeira tela (vem junto com o catálogo). */}
+              {data.storeLogo && (
+                <img
+                  src={data.storeLogo}
+                  alt="SPERB"
+                  className="h-9 w-auto max-w-24 object-contain"
+                  loading="eager"
+                  fetchPriority="high"
+                  decoding="async"
+                />
+              )}
             </Link>
             <div className="relative min-w-0 flex-1">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
