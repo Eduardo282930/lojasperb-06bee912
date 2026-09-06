@@ -25,6 +25,8 @@ import { fetchCoinBalance, coinsToBRL, maxCoinsFor, COIN_MAX_RATIO } from "@/lib
 import { recordOrder } from "@/lib/orders";
 import { getHoldId, releaseStockHold, forgetStockHold } from "@/lib/stock";
 import { startCheckout, paymentsStatus, MIN_CHECKOUT_BRL } from "@/lib/payments.functions";
+import { checkCartBeforeOrder } from "@/lib/orders.functions";
+import { applyFreshCart } from "@/lib/cart";
 
 const WHATSAPP_NUMBER = "5551996109657";
 
