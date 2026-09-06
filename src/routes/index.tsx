@@ -13,7 +13,6 @@ import {
   UserRound,
   Sparkles,
 } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
 import { fetchCatalog, type CatalogProduct } from "@/lib/loyverse.functions";
 import { loadCachedCatalog, saveCachedCatalog } from "@/lib/catalog-cache";
 import { addToCart, useCart, formatPrice, syncCartPrices } from "@/lib/cart";
