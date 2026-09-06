@@ -1,5 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
 
+const FALLBACK_ORIGIN =
+  "https://project--50628d9d-ee67-4887-b808-5e0452dad905-dev.lovable.app";
+
+/** Em desenvolvimento a URL é local: o Loyverse precisa da URL pública. */
+function publicOrigin(origin: string): string {
+  const configured = process.env["PUBLIC_APP_URL"];
+  if (configured) return configured;
+  if (/localhost|127\.0\.0\.1|^http:/.test(origin)) return FALLBACK_ORIGIN;
+  return origin;
+}
+
 /** Reconfere os avisos do Loyverse no máximo a cada 30 minutos. */
 let lastWebhookCheck = 0;
 
@@ -35,7 +46,7 @@ export const Route = createFileRoute("/api/public/sync-catalog")({
                 "@/lib/loyverse-webhooks.server"
               );
               const origin =
-                process.env["PUBLIC_APP_URL"] ?? new URL(request.url).origin;
+                publicOrigin(new URL(request.url).origin);
               await ensureLoyverseWebhooks(webhookTargetUrl(origin));
             } catch (err) {
               console.error("[sync-catalog] webhooks", err);
