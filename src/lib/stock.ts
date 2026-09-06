@@ -18,13 +18,35 @@ export type HoldProblem = {
   available: number;
 };
 
+export type CartChange = {
+  id: string;
+  name: string;
+  kind: "missing" | "unavailable" | "price" | "stock";
+  requested: number;
+  expected: number;
+  actual: number;
+};
+
+export type FreshItem = {
+  id: string;
+  name: string;
+  price: number;
+  stock: number;
+  available: boolean;
+};
+
 export type HoldResult = {
   ok: boolean;
   holdId: string;
   problems: HoldProblem[];
+  /** Divergências vindas do Loyverse (preço, estoque, disponibilidade). */
+  changes: CartChange[];
+  /** Preço/estoque atuais para corrigir o carrinho antes de tentar de novo. */
+  fresh: FreshItem[];
+  message: string;
 };
 
-export type HoldItem = { id: string; name: string; qty: number };
+export type HoldItem = { id: string; name: string; qty: number; price?: number };
 
 
 export function getHoldId(): string {
@@ -38,22 +60,30 @@ function saveHoldId(id: string | null) {
   else window.localStorage.removeItem(HOLD_KEY);
 }
 
-/** Valida o estoque em tempo real (Loyverse) e reserva tudo de uma vez só. */
+/** Confere tudo no Loyverse (preço/estoque/variação) e reserva de uma vez só. */
 export async function createStockHold(items: HoldItem[]): Promise<HoldResult> {
   const payload = items.map((i) => ({
     id: i.id,
     name: i.name,
     qty: Math.max(1, Math.round(i.qty)),
+    ...(typeof i.price === "number" ? { price: i.price } : {}),
   }));
   try {
     const res = await createHoldOnServer({
       data: { deviceId: deviceId(), items: payload },
     });
     saveHoldId(res.ok ? res.holdId : null);
-    return { ok: res.ok, holdId: res.holdId, problems: res.problems };
+    return {
+      ok: res.ok,
+      holdId: res.holdId,
+      problems: res.problems,
+      changes: res.changes ?? [],
+      fresh: res.fresh ?? [],
+      message: res.message ?? "",
+    };
   } catch {
     saveHoldId(null);
-    return { ok: false, holdId: "", problems: [] };
+    return { ok: false, holdId: "", problems: [], changes: [], fresh: [], message: "" };
   }
 }
 
