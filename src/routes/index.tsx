@@ -13,7 +13,6 @@ import {
   UserRound,
   Sparkles,
 } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
 import { fetchCatalog, type CatalogProduct } from "@/lib/loyverse.functions";
 import { loadCachedCatalog, saveCachedCatalog } from "@/lib/catalog-cache";
 import { addToCart, useCart, formatPrice, syncCartPrices } from "@/lib/cart";
@@ -21,15 +20,7 @@ import { fuzzyScore, STRONG_MATCH } from "@/lib/search";
 import { flyToCart } from "@/lib/fly";
 import { shareProduct } from "@/lib/share";
 import { filterCommercialProducts } from "@/lib/product-filters";
-import { StoreLogoWithFallback } from "@/components/store-logo";
 import { useLiveCatalog } from "@/lib/live";
-import {
-  fetchFeatured,
-  fetchTopSelling,
-  fetchReservedStock,
-  applyReservations,
-  badgeFor,
-} from "@/lib/merchandising";
 import { cardImageSources, optimizedImage, CARD_WIDTHS } from "@/lib/image-url";
 
 const PAGE_SIZE = 30;
@@ -156,25 +147,11 @@ function Home() {
     }
   }, [data.products.length, queryClient]);
 
-  // Vitrine comercial: destaques do admin, mais vendidos e estoque reservado.
-  const merch = useQuery({
-    queryKey: ["merchandising"],
-    queryFn: async () => {
-      const [featured, top, reserved] = await Promise.all([
-        fetchFeatured(),
-        fetchTopSelling(),
-        fetchReservedStock(),
-      ]);
-      return { featured, top, reserved };
-    },
-    staleTime: 60 * 1000,
-    retry: 0,
-  });
-
   /*
-   * A ordem comercial (destaques no início, resto sorteado a cada abertura)
-   * já vem pronta do servidor junto com a primeira tela — os destaques
-   * aparecem na hora, sem esperar nenhuma busca extra no aparelho.
+   * A vitrine já chega PRONTA do servidor: ordem final (destaques no
+   * início, resto sorteado a cada abertura), estoque com reservas
+   * descontadas e selos comerciais. Nada é buscado de novo ao abrir,
+   * então a tela não muda depois do primeiro desenho.
    * Guardamos a ordem da primeira montagem para que atualizações de
    * estoque/preço em tempo real nunca embaralhem a vitrine aberta.
    */
@@ -183,18 +160,15 @@ function Home() {
   // Filter out system products (e.g., store logo)
   const commercialProducts = useMemo(() => {
     const base = filterCommercialProducts(data.products);
-    const withStock = merch.data
-      ? applyReservations(base, merch.data.reserved)
-      : base;
-    if (orderRef.current.length === 0 && withStock.length > 0) {
-      orderRef.current = withStock.map((p) => p.id);
-      return withStock;
+    if (orderRef.current.length === 0 && base.length > 0) {
+      orderRef.current = base.map((p) => p.id);
+      return base;
     }
     const pos = new Map(orderRef.current.map((id, i) => [id, i]));
-    return [...withStock].sort(
+    return [...base].sort(
       (a, b) => (pos.get(a.id) ?? 1e9) - (pos.get(b.id) ?? 1e9),
     );
-  }, [data.products, merch.data]);
+  }, [data.products]);
 
   const byCategory = useMemo(() => {
     if (category === "todos") return commercialProducts;
@@ -264,8 +238,8 @@ function Home() {
 
   const shownResults = results.slice(0, visible);
 
-  const badgeOf = (id: string) =>
-    merch.data ? badgeFor(id, merch.data.featured, merch.data.top) : null;
+  // O selo já vem pronto do servidor junto com cada produto.
+  const badgeOf = (p: CatalogProduct) => p.badge ?? null;
 
   const categoryChips = showAllCategories
     ? data.categories
@@ -278,11 +252,17 @@ function Home() {
         <div className="mx-auto max-w-5xl px-3 py-2 pr-16">
           <div className="flex items-center gap-2">
             <Link to="/" aria-label="SPERB" className="shrink-0">
-              <StoreLogoWithFallback
-                storeName="SPERB"
-                className="h-9 w-auto max-w-24 object-contain"
-                fallbackClassName="text-lg font-black tracking-tight text-foreground"
-              />
+              {/* Só o logo, já na primeira tela (vem junto com o catálogo). */}
+              {data.storeLogo && (
+                <img
+                  src={data.storeLogo}
+                  alt="SPERB"
+                  className="h-9 w-auto max-w-24 object-contain"
+                  loading="eager"
+                  fetchPriority="high"
+                  decoding="async"
+                />
+              )}
             </Link>
             <div className="relative min-w-0 flex-1">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
@@ -361,7 +341,7 @@ function Home() {
                   <ProductCard
                     key={p.id}
                     product={p}
-                    badge={badgeOf(p.id)}
+                    badge={badgeOf(p)}
                     priority={i < PRIORITY_COUNT}
                     eager={i < EAGER_COUNT}
                   />

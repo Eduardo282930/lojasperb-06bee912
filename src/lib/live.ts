@@ -91,7 +91,11 @@ async function applyChangedProducts(qc: QueryClient, ids: string[]): Promise<voi
   } else {
     const products = current.products
       .filter((p) => !removed.includes(p.id))
-      .map((p) => byId.get(p.id) ?? p);
+      .map((p) => {
+        const fresh = byId.get(p.id);
+        // Mantém o selo comercial que já estava na tela.
+        return fresh ? { ...fresh, badge: p.badge } : p;
+      });
     const next: Catalog = { ...current, products };
     qc.setQueryData(["catalog"], next);
     saveCachedCatalog(next);
