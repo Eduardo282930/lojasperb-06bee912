@@ -38,9 +38,7 @@ export function useLiveInvalidate(watches: Watch[], enabled = true): void {
     const channel = supabase.channel(name);
 
     for (const watch of list) {
-      channel.on(
-        // @ts-expect-error – assinatura genérica do supabase-js
-        "postgres_changes",
+      channel.on(        "postgres_changes",
         { event: "*", schema: "public", table: watch.table },
         () => {
           for (const key of watch.keys) {
@@ -73,9 +71,7 @@ export function useLiveCatalog(extraKeys: QueryKey[] = []): void {
     const channel = supabase.channel(
       `live:catalog:${Math.random().toString(36).slice(2, 8)}`,
     );
-    channel.on(
-      // @ts-expect-error – assinatura genérica do supabase-js
-      "postgres_changes",
+    channel.on(      "postgres_changes",
       { event: "*", schema: "public", table: "catalog_revision" },
       () => {
         void qc.invalidateQueries({ queryKey: ["catalog"] });
