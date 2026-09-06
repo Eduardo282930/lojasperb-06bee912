@@ -67,6 +67,7 @@ import { paymentsStatus } from "@/lib/payments.functions";
 import { formatPrice } from "@/lib/cart";
 import { broadcastNotification } from "@/lib/notifications";
 import { fetchCatalog, type CatalogProduct } from "@/lib/loyverse.functions";
+import { useLiveInvalidate } from "@/lib/live";
 import {
   FEATURED_SECTIONS,
   fetchFeatured,
@@ -245,6 +246,10 @@ const SECTION_TO_GROUP: Record<AdminItem["id"], AdminGroup["id"]> = {
 };
 
 function AdminPage() {
+  // Pedidos novos e mudanças de pagamento aparecem sozinhos no painel.
+  useLiveInvalidate([
+    { table: "orders", keys: [["orders"], ["admin-orders"]] },
+  ]);
   const { isAdmin, checking } = useAdmin();
   const [section, setSection] = useState<Section>("home");
 
