@@ -28,7 +28,9 @@ export function StoreLogo({
       src={logoUrl}
       alt={alt}
       className={className}
-      loading="lazy"
+      loading="eager"
+      fetchPriority="high"
+      decoding="async"
     />
   );
 }
@@ -57,7 +59,9 @@ export function StoreLogoWithFallback({
       src={logoUrl}
       alt={storeName}
       className={className}
-      loading="lazy"
+      loading="eager"
+      fetchPriority="high"
+      decoding="async"
     />
   );
 }
@@ -86,7 +90,9 @@ export function StoreLogoAdmin({
       src={logoUrl}
       alt="Logo da Loja"
       className={className}
-      loading="lazy"
+      loading="eager"
+      fetchPriority="high"
+      decoding="async"
     />
   );
 }
