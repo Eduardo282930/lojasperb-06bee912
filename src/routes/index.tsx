@@ -28,7 +28,6 @@ import {
   fetchTopSelling,
   fetchReservedStock,
   applyReservations,
-  merchandiseOrder,
   badgeFor,
 } from "@/lib/merchandising";
 import { cardImageSources, optimizedImage, CARD_WIDTHS } from "@/lib/image-url";
@@ -173,12 +172,13 @@ function Home() {
   });
 
   /*
-   * Sorteio novo a cada abertura do app: a semente é criada uma única vez
-   * quando a tela abre, então a vitrine nunca repete a ordem anterior e
-   * nunca é alfabética. Os destaques escolhidos no admin ficam sempre no
-   * início, na ordem definida lá.
+   * A ordem comercial (destaques no início, resto sorteado a cada abertura)
+   * já vem pronta do servidor junto com a primeira tela — os destaques
+   * aparecem na hora, sem esperar nenhuma busca extra no aparelho.
+   * Guardamos a ordem da primeira montagem para que atualizações de
+   * estoque/preço em tempo real nunca embaralhem a vitrine aberta.
    */
-  const [sessionSeed] = useState(() => Math.random());
+  const orderRef = useRef<string[]>([]);
 
   // Filter out system products (e.g., store logo)
   const commercialProducts = useMemo(() => {
@@ -186,13 +186,15 @@ function Home() {
     const withStock = merch.data
       ? applyReservations(base, merch.data.reserved)
       : base;
-    return merchandiseOrder(
-      withStock,
-      merch.data?.featured ?? [],
-      merch.data?.top ?? new Map(),
-      sessionSeed,
+    if (orderRef.current.length === 0 && withStock.length > 0) {
+      orderRef.current = withStock.map((p) => p.id);
+      return withStock;
+    }
+    const pos = new Map(orderRef.current.map((id, i) => [id, i]));
+    return [...withStock].sort(
+      (a, b) => (pos.get(a.id) ?? 1e9) - (pos.get(b.id) ?? 1e9),
     );
-  }, [data.products, merch.data, sessionSeed]);
+  }, [data.products, merch.data]);
 
   const byCategory = useMemo(() => {
     if (category === "todos") return commercialProducts;

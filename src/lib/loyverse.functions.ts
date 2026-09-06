@@ -561,7 +561,12 @@ async function getCatalog(): Promise<Catalog> {
 }
 
 export const fetchCatalog = createServerFn({ method: "GET" }).handler(
-  async (): Promise<Catalog> => getCatalog(),
+  async (): Promise<Catalog> => {
+    // A vitrine sai do servidor JÁ na ordem final (destaques no início,
+    // resto sorteado a cada abertura) — a primeira tela já é a certa.
+    const { orderCatalog } = await import("@/lib/merch-order.server");
+    return orderCatalog(await getCatalog());
+  },
 );
 
 /** Só os produtos que mudaram (atualização cirúrgica da vitrine aberta). */
