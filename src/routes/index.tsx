@@ -22,6 +22,7 @@ import { flyToCart } from "@/lib/fly";
 import { shareProduct } from "@/lib/share";
 import { filterCommercialProducts } from "@/lib/product-filters";
 import { StoreLogoWithFallback } from "@/components/store-logo";
+import { useLiveCatalog } from "@/lib/live";
 import {
   fetchFeatured,
   fetchTopSelling,
@@ -134,6 +135,8 @@ function ErrorView({ error }: { error: Error }) {
 
 function Home() {
   const { data } = useSuspenseQuery(catalogQuery);
+  // Mudou preço, estoque ou variação no Loyverse? A vitrine atualiza sozinha.
+  useLiveCatalog();
   const queryClient = useQueryClient();
   const cart = useCart();
   const [query, setQuery] = useState("");
