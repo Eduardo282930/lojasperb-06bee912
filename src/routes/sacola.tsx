@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Minus, Plus, Trash2, Check, ShoppingCart } from "lucide-react";
 import { StoreLogoWithFallback } from "@/components/store-logo";
 import { BackButton } from "@/components/back-button";
-import { useCart, updateQty, formatPrice, priceValue, clearCart } from "@/lib/cart";
+import { useCart, updateQty, formatPrice, priceValue, clearCart, applyFreshCart } from "@/lib/cart";
 import { SELECTION_KEY } from "@/lib/checkout-selection";
 import { createStockHold, releaseStockHold } from "@/lib/stock";
 
