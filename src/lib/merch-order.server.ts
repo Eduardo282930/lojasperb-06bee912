@@ -48,16 +48,11 @@ async function loadMerch(): Promise<Merch> {
   }
 }
 
-/** Semente de rotação estável por hora (a vitrine varia ao longo do dia). */
-function hourlySeed(): number {
-  return Math.floor(Date.now() / (60 * 60 * 1000));
-}
-
-/** Devolve o catálogo já na ordem final da vitrine. */
+/** Devolve o catálogo já na ordem final da vitrine (sorteio novo a cada resposta). */
 export async function orderCatalog(catalog: Catalog): Promise<Catalog> {
   const { featured, top } = await loadMerch();
   return {
     ...catalog,
-    products: merchandiseOrder(catalog.products, featured, top, hourlySeed()),
+    products: merchandiseOrder(catalog.products, featured, top, Math.random()),
   };
 }
