@@ -120,7 +120,8 @@ type Section =
   | "clientes"
   | "destaques"
   | "pagamentos"
-  | "duplicidades";
+  | "duplicidades"
+  | "estoque";
 
 type AdminItem = {
   id: Exclude<Section, "home" | "operacao" | "clientes-area" | "vitrine" | "sistema" | "estoque-area">;
