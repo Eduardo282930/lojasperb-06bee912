@@ -232,6 +232,15 @@ function ConfirmarPage() {
         },
       });
       if (!checkout.url) {
+        if (checkout.reason === "cart_changed") {
+          // O Loyverse mudou preço/estoque: corrige o carrinho e não cobra nada.
+          applyFreshCart(checkout.fresh ?? []);
+          setErro(
+            checkout.message ||
+              "Seu carrinho foi atualizado. Confira e toque de novo para continuar.",
+          );
+          return;
+        }
         setErro(
           checkout.reason === "min_value"
             ? `O pagamento online começa em ${formatPrice(MIN_CHECKOUT_BRL)}.`
