@@ -28,7 +28,6 @@ import {
   fetchTopSelling,
   fetchReservedStock,
   applyReservations,
-  merchandiseOrder,
   badgeFor,
 } from "@/lib/merchandising";
 import { cardImageSources, optimizedImage, CARD_WIDTHS } from "@/lib/image-url";
