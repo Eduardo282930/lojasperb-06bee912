@@ -571,7 +571,7 @@ function CategoryRound({
     <button
       type="button"
       onClick={onClick}
-      className="group flex w-[72px] shrink-0 flex-col items-center gap-1.5 active:scale-95"
+      className="group flex w-[88px] shrink-0 flex-col items-center gap-1.5 active:scale-95 sm:w-[104px]"
       aria-pressed={active}
     >
       <span
