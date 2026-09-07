@@ -172,14 +172,49 @@ function Home() {
     );
   }, [data.products]);
 
-  // Produtos escolhidos como destaque ficam exclusivamente no carrossel do topo.
-  // Eles não voltam a aparecer na grade, nem quando "Todos" estiver selecionado.
+  /*
+   * "Mais recomendados" mostra SÓ:
+   * 1) os produtos escolhidos pelo administrador (destaque / oferta / mais
+   *    vendido marcados na tela de admin);
+   * 2) os produtos que combinam com o que este cliente pesquisa, com as
+   *    categorias que ele abre e com o que ele coloca na sacola.
+   * Eles não voltam a aparecer na grade, nem quando "Todos" estiver selecionado.
+   */
+  const [interests, setInterests] = useState<Interests | null>(null);
+
+  useEffect(() => {
+    setInterests(loadInterests());
+  }, []);
+
+  // O que está na sacola também conta como interesse do cliente.
+  useEffect(() => {
+    if (cart.length === 0) return;
+    const byId = new Map(data.products.map((p) => [p.id, p]));
+    for (const item of cart) {
+      const p = byId.get(item.id);
+      if (p) recordProductInterest({ name: p.name, categoryId: p.categoryId });
+    }
+    setInterests(loadInterests());
+  }, [cart, data.products]);
+
   const recommendedProducts = useMemo(() => {
-    const featured = commercialProducts.filter(
-      (p) => p.badge?.tone === "featured",
-    );
-    return (featured.length > 0 ? featured : commercialProducts).slice(0, 8);
-  }, [commercialProducts]);
+    const adminPicks = commercialProducts.filter((p) => Boolean(p.badge));
+    const picked = new Set(adminPicks.map((p) => p.id));
+
+    const interestPicks =
+      interests && hasInterests(interests)
+        ? commercialProducts
+            .filter((p) => !picked.has(p.id))
+            .map((p) => ({ p, score: interestScore(p, interests) }))
+            .filter((r) => r.score > 0)
+            .sort((a, b) => b.score - a.score)
+            .slice(0, 6)
+            .map((r) => r.p)
+        : [];
+
+    return [...adminPicks, ...interestPicks].slice(0, 8);
+  }, [commercialProducts, interests]);
+
 
   const recommendedIds = useMemo(
     () => new Set(recommendedProducts.map((p) => p.id)),
