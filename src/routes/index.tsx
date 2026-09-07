@@ -18,6 +18,16 @@ import { fetchCatalog, type CatalogProduct } from "@/lib/loyverse.functions";
 import { loadCachedCatalog, saveCachedCatalog } from "@/lib/catalog-cache";
 import { addToCart, useCart, formatPrice, syncCartPrices } from "@/lib/cart";
 import { fuzzyScore, STRONG_MATCH } from "@/lib/search";
+import {
+  loadInterests,
+  recordSearch,
+  recordCategory,
+  recordProductInterest,
+  interestScore,
+  hasInterests,
+  type Interests,
+} from "@/lib/interests";
+
 import { flyToCart } from "@/lib/fly";
 import { shareProduct } from "@/lib/share";
 import { filterCommercialProducts } from "@/lib/product-filters";
