@@ -583,7 +583,10 @@ function CategoryRound({
       >
         {icon}
       </span>
-      <span className={`w-full truncate text-center text-xs font-black ${active ? "text-primary" : "text-foreground"}`}>
+      <span
+        className={`w-full whitespace-normal break-words text-center text-xs font-black leading-tight ${active ? "text-primary" : "text-foreground"}`}
+      >
+
         {displayLabel}
       </span>
     </button>
