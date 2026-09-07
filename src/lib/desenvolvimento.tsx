@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { LockKeyhole } from "lucide-react";
+import { Lock, LockKeyhole } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAdmin, adminSignIn, adminSignOut } from "@/lib/admin";
 
@@ -37,13 +37,37 @@ export function useDevelopmentMode() {
 
   useEffect(() => {
     let alive = true;
-    void fetchDevelopmentMode().then((value) => {
+
+    async function check() {
+      const value = await fetchDevelopmentMode();
       if (!alive) return;
       setEnabled(value);
       setChecking(false);
-    });
+    }
+
+    void check();
+
+    // Interrompe na hora: aviso em tempo real do banco + conferência leve de apoio.
+    const channel = supabase
+      .channel("sperb-development-mode")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "store_settings" },
+        () => void check(),
+      )
+      .subscribe();
+
+    const timer = window.setInterval(() => void check(), 5000);
+    const onFocus = () => void check();
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+
     return () => {
       alive = false;
+      window.clearInterval(timer);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
+      void supabase.removeChannel(channel);
     };
   }, []);
 
@@ -57,6 +81,7 @@ export function DevelopmentGate() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [showAdmin, setShowAdmin] = useState(false);
 
   if (checking || (enabled && checkingAdmin)) return <DevelopmentLoading />;
   if (!enabled || isAdmin) return null;
@@ -96,38 +121,49 @@ export function DevelopmentGate() {
           O aplicativo está temporariamente em manutenção para receber melhorias e correções. Volte em breve.
         </p>
 
-        <div className="mt-8 rounded-3xl border-2 border-border bg-card p-5 text-left shadow-lg">
-          <p className="text-lg font-black text-foreground">Acesso do administrador</p>
-          <p className="mt-1 text-sm font-semibold text-muted-foreground">
-            Somente o administrador pode entrar enquanto a loja está em manutenção.
-          </p>
-          <input
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            type="email"
-            autoComplete="email"
-            placeholder="E-mail do administrador"
-            className="mt-4 w-full rounded-2xl border-2 border-border bg-background px-4 py-3 text-base font-semibold text-foreground outline-none focus:border-primary"
-          />
-          <input
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            type="password"
-            autoComplete="current-password"
-            placeholder="Senha"
-            onKeyDown={(e) => e.key === "Enter" && void enterAsAdmin()}
-            className="mt-3 w-full rounded-2xl border-2 border-border bg-background px-4 py-3 text-base font-semibold text-foreground outline-none focus:border-primary"
-          />
-          <button
-            type="button"
-            onClick={() => void enterAsAdmin()}
-            disabled={busy}
-            className="mt-4 w-full rounded-2xl bg-primary px-4 py-3.5 text-base font-black text-primary-foreground transition-opacity disabled:opacity-60"
-          >
-            {busy ? "Entrando…" : "Entrar como administrador"}
-          </button>
-          {error && <p className="mt-3 text-sm font-bold text-destructive">{error}</p>}
-        </div>
+        {showAdmin ? (
+          <div className="mt-8 rounded-3xl border-2 border-border bg-card p-5 text-left shadow-lg">
+            <p className="text-lg font-black text-foreground">Acesso restrito</p>
+            <input
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              type="email"
+              autoComplete="email"
+              placeholder="E-mail"
+              className="mt-4 w-full rounded-2xl border-2 border-border bg-background px-4 py-3 text-base font-semibold text-foreground outline-none focus:border-primary"
+            />
+            <input
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              type="password"
+              autoComplete="current-password"
+              placeholder="Senha"
+              onKeyDown={(e) => e.key === "Enter" && void enterAsAdmin()}
+              className="mt-3 w-full rounded-2xl border-2 border-border bg-background px-4 py-3 text-base font-semibold text-foreground outline-none focus:border-primary"
+            />
+            <button
+              type="button"
+              onClick={() => void enterAsAdmin()}
+              disabled={busy}
+              className="mt-4 w-full rounded-2xl bg-primary px-4 py-3.5 text-base font-black text-primary-foreground transition-opacity disabled:opacity-60"
+            >
+              {busy ? "Entrando…" : "Entrar"}
+            </button>
+            {error && <p className="mt-3 text-sm font-bold text-destructive">{error}</p>}
+          </div>
+        ) : (
+          // Acesso do proprietário: discreto, quase invisível para o cliente.
+          <div className="mt-10 flex justify-end">
+            <button
+              type="button"
+              aria-label="Acesso restrito"
+              onClick={() => setShowAdmin(true)}
+              className="p-2 text-muted-foreground/20"
+            >
+              <Lock className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
