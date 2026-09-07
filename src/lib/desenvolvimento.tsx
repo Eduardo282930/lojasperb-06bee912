@@ -3,7 +3,6 @@ import { LockKeyhole } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAdmin, adminSignIn, adminSignOut } from "@/lib/admin";
 
-const STORE_KEY = "sperb";
 const SETTING_KEY = "development_mode";
 
 function readEnabled(settings: unknown): boolean {
@@ -13,7 +12,7 @@ function readEnabled(settings: unknown): boolean {
 }
 
 export async function fetchDevelopmentMode(): Promise<boolean> {
-  const { data, error } = await supabase.rpc("get_development_mode");
+  const { data, error } = await supabase.rpc("admin_get_development_mode");
   if (error) {
     console.error("[SPERB] Não foi possível consultar o modo desenvolvimento:", error);
     return false;
@@ -22,7 +21,7 @@ export async function fetchDevelopmentMode(): Promise<boolean> {
 }
 
 export async function setDevelopmentMode(enabled: boolean): Promise<boolean> {
-  const { data, error } = await supabase.rpc("set_development_mode", {
+  const { data, error } = await supabase.rpc("admin_set_development_mode", {
     p_enabled: enabled,
   });
   if (error) {
