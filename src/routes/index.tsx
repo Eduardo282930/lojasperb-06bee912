@@ -496,7 +496,12 @@ function Home() {
                 key={c.id}
                 label={c.name}
                 active={category === c.id}
-                onClick={() => setCategory(c.id)}
+                onClick={() => {
+                  setCategory(c.id);
+                  recordCategory(c.id);
+                  setInterests(loadInterests());
+                }}
+
               />
             ))}
           </div>
