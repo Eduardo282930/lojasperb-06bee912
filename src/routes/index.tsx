@@ -754,11 +754,14 @@ function ProductImage({
   alt,
   priority,
   eager,
+  contain = false,
 }: {
   src: string;
   alt: string;
   priority: boolean;
   eager: boolean;
+  /** Mostra a foto inteira (sem cortar as bordas). */
+  contain?: boolean;
 }) {
   const { webp, fallback, sizes } = cardImageSources(src);
   return (
@@ -767,7 +770,8 @@ function ProductImage({
       <img
         src={fallback}
         alt={alt}
-        className="h-full w-full object-cover"
+        className={`h-full w-full ${contain ? "object-contain" : "object-cover"}`}
+
         loading={priority || eager ? "eager" : "lazy"}
         decoding={priority ? "sync" : "async"}
         fetchPriority={priority ? "high" : "auto"}
