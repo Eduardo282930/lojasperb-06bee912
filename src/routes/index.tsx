@@ -207,24 +207,12 @@ function Home() {
     setInterests(loadInterests());
   }, [cart, data.products]);
 
-  const recommendedProducts = (useMemo(() => {
-    const adminPicks = commercialProducts.filter((p) => Boolean(p.badge))).filter((product) => product.isFeatured === true || product.featured === true);
-    const picked = new Set(adminPicks.map((p) => p.id));
-
-    const interestPicks =
-      interests && hasInterests(interests)
-        ? commercialProducts
-            .filter((p) => !picked.has(p.id))
-            .map((p) => ({ p, score: interestScore(p, interests) }))
-            .filter((r) => r.score > 0)
-            .sort((a, b) => b.score - a.score)
-            .slice(0, 6)
-            .map((r) => r.p)
-        : [];
-
-    return [...adminPicks, ...interestPicks].slice(0, 8);
-  }, [commercialProducts, interests]);
-
+  const recommendedProducts = useMemo(() => {
+    // Mostra EXCLUSIVAMENTE os produtos que o administrador marcou
+    // no painel como destaque/oferta/mais vendido.
+    // Nenhum produto é adicionado automaticamente por interesses do cliente.
+    return commercialProducts.filter((p) => p.badge?.tone !== "automatic-top").slice(0, 8);
+  }, [commercialProducts]);
 
   const recommendedIds = useMemo(
     () => new Set(recommendedProducts.map((p) => p.id)),
@@ -332,6 +320,44 @@ function Home() {
   }, [recommendedProducts.length, query]);
 
   const recommended = recommendedProducts[recommendedIndex] ?? null;
+  const recommendedTouchStart = useRef<{ x: number; y: number } | null>(null);
+  const recommendedWasSwiped = useRef(false);
+
+  const handleRecommendedTouchStart = (event: React.TouchEvent<HTMLAnchorElement>) => {
+    recommendedTouchStart.current = {
+      x: event.touches[0]?.clientX ?? 0,
+      y: event.touches[0]?.clientY ?? 0,
+    };
+    recommendedWasSwiped.current = false;
+  };
+
+  const handleRecommendedTouchEnd = (event: React.TouchEvent<HTMLAnchorElement>) => {
+    const start = recommendedTouchStart.current;
+    if (!start || recommendedProducts.length <= 1) return;
+
+    const endX = event.changedTouches[0]?.clientX ?? start.x;
+    const endY = event.changedTouches[0]?.clientY ?? start.y;
+    const deltaX = endX - start.x;
+    const deltaY = endY - start.y;
+
+    if (Math.abs(deltaX) >= 50 && Math.abs(deltaX) > Math.abs(deltaY)) {
+      recommendedWasSwiped.current = true;
+      setRecommendedIndex((current) =>
+        deltaX < 0
+          ? (current + 1) % recommendedProducts.length
+          : (current - 1 + recommendedProducts.length) % recommendedProducts.length,
+      );
+    }
+
+    recommendedTouchStart.current = null;
+  };
+
+  const handleRecommendedClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
+    if (recommendedWasSwiped.current) {
+      event.preventDefault();
+      recommendedWasSwiped.current = false;
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background pb-28">
@@ -411,7 +437,10 @@ function Home() {
             <Link
               to="/produto/$id"
               params={{ id: recommended.id }}
-              className="group relative block overflow-hidden rounded-[2rem] border border-border bg-card shadow-md"
+              onTouchStart={handleRecommendedTouchStart}
+              onTouchEnd={handleRecommendedTouchEnd}
+              onClick={handleRecommendedClick}
+              className="group relative block touch-pan-y overflow-hidden rounded-[2rem] border border-border bg-card shadow-md"
             >
               <div className="grid min-h-[150px] grid-cols-[44%_56%] items-center sm:min-h-[200px]">
                 <div className="relative h-full min-h-[150px] overflow-hidden bg-muted p-2 sm:min-h-[200px] sm:p-3">
