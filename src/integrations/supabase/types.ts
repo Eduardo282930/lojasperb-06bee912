@@ -1006,6 +1006,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      set_development_mode: { Args: { p_enabled: boolean }; Returns: boolean }
       admin_adjust_coins: {
         Args: { p_customer_id: string; p_delta: number; p_reason: string }
         Returns: number
