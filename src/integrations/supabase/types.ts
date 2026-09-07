@@ -1006,6 +1006,8 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_get_development_mode: { Args: never; Returns: boolean }
+      admin_set_development_mode: { Args: { p_enabled: boolean }; Returns: boolean }
       get_development_mode: { Args: never; Returns: boolean }
       set_development_mode: { Args: { p_enabled: boolean }; Returns: boolean }
       admin_adjust_coins: {
