@@ -172,12 +172,27 @@ function Home() {
     );
   }, [data.products]);
 
+  // Produtos escolhidos como destaque ficam exclusivamente no carrossel do topo.
+  // Eles não voltam a aparecer na grade, nem quando "Todos" estiver selecionado.
+  const recommendedProducts = useMemo(() => {
+    const featured = commercialProducts.filter(
+      (p) => p.badge?.tone === "featured",
+    );
+    return (featured.length > 0 ? featured : commercialProducts).slice(0, 8);
+  }, [commercialProducts]);
+
+  const recommendedIds = useMemo(
+    () => new Set(recommendedProducts.map((p) => p.id)),
+    [recommendedProducts],
+  );
+
   const byCategory = useMemo(() => {
-    if (category === "todos") return commercialProducts;
+    const available = commercialProducts.filter((p) => !recommendedIds.has(p.id));
+    if (category === "todos") return available;
     if (category === "sem-categoria")
-      return commercialProducts.filter((p) => !p.categoryId);
-    return commercialProducts.filter((p) => p.categoryId === category);
-  }, [commercialProducts, category]);
+      return available.filter((p) => !p.categoryId);
+    return available.filter((p) => p.categoryId === category);
+  }, [commercialProducts, category, recommendedIds]);
 
   const { results, suggestions } = useMemo(() => {
     const q = query.trim();
@@ -247,25 +262,17 @@ function Home() {
     ? data.categories
     : data.categories.slice(0, 8);
 
-  // Os produtos com selo comercial já vêm priorizados pelo servidor:
-  // destaques escolhidos pelo admin e mais vendidos. Eles alimentam o carrossel
-  // do topo sem criar uma nova leitura do catálogo.
-  const recommendedProducts = useMemo(() => {
-    const marked = commercialProducts.filter((p) => p.badge);
-    return (marked.length > 0 ? marked : commercialProducts).slice(0, 8);
-  }, [commercialProducts]);
-
   useEffect(() => {
     setRecommendedIndex(0);
-  }, [category, query]);
+  }, [query]);
 
   useEffect(() => {
-    if (recommendedProducts.length <= 1 || query.trim() || category !== "todos") return;
+    if (recommendedProducts.length <= 1 || query.trim()) return;
     const timer = window.setInterval(() => {
       setRecommendedIndex((current) => (current + 1) % recommendedProducts.length);
     }, 4500);
     return () => window.clearInterval(timer);
-  }, [recommendedProducts.length, query, category]);
+  }, [recommendedProducts.length, query]);
 
   const recommended = recommendedProducts[recommendedIndex] ?? null;
 
@@ -315,7 +322,7 @@ function Home() {
       </header>
 
       <main className="mx-auto max-w-5xl px-3 pt-3">
-        {!query.trim() && category === "todos" && recommended && (
+        {!query.trim() && recommended && (
           <section className="mb-5" aria-label="Produtos recomendados">
             <div className="mb-2 flex items-center justify-between px-1">
               <div>
@@ -504,21 +511,24 @@ function CategoryRound({
   active: boolean;
   onClick: () => void;
 }) {
-  // O símbolo da categoria vem do próprio nome cadastrado no Loyverse.
-  // Ex.: "⚡ Eletrônicos" -> mostra ⚡ e usa "Eletrônicos" como nome.
-  const symbolMatch = label.trim().match(/^(\p{Extended_Pictographic}(?:\uFE0F|\u200D\p{Extended_Pictographic})*)\s*/u);
-  const symbol = symbolMatch?.[1] ?? "";
-  const displayLabel = symbolMatch
-    ? label.trim().slice(symbolMatch[0].length).trim()
+  // O símbolo é o primeiro emoji/símbolo do próprio nome vindo do Loyverse.
+  // Assim, se o nome mudar lá (ex.: "⚡ Eletrônicos"), a vitrine acompanha.
+  const leadingSymbol = label
+    .trim()
+    .match(
+      /^(?:\p{Extended_Pictographic}|\p{Emoji_Presentation})(?:\uFE0F|\u200D(?:\p{Extended_Pictographic}|\p{Emoji_Presentation}))*/u,
+    )?.[0];
+  const icon = leadingSymbol ?? "🛍️";
+  const displayLabel = leadingSymbol
+    ? label.trim().slice(leadingSymbol.length).trim() || label.trim()
     : label.trim();
 
   return (
     <button
       type="button"
       onClick={onClick}
-      className="group flex w-[88px] shrink-0 flex-col items-center gap-1.5 active:scale-95"
+      className="group flex w-[72px] shrink-0 flex-col items-center gap-1.5 active:scale-95"
       aria-pressed={active}
-      aria-label={`Categoria ${displayLabel}`}
     >
       <span
         className={`grid h-16 w-16 place-items-center rounded-full border-2 text-2xl shadow-sm transition-all ${
@@ -527,13 +537,9 @@ function CategoryRound({
             : "border-border bg-card group-hover:border-primary/40"
         }`}
       >
-        {symbol || "🛍️"}
+        {icon}
       </span>
-      <span
-        className={`w-full text-center text-xs font-black leading-tight ${
-          active ? "text-primary" : "text-foreground"
-        }`}
-      >
+      <span className={`w-full truncate text-center text-xs font-black ${active ? "text-primary" : "text-foreground"}`}>
         {displayLabel}
       </span>
     </button>
