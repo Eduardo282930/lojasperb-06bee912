@@ -81,13 +81,13 @@ export function badgeFor(
   productId: string,
   featured: FeaturedItem[],
   topSelling: Map<string, number>,
-): { label: string; tone: "featured" | "top" | "offer" } | null {
+): { label: string; tone: "featured" | "top" | "offer" | "automatic-top" } | null {
   const manual = featured.find((f) => f.productKey === productId);
   if (manual) {
     if (manual.section === "offers") return { label: "Oferta", tone: "offer" };
     if (manual.section === "bestsellers") return { label: "Mais vendido", tone: "top" };
     return { label: "Destaque", tone: "featured" };
   }
-  if ((topSelling.get(productId) ?? 0) > 0) return { label: "Mais vendido", tone: "top" };
+  if ((topSelling.get(productId) ?? 0) > 0) return { label: "Mais vendido", tone: "automatic-top" };
   return null;
 }
