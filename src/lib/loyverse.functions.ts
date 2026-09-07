@@ -30,7 +30,7 @@ export type CatalogProduct = {
   variantAxis: string;
   variants: ProductVariant[];
   /** Selo comercial (Destaque/Oferta/Mais vendido), calculado no servidor. */
-  badge?: { label: string; tone: "featured" | "top" | "offer" } | null;
+  badge?: { label: string; tone: "featured" | "top" | "offer" | "automatic-top" } | null;
 };
 
 export type Category = {
