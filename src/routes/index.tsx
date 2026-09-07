@@ -18,6 +18,16 @@ import { fetchCatalog, type CatalogProduct } from "@/lib/loyverse.functions";
 import { loadCachedCatalog, saveCachedCatalog } from "@/lib/catalog-cache";
 import { addToCart, useCart, formatPrice, syncCartPrices } from "@/lib/cart";
 import { fuzzyScore, STRONG_MATCH } from "@/lib/search";
+import {
+  loadInterests,
+  recordSearch,
+  recordCategory,
+  recordProductInterest,
+  interestScore,
+  hasInterests,
+  type Interests,
+} from "@/lib/interests";
+
 import { flyToCart } from "@/lib/fly";
 import { shareProduct } from "@/lib/share";
 import { filterCommercialProducts } from "@/lib/product-filters";
@@ -172,14 +182,49 @@ function Home() {
     );
   }, [data.products]);
 
-  // Produtos escolhidos como destaque ficam exclusivamente no carrossel do topo.
-  // Eles não voltam a aparecer na grade, nem quando "Todos" estiver selecionado.
+  /*
+   * "Mais recomendados" mostra SÓ:
+   * 1) os produtos escolhidos pelo administrador (destaque / oferta / mais
+   *    vendido marcados na tela de admin);
+   * 2) os produtos que combinam com o que este cliente pesquisa, com as
+   *    categorias que ele abre e com o que ele coloca na sacola.
+   * Eles não voltam a aparecer na grade, nem quando "Todos" estiver selecionado.
+   */
+  const [interests, setInterests] = useState<Interests | null>(null);
+
+  useEffect(() => {
+    setInterests(loadInterests());
+  }, []);
+
+  // O que está na sacola também conta como interesse do cliente.
+  useEffect(() => {
+    if (cart.length === 0) return;
+    const byId = new Map(data.products.map((p) => [p.id, p]));
+    for (const item of cart) {
+      const p = byId.get(item.id);
+      if (p) recordProductInterest({ name: p.name, categoryId: p.categoryId });
+    }
+    setInterests(loadInterests());
+  }, [cart, data.products]);
+
   const recommendedProducts = useMemo(() => {
-    const featured = commercialProducts.filter(
-      (p) => p.badge?.tone === "featured",
-    );
-    return (featured.length > 0 ? featured : commercialProducts).slice(0, 8);
-  }, [commercialProducts]);
+    const adminPicks = commercialProducts.filter((p) => Boolean(p.badge));
+    const picked = new Set(adminPicks.map((p) => p.id));
+
+    const interestPicks =
+      interests && hasInterests(interests)
+        ? commercialProducts
+            .filter((p) => !picked.has(p.id))
+            .map((p) => ({ p, score: interestScore(p, interests) }))
+            .filter((r) => r.score > 0)
+            .sort((a, b) => b.score - a.score)
+            .slice(0, 6)
+            .map((r) => r.p)
+        : [];
+
+    return [...adminPicks, ...interestPicks].slice(0, 8);
+  }, [commercialProducts, interests]);
+
 
   const recommendedIds = useMemo(
     () => new Set(recommendedProducts.map((p) => p.id)),
@@ -265,6 +310,18 @@ function Home() {
   useEffect(() => {
     setRecommendedIndex(0);
   }, [query]);
+
+  // Aprende com o que o cliente pesquisa (só no aparelho dele).
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 3) return;
+    const timer = window.setTimeout(() => {
+      recordSearch(q);
+      setInterests(loadInterests());
+    }, 1200);
+    return () => window.clearTimeout(timer);
+  }, [query]);
+
 
   useEffect(() => {
     if (recommendedProducts.length <= 1 || query.trim()) return;
@@ -356,14 +413,15 @@ function Home() {
               params={{ id: recommended.id }}
               className="group relative block overflow-hidden rounded-[2rem] border border-border bg-card shadow-md"
             >
-              <div className="grid min-h-[210px] grid-cols-[42%_58%] items-center sm:min-h-[260px]">
-                <div className="relative h-full min-h-[210px] overflow-hidden bg-muted sm:min-h-[260px]">
+              <div className="grid min-h-[150px] grid-cols-[44%_56%] items-center sm:min-h-[200px]">
+                <div className="relative h-full min-h-[150px] overflow-hidden bg-muted p-2 sm:min-h-[200px] sm:p-3">
                   {recommended.image ? (
                     <ProductImage
                       src={recommended.image}
                       alt={recommended.name}
                       priority
                       eager
+                      contain
                     />
                   ) : (
                     <div className="grid h-full place-items-center">
@@ -371,28 +429,26 @@ function Home() {
                     </div>
                   )}
                   {recommended.badge && (
-                    <span className="absolute left-3 top-3 rounded-full bg-primary px-3 py-1 text-xs font-black text-primary-foreground shadow">
+                    <span className="absolute left-2 top-2 rounded-full bg-primary px-2.5 py-0.5 text-[11px] font-black text-primary-foreground shadow">
                       {recommended.badge.label}
                     </span>
                   )}
                 </div>
-                <div className="p-5 sm:p-7">
-                  <p className="text-xs font-black uppercase tracking-[0.12em] text-primary">
+                <div className="p-3 sm:p-6">
+                  <p className="text-[11px] font-black uppercase tracking-[0.12em] text-primary">
                     Destaque SPERB
                   </p>
-                  <h3 className="mt-2 line-clamp-3 text-xl font-black leading-tight text-foreground sm:text-2xl">
+                  <h3 className="mt-1 line-clamp-2 text-base font-black leading-tight text-foreground sm:text-xl">
                     {recommended.name}
                   </h3>
-                  <p className="mt-3 text-sm font-semibold text-muted-foreground">
-                    Confira este produto em destaque na nossa vitrine.
-                  </p>
-                  <p className="mt-4 text-2xl font-black text-primary">
+                  <p className="mt-2 text-xl font-black text-primary sm:text-2xl">
                     {formatPrice(recommended.price)}
                   </p>
-                  <span className="mt-4 inline-flex rounded-full bg-muted px-4 py-2 text-sm font-black text-foreground">
+                  <span className="mt-2 inline-flex rounded-full bg-muted px-3 py-1.5 text-xs font-black text-foreground sm:text-sm">
                     Ver produto →
                   </span>
                 </div>
+
               </div>
             </Link>
 
@@ -440,7 +496,12 @@ function Home() {
                 key={c.id}
                 label={c.name}
                 active={category === c.id}
-                onClick={() => setCategory(c.id)}
+                onClick={() => {
+                  setCategory(c.id);
+                  recordCategory(c.id);
+                  setInterests(loadInterests());
+                }}
+
               />
             ))}
           </div>
@@ -527,7 +588,7 @@ function CategoryRound({
     <button
       type="button"
       onClick={onClick}
-      className="group flex w-[72px] shrink-0 flex-col items-center gap-1.5 active:scale-95"
+      className="group flex w-[88px] shrink-0 flex-col items-center gap-1.5 active:scale-95 sm:w-[104px]"
       aria-pressed={active}
     >
       <span
@@ -539,7 +600,10 @@ function CategoryRound({
       >
         {icon}
       </span>
-      <span className={`w-full truncate text-center text-xs font-black ${active ? "text-primary" : "text-foreground"}`}>
+      <span
+        className={`w-full whitespace-normal break-words text-center text-xs font-black leading-tight ${active ? "text-primary" : "text-foreground"}`}
+      >
+
         {displayLabel}
       </span>
     </button>
@@ -710,11 +774,14 @@ function ProductImage({
   alt,
   priority,
   eager,
+  contain = false,
 }: {
   src: string;
   alt: string;
   priority: boolean;
   eager: boolean;
+  /** Mostra a foto inteira (sem cortar as bordas). */
+  contain?: boolean;
 }) {
   const { webp, fallback, sizes } = cardImageSources(src);
   return (
@@ -723,7 +790,8 @@ function ProductImage({
       <img
         src={fallback}
         alt={alt}
-        className="h-full w-full object-cover"
+        className={`h-full w-full ${contain ? "object-contain" : "object-cover"}`}
+
         loading={priority || eager ? "eager" : "lazy"}
         decoding={priority ? "sync" : "async"}
         fetchPriority={priority ? "high" : "auto"}
