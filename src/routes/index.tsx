@@ -11,6 +11,8 @@ import {
   Share2,
   UserRound,
   Sparkles,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { fetchCatalog, type CatalogProduct } from "@/lib/loyverse.functions";
 import { loadCachedCatalog, saveCachedCatalog } from "@/lib/catalog-cache";
@@ -131,6 +133,8 @@ function Home() {
   const cart = useCart();
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<string>("todos");
+  const [showAllCategories, setShowAllCategories] = useState(false);
+  const [recommendedIndex, setRecommendedIndex] = useState(0);
 
   /*
    * Cópia local do aparelho: só entra DEPOIS da hidratação, para que a tela
@@ -236,38 +240,6 @@ function Home() {
 
   const shownResults = results.slice(0, visible);
 
-  // Produtos recomendados: usa os produtos que já chegam com selo comercial
-  // e troca automaticamente a cada 4 segundos.
-  const recommendedProducts = useMemo(() => {
-    const recommended = commercialProducts.filter((p) => p.badge);
-    return (recommended.length > 0 ? recommended : commercialProducts).slice(0, 8);
-  }, [commercialProducts]);
-  const [recommendedIndex, setRecommendedIndex] = useState(0);
-
-  useEffect(() => {
-    setRecommendedIndex(0);
-  }, [recommendedProducts.length]);
-
-  useEffect(() => {
-    if (recommendedProducts.length <= 1) return;
-    const timer = window.setInterval(() => {
-      setRecommendedIndex((current) => (current + 1) % recommendedProducts.length);
-    }, 4000);
-    return () => window.clearInterval(timer);
-  }, [recommendedProducts.length]);
-
-  const recommended = recommendedProducts[recommendedIndex] ?? null;
-
-  // Cada categoria usa a foto de um produto dela como capa do círculo.
-  const categoryItems = useMemo(
-    () =>
-      data.categories.map((c) => ({
-        ...c,
-        image: commercialProducts.find((p) => p.categoryId === c.id)?.image ?? null,
-      })),
-    [data.categories, commercialProducts],
-  );
-
   // O selo já vem pronto do servidor junto com cada produto.
   const badgeOf = (p: CatalogProduct) => p.badge ?? null;
 
@@ -275,6 +247,27 @@ function Home() {
     ? data.categories
     : data.categories.slice(0, 8);
 
+  // Os produtos com selo comercial já vêm priorizados pelo servidor:
+  // destaques escolhidos pelo admin e mais vendidos. Eles alimentam o carrossel
+  // do topo sem criar uma nova leitura do catálogo.
+  const recommendedProducts = useMemo(() => {
+    const marked = commercialProducts.filter((p) => p.badge);
+    return (marked.length > 0 ? marked : commercialProducts).slice(0, 8);
+  }, [commercialProducts]);
+
+  useEffect(() => {
+    setRecommendedIndex(0);
+  }, [category, query]);
+
+  useEffect(() => {
+    if (recommendedProducts.length <= 1 || query.trim() || category !== "todos") return;
+    const timer = window.setInterval(() => {
+      setRecommendedIndex((current) => (current + 1) % recommendedProducts.length);
+    }, 4500);
+    return () => window.clearInterval(timer);
+  }, [recommendedProducts.length, query, category]);
+
+  const recommended = recommendedProducts[recommendedIndex] ?? null;
 
   return (
     <div className="min-h-screen bg-background pb-28">
@@ -318,62 +311,133 @@ function Home() {
           </div>
 
 
-
-
-
         </div>
       </header>
 
       <main className="mx-auto max-w-5xl px-3 pt-3">
-        {recommended && !query && category === "todos" && (
-          <section aria-label="Produtos recomendados" className="mb-5">
-            <div className="mb-2 flex items-center justify-between">
-              <h2 className="text-xl font-black text-foreground">Recomendados</h2>
-              {recommendedProducts.length > 1 && (
-                <div className="flex gap-1" aria-hidden="true">
-                  {recommendedProducts.map((p, i) => (
-                    <span key={p.id} className={`h-1.5 rounded-full transition-all ${i === recommendedIndex ? "w-5 bg-primary" : "w-1.5 bg-muted"}`} />
-                  ))}
-                </div>
-              )}
-            </div>
-            <Link to="/produto/$id" params={{ id: recommended.id }} className="group relative flex min-h-48 overflow-hidden rounded-3xl border border-border bg-card shadow-md transition-transform active:scale-[0.99]">
-              <div className="relative w-1/2 overflow-hidden bg-muted sm:w-2/5">
-                {recommended.image ? (
-                  <ProductImage src={recommended.image} alt={recommended.name} priority eager />
-                ) : (
-                  <div className="grid h-full place-items-center"><ImageOff className="h-10 w-10 text-muted-foreground" /></div>
-                )}
+        {!query.trim() && category === "todos" && recommended && (
+          <section className="mb-5" aria-label="Produtos recomendados">
+            <div className="mb-2 flex items-center justify-between px-1">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">
+                  Para você
+                </p>
+                <h2 className="text-xl font-black text-foreground">Mais recomendados</h2>
               </div>
-              <div className="flex flex-1 flex-col justify-center p-4 sm:p-6">
-                {recommended.badge && <span className="mb-2 w-fit rounded-full bg-primary px-3 py-1 text-xs font-black text-primary-foreground">{recommended.badge.label}</span>}
-                <h3 className="line-clamp-2 text-lg font-black leading-tight text-foreground sm:text-2xl">{recommended.name}</h3>
-                <p className="mt-2 text-xl font-black text-primary sm:text-2xl">{formatPrice(recommended.price)}</p>
-                <span className="mt-3 w-fit rounded-full bg-primary px-4 py-2 text-sm font-black text-primary-foreground">Ver produto</span>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  aria-label="Produto recomendado anterior"
+                  onClick={() => setRecommendedIndex((i) => (i - 1 + recommendedProducts.length) % recommendedProducts.length)}
+                  className="grid h-9 w-9 place-items-center rounded-full border border-border bg-card text-foreground shadow-sm active:scale-95"
+                >
+                  <ChevronLeft className="h-5 w-5" />
+                </button>
+                <button
+                  type="button"
+                  aria-label="Próximo produto recomendado"
+                  onClick={() => setRecommendedIndex((i) => (i + 1) % recommendedProducts.length)}
+                  className="grid h-9 w-9 place-items-center rounded-full border border-border bg-card text-foreground shadow-sm active:scale-95"
+                >
+                  <ChevronRight className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+
+            <Link
+              to="/produto/$id"
+              params={{ id: recommended.id }}
+              className="group relative block overflow-hidden rounded-[2rem] border border-border bg-card shadow-md"
+            >
+              <div className="grid min-h-[210px] grid-cols-[42%_58%] items-center sm:min-h-[260px]">
+                <div className="relative h-full min-h-[210px] overflow-hidden bg-muted sm:min-h-[260px]">
+                  {recommended.image ? (
+                    <ProductImage
+                      src={recommended.image}
+                      alt={recommended.name}
+                      priority
+                      eager
+                    />
+                  ) : (
+                    <div className="grid h-full place-items-center">
+                      <ImageOff className="h-10 w-10 text-muted-foreground" />
+                    </div>
+                  )}
+                  {recommended.badge && (
+                    <span className="absolute left-3 top-3 rounded-full bg-primary px-3 py-1 text-xs font-black text-primary-foreground shadow">
+                      {recommended.badge.label}
+                    </span>
+                  )}
+                </div>
+                <div className="p-5 sm:p-7">
+                  <p className="text-xs font-black uppercase tracking-[0.12em] text-primary">
+                    Destaque SPERB
+                  </p>
+                  <h3 className="mt-2 line-clamp-3 text-xl font-black leading-tight text-foreground sm:text-2xl">
+                    {recommended.name}
+                  </h3>
+                  <p className="mt-3 text-sm font-semibold text-muted-foreground">
+                    Confira este produto em destaque na nossa vitrine.
+                  </p>
+                  <p className="mt-4 text-2xl font-black text-primary">
+                    {formatPrice(recommended.price)}
+                  </p>
+                  <span className="mt-4 inline-flex rounded-full bg-muted px-4 py-2 text-sm font-black text-foreground">
+                    Ver produto →
+                  </span>
+                </div>
               </div>
             </Link>
-          </section>
-        )}
 
-        {!query && (
-          <section aria-label="Categorias" className="mb-6">
-            <h2 className="mb-3 text-xl font-black text-foreground">Categorias</h2>
-            <div className="-mx-1 flex gap-4 overflow-x-auto px-1 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              <button onClick={() => setCategory("todos")} className="flex w-20 shrink-0 flex-col items-center gap-1.5 active:scale-95">
-                <span className={`grid h-16 w-16 place-items-center rounded-full border-2 bg-card text-xs font-black shadow-sm ${category === "todos" ? "border-primary" : "border-border"}`}>Todos</span>
-                <span className="max-w-20 truncate text-xs font-bold text-foreground">Todos</span>
-              </button>
-              {categoryItems.map((c) => (
-                <button key={c.id} onClick={() => setCategory(c.id)} className="flex w-20 shrink-0 flex-col items-center gap-1.5 active:scale-95" aria-pressed={category === c.id}>
-                  <span className={`grid h-16 w-16 overflow-hidden place-items-center rounded-full border-2 bg-muted shadow-sm ${category === c.id ? "border-primary" : "border-border"}`}>
-                    {c.image ? <img src={c.image} alt="" className="h-full w-full object-cover" loading="lazy" /> : <span className="px-2 text-center text-[10px] font-black text-muted-foreground">{c.name}</span>}
-                  </span>
-                  <span className="max-w-20 truncate text-xs font-bold text-foreground">{c.name}</span>
-                </button>
+            <div className="mt-2 flex justify-center gap-1.5" aria-hidden="true">
+              {recommendedProducts.map((p, index) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  aria-label={`Mostrar ${p.name}`}
+                  onClick={() => setRecommendedIndex(index)}
+                  className={`h-1.5 rounded-full transition-all ${index === recommendedIndex ? "w-6 bg-primary" : "w-1.5 bg-muted-foreground/30"}`}
+                />
               ))}
             </div>
           </section>
         )}
+
+        <section className="mb-5" aria-label="Categorias">
+          <div className="mb-2 flex items-end justify-between px-1">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">
+                Explore
+              </p>
+              <h2 className="text-xl font-black text-foreground">Categorias</h2>
+            </div>
+            {data.categories.length > 8 && (
+              <button
+                type="button"
+                onClick={() => setShowAllCategories((v) => !v)}
+                className="rounded-full bg-muted px-3 py-1.5 text-xs font-black text-foreground"
+              >
+                {showAllCategories ? "Menos" : "Todas"}
+              </button>
+            )}
+          </div>
+
+          <div className="-mx-1 flex gap-4 overflow-x-auto px-1 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <CategoryRound
+              label="Todos"
+              active={category === "todos"}
+              onClick={() => setCategory("todos")}
+            />
+            {categoryChips.map((c) => (
+              <CategoryRound
+                key={c.id}
+                label={c.name}
+                active={category === c.id}
+                onClick={() => setCategory(c.id)}
+              />
+            ))}
+          </div>
+        </section>
 
         {results.length === 0 && suggestions.length === 0 ? (
           <p className="mt-10 text-center text-xl text-muted-foreground">
@@ -382,13 +446,7 @@ function Home() {
         ) : (
           <>
             {results.length > 0 && (
-              <>
-                {!query && category !== "todos" && (
-                  <h2 className="mb-3 text-xl font-black text-foreground">
-                    {data.categories.find((c) => c.id === category)?.name ?? "Produtos"}
-                  </h2>
-                )}
-                <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+              <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                 {shownResults.map((p, i) => (
                   <ProductCard
                     key={p.id}
@@ -398,8 +456,7 @@ function Home() {
                     eager={i < EAGER_COUNT}
                   />
                 ))}
-                </ul>
-              </>
+              </ul>
             )}
 
             <div ref={sentinelRef} className="h-1 w-full" />
@@ -435,6 +492,57 @@ function Home() {
         <Sparkles className="absolute -right-0.5 -top-0.5 h-5 w-5 text-[oklch(0.85_0.18_95)] drop-shadow" />
       </Link>
     </div>
+  );
+}
+
+function CategoryRound({
+  label,
+  active,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  const normalized = label.toLowerCase();
+  const icon = normalized.includes("casa")
+    ? "🏠"
+    : normalized.includes("beleza")
+      ? "💄"
+      : normalized.includes("brinqu")
+        ? "🧸"
+        : normalized.includes("eletr")
+          ? "📱"
+          : normalized.includes("ferrament")
+            ? "🔧"
+            : normalized.includes("moda") || normalized.includes("roup")
+              ? "👕"
+              : normalized.includes("cozinha")
+                ? "🍳"
+                : normalized.includes("papel")
+                  ? "📚"
+                  : "🛍️";
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="group flex w-[72px] shrink-0 flex-col items-center gap-1.5 active:scale-95"
+      aria-pressed={active}
+    >
+      <span
+        className={`grid h-16 w-16 place-items-center rounded-full border-2 text-2xl shadow-sm transition-all ${
+          active
+            ? "border-primary bg-primary/10 ring-4 ring-primary/10"
+            : "border-border bg-card group-hover:border-primary/40"
+        }`}
+      >
+        {icon}
+      </span>
+      <span className={`w-full truncate text-center text-xs font-black ${active ? "text-primary" : "text-foreground"}`}>
+        {label}
+      </span>
+    </button>
   );
 }
 

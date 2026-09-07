@@ -4,6 +4,7 @@ import {
   Link,
   createRootRouteWithContext,
   useRouter,
+  useRouterState,
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
@@ -13,6 +14,7 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { useFaviconSync } from "../lib/favicon-sync";
 import { FloatingCart } from "../components/floating-cart";
+import { DevelopmentGate } from "../lib/desenvolvimento";
 
 function NotFoundComponent() {
   return (
@@ -247,10 +249,13 @@ function RootShell({
  */
 function FaviconSyncWrapper() {
   useFaviconSync();
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const isAdminRoute = pathname === "/admin";
 
   return (
     <>
       <Outlet />
+      {!isAdminRoute && <DevelopmentGate />}
       <FloatingCart />
     </>
   );

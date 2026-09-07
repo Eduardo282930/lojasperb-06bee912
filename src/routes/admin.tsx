@@ -21,6 +21,7 @@ import {
   AlertTriangle,
   CircleDollarSign,
   Boxes,
+  LockKeyhole,
 } from "lucide-react";
 import {
   findCustomerId,
@@ -66,6 +67,7 @@ import { useAdmin, adminSignIn, adminSignOut } from "@/lib/admin";
 import { paymentsStatus } from "@/lib/payments.functions";
 import { formatPrice } from "@/lib/cart";
 import { broadcastNotification } from "@/lib/notifications";
+import { fetchDevelopmentMode, setDevelopmentMode } from "@/lib/desenvolvimento";
 import { fetchCatalog, type CatalogProduct } from "@/lib/loyverse.functions";
 import { useLiveInvalidate } from "@/lib/live";
 import {
@@ -122,7 +124,8 @@ type Section =
   | "destaques"
   | "pagamentos"
   | "duplicidades"
-  | "estoque";
+  | "estoque"
+  | "desenvolvimento";
 
 type AdminItem = {
   id: Exclude<Section, "home" | "operacao" | "clientes-area" | "vitrine" | "sistema" | "estoque-area">;
@@ -188,6 +191,12 @@ const SECTIONS: AdminItem[] = [
     hint: "Vendas registradas na loja",
     icon: <Receipt className="h-6 w-6" />,
   },
+  {
+    id: "desenvolvimento",
+    label: "Modo desenvolvimento",
+    hint: "Bloquear a loja durante manutenção",
+    icon: <LockKeyhole className="h-6 w-6" />,
+  },
 ];
 
 const ADMIN_GROUPS: AdminGroup[] = [
@@ -230,7 +239,7 @@ const ADMIN_GROUPS: AdminGroup[] = [
     label: "Sistema e registros",
     hint: "Loyverse e informações da operação",
     icon: <Receipt className="h-7 w-7" />,
-    items: SECTIONS.filter((item) => item.id === "recibos"),
+    items: SECTIONS.filter((item) => ["recibos", "desenvolvimento"].includes(item.id)),
   },
 ];
 
@@ -243,6 +252,7 @@ const SECTION_TO_GROUP: Record<AdminItem["id"], AdminGroup["id"]> = {
   cupons: "vitrine",
   recibos: "sistema",
   estoque: "estoque-area",
+  desenvolvimento: "sistema",
 };
 
 function AdminPage() {
@@ -509,7 +519,93 @@ function AdminPage() {
         {section === "destaques" && <FeaturedPanel />}
         {section === "pagamentos" && <PaymentsPanel />}
         {section === "duplicidades" && <DuplicatesPanel />}
+        {section === "desenvolvimento" && <DevelopmentPanel />}
       </main>
+    </div>
+  );
+}
+
+function DevelopmentPanel() {
+  const [enabled, setEnabled] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    void fetchDevelopmentMode().then((value) => {
+      setEnabled(value);
+      setLoading(false);
+    });
+  }, []);
+
+  async function toggle(next: boolean) {
+    setBusy(true);
+    setMessage("");
+    const ok = await setDevelopmentMode(next);
+    if (ok) {
+      setEnabled(next);
+      setMessage(next ? "Modo desenvolvimento ativado." : "Loja liberada para os clientes.");
+    } else {
+      setMessage("Não foi possível alterar o modo desenvolvimento.");
+    }
+    setBusy(false);
+  }
+
+  if (loading) {
+    return <div className="rounded-3xl border bg-card p-6 text-base font-bold text-muted-foreground">Carregando configuração…</div>;
+  }
+
+  return (
+    <div className="space-y-4">
+      <section className="rounded-3xl border-2 border-border bg-card p-6 shadow-sm">
+        <div className="flex items-start gap-4">
+          <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-primary/10 text-primary">
+            <LockKeyhole className="h-7 w-7" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-xl font-black text-foreground">Modo desenvolvimento</h2>
+            <p className="mt-1 text-sm font-semibold leading-5 text-muted-foreground">
+              Quando estiver ligado, os clientes não conseguem entrar na loja. Somente uma conta de administrador consegue acessar o aplicativo.
+            </p>
+          </div>
+        </div>
+
+        <div className={`mt-5 rounded-2xl border-2 p-4 ${enabled ? "border-destructive/30 bg-destructive/5" : "border-primary/20 bg-primary/5"}`}>
+          <p className="text-base font-black text-foreground">
+            {enabled ? "🔒 Loja em manutenção" : "🟢 Loja aberta para clientes"}
+          </p>
+          <p className="mt-1 text-sm font-semibold text-muted-foreground">
+            {enabled
+              ? "A tela de manutenção será mostrada automaticamente para quem acessar o aplicativo."
+              : "O aplicativo está funcionando normalmente para os clientes."}
+          </p>
+        </div>
+
+        <div className="mt-5 grid gap-3 sm:grid-cols-2">
+          <button
+            type="button"
+            disabled={busy || enabled}
+            onClick={() => void toggle(true)}
+            className="rounded-2xl bg-destructive px-4 py-3.5 text-base font-black text-destructive-foreground disabled:opacity-50"
+          >
+            {busy && !enabled ? "Ativando…" : "Ativar manutenção"}
+          </button>
+          <button
+            type="button"
+            disabled={busy || !enabled}
+            onClick={() => void toggle(false)}
+            className="rounded-2xl bg-primary px-4 py-3.5 text-base font-black text-primary-foreground disabled:opacity-50"
+          >
+            {busy && enabled ? "Liberando…" : "Desativar e abrir loja"}
+          </button>
+        </div>
+
+        {message && <p className="mt-4 text-sm font-bold text-muted-foreground">{message}</p>}
+      </section>
+
+      <p className="px-1 text-sm font-semibold leading-5 text-muted-foreground">
+        O login usado aqui é o mesmo login de administrador já existente no painel SPERB. Não criamos uma segunda senha.
+      </p>
     </div>
   );
 }
