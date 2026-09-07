@@ -9,7 +9,6 @@ import {
   X,
   Check,
   Share2,
-  ChevronDown,
   UserRound,
   Sparkles,
 } from "lucide-react";
@@ -132,7 +131,6 @@ function Home() {
   const cart = useCart();
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<string>("todos");
-  const [showAllCategories, setShowAllCategories] = useState(false);
 
   /*
    * Cópia local do aparelho: só entra DEPOIS da hidratação, para que a tela
@@ -238,6 +236,38 @@ function Home() {
 
   const shownResults = results.slice(0, visible);
 
+  // Produtos recomendados: usa os produtos que já chegam com selo comercial
+  // e troca automaticamente a cada 4 segundos.
+  const recommendedProducts = useMemo(() => {
+    const recommended = commercialProducts.filter((p) => p.badge);
+    return (recommended.length > 0 ? recommended : commercialProducts).slice(0, 8);
+  }, [commercialProducts]);
+  const [recommendedIndex, setRecommendedIndex] = useState(0);
+
+  useEffect(() => {
+    setRecommendedIndex(0);
+  }, [recommendedProducts.length]);
+
+  useEffect(() => {
+    if (recommendedProducts.length <= 1) return;
+    const timer = window.setInterval(() => {
+      setRecommendedIndex((current) => (current + 1) % recommendedProducts.length);
+    }, 4000);
+    return () => window.clearInterval(timer);
+  }, [recommendedProducts.length]);
+
+  const recommended = recommendedProducts[recommendedIndex] ?? null;
+
+  // Cada categoria usa a foto de um produto dela como capa do círculo.
+  const categoryItems = useMemo(
+    () =>
+      data.categories.map((c) => ({
+        ...c,
+        image: commercialProducts.find((p) => p.categoryId === c.id)?.image ?? null,
+      })),
+    [data.categories, commercialProducts],
+  );
+
   // O selo já vem pronto do servidor junto com cada produto.
   const badgeOf = (p: CatalogProduct) => p.badge ?? null;
 
@@ -291,44 +321,60 @@ function Home() {
 
 
 
-          <div className="mt-2 flex items-start gap-2">
-            <div
-              className={`-mx-1 flex min-w-0 flex-1 gap-1.5 px-1 pb-0.5 ${
-                showAllCategories
-                  ? "flex-wrap"
-                  : "overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-              }`}
-            >
-              <CategoryChip
-                label="Todos"
-                active={category === "todos"}
-                onClick={() => setCategory("todos")}
-              />
-              {categoryChips.map((c) => (
-                <CategoryChip
-                  key={c.id}
-                  label={c.name}
-                  active={category === c.id}
-                  onClick={() => setCategory(c.id)}
-                />
-              ))}
-            </div>
-            {data.categories.length > 8 && (
-              <button
-                onClick={() => setShowAllCategories((v) => !v)}
-                className="shrink-0 inline-flex items-center gap-1 rounded-full border border-border bg-card px-2.5 py-1 text-sm font-bold text-muted-foreground"
-              >
-                {showAllCategories ? "Menos" : "Todas"}
-                <ChevronDown
-                  className={`h-4 w-4 transition-transform ${showAllCategories ? "rotate-180" : ""}`}
-                />
-              </button>
-            )}
-          </div>
         </div>
       </header>
 
       <main className="mx-auto max-w-5xl px-3 pt-3">
+        {recommended && !query && category === "todos" && (
+          <section aria-label="Produtos recomendados" className="mb-5">
+            <div className="mb-2 flex items-center justify-between">
+              <h2 className="text-xl font-black text-foreground">Recomendados</h2>
+              {recommendedProducts.length > 1 && (
+                <div className="flex gap-1" aria-hidden="true">
+                  {recommendedProducts.map((p, i) => (
+                    <span key={p.id} className={`h-1.5 rounded-full transition-all ${i === recommendedIndex ? "w-5 bg-primary" : "w-1.5 bg-muted"}`} />
+                  ))}
+                </div>
+              )}
+            </div>
+            <Link to="/produto/$id" params={{ id: recommended.id }} className="group relative flex min-h-48 overflow-hidden rounded-3xl border border-border bg-card shadow-md transition-transform active:scale-[0.99]">
+              <div className="relative w-1/2 overflow-hidden bg-muted sm:w-2/5">
+                {recommended.image ? (
+                  <ProductImage src={recommended.image} alt={recommended.name} priority eager />
+                ) : (
+                  <div className="grid h-full place-items-center"><ImageOff className="h-10 w-10 text-muted-foreground" /></div>
+                )}
+              </div>
+              <div className="flex flex-1 flex-col justify-center p-4 sm:p-6">
+                {recommended.badge && <span className="mb-2 w-fit rounded-full bg-primary px-3 py-1 text-xs font-black text-primary-foreground">{recommended.badge.label}</span>}
+                <h3 className="line-clamp-2 text-lg font-black leading-tight text-foreground sm:text-2xl">{recommended.name}</h3>
+                <p className="mt-2 text-xl font-black text-primary sm:text-2xl">{formatPrice(recommended.price)}</p>
+                <span className="mt-3 w-fit rounded-full bg-primary px-4 py-2 text-sm font-black text-primary-foreground">Ver produto</span>
+              </div>
+            </Link>
+          </section>
+        )}
+
+        {!query && (
+          <section aria-label="Categorias" className="mb-6">
+            <h2 className="mb-3 text-xl font-black text-foreground">Categorias</h2>
+            <div className="-mx-1 flex gap-4 overflow-x-auto px-1 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <button onClick={() => setCategory("todos")} className="flex w-20 shrink-0 flex-col items-center gap-1.5 active:scale-95">
+                <span className={`grid h-16 w-16 place-items-center rounded-full border-2 bg-card text-xs font-black shadow-sm ${category === "todos" ? "border-primary" : "border-border"}`}>Todos</span>
+                <span className="max-w-20 truncate text-xs font-bold text-foreground">Todos</span>
+              </button>
+              {categoryItems.map((c) => (
+                <button key={c.id} onClick={() => setCategory(c.id)} className="flex w-20 shrink-0 flex-col items-center gap-1.5 active:scale-95" aria-pressed={category === c.id}>
+                  <span className={`grid h-16 w-16 overflow-hidden place-items-center rounded-full border-2 bg-muted shadow-sm ${category === c.id ? "border-primary" : "border-border"}`}>
+                    {c.image ? <img src={c.image} alt="" className="h-full w-full object-cover" loading="lazy" /> : <span className="px-2 text-center text-[10px] font-black text-muted-foreground">{c.name}</span>}
+                  </span>
+                  <span className="max-w-20 truncate text-xs font-bold text-foreground">{c.name}</span>
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+
         {results.length === 0 && suggestions.length === 0 ? (
           <p className="mt-10 text-center text-xl text-muted-foreground">
             Nenhum produto encontrado.
@@ -336,7 +382,13 @@ function Home() {
         ) : (
           <>
             {results.length > 0 && (
-              <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+              <>
+                {!query && category !== "todos" && (
+                  <h2 className="mb-3 text-xl font-black text-foreground">
+                    {data.categories.find((c) => c.id === category)?.name ?? "Produtos"}
+                  </h2>
+                )}
+                <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                 {shownResults.map((p, i) => (
                   <ProductCard
                     key={p.id}
@@ -346,7 +398,8 @@ function Home() {
                     eager={i < EAGER_COUNT}
                   />
                 ))}
-              </ul>
+                </ul>
+              </>
             )}
 
             <div ref={sentinelRef} className="h-1 w-full" />
@@ -382,29 +435,6 @@ function Home() {
         <Sparkles className="absolute -right-0.5 -top-0.5 h-5 w-5 text-[oklch(0.85_0.18_95)] drop-shadow" />
       </Link>
     </div>
-  );
-}
-
-function CategoryChip({
-  label,
-  active,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`shrink-0 rounded-full border px-3 py-1 text-sm font-bold transition-colors active:scale-95 ${
-        active
-          ? "border-[oklch(0.55_0.22_255)] bg-[oklch(0.55_0.22_255)] text-white"
-          : "border-border bg-card text-foreground"
-      }`}
-    >
-      {label}
-    </button>
   );
 }
 
