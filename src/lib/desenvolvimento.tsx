@@ -13,16 +13,12 @@ function readEnabled(settings: unknown): boolean {
 }
 
 export async function fetchDevelopmentMode(): Promise<boolean> {
-  const { data, error } = await supabase
-    .from("store_settings")
-    .select("settings")
-    .eq("store_key", STORE_KEY)
-    .maybeSingle();
+  const { data, error } = await supabase.rpc("get_development_mode");
   if (error) {
     console.error("[SPERB] Não foi possível consultar o modo desenvolvimento:", error);
     return false;
   }
-  return readEnabled(data?.settings);
+  return data === true;
 }
 
 export async function setDevelopmentMode(enabled: boolean): Promise<boolean> {
