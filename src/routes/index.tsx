@@ -504,31 +504,21 @@ function CategoryRound({
   active: boolean;
   onClick: () => void;
 }) {
-  const normalized = label.toLowerCase();
-  const icon = normalized.includes("casa")
-    ? "🏠"
-    : normalized.includes("beleza")
-      ? "💄"
-      : normalized.includes("brinqu")
-        ? "🧸"
-        : normalized.includes("eletr")
-          ? "📱"
-          : normalized.includes("ferrament")
-            ? "🔧"
-            : normalized.includes("moda") || normalized.includes("roup")
-              ? "👕"
-              : normalized.includes("cozinha")
-                ? "🍳"
-                : normalized.includes("papel")
-                  ? "📚"
-                  : "🛍️";
+  // O símbolo da categoria vem do próprio nome cadastrado no Loyverse.
+  // Ex.: "⚡ Eletrônicos" -> mostra ⚡ e usa "Eletrônicos" como nome.
+  const symbolMatch = label.trim().match(/^(\p{Extended_Pictographic}(?:\uFE0F|\u200D\p{Extended_Pictographic})*)\s*/u);
+  const symbol = symbolMatch?.[1] ?? "";
+  const displayLabel = symbolMatch
+    ? label.trim().slice(symbolMatch[0].length).trim()
+    : label.trim();
 
   return (
     <button
       type="button"
       onClick={onClick}
-      className="group flex w-[72px] shrink-0 flex-col items-center gap-1.5 active:scale-95"
+      className="group flex w-[88px] shrink-0 flex-col items-center gap-1.5 active:scale-95"
       aria-pressed={active}
+      aria-label={`Categoria ${displayLabel}`}
     >
       <span
         className={`grid h-16 w-16 place-items-center rounded-full border-2 text-2xl shadow-sm transition-all ${
@@ -537,10 +527,14 @@ function CategoryRound({
             : "border-border bg-card group-hover:border-primary/40"
         }`}
       >
-        {icon}
+        {symbol || "🛍️"}
       </span>
-      <span className={`w-full truncate text-center text-xs font-black ${active ? "text-primary" : "text-foreground"}`}>
-        {label}
+      <span
+        className={`w-full text-center text-xs font-black leading-tight ${
+          active ? "text-primary" : "text-foreground"
+        }`}
+      >
+        {displayLabel}
       </span>
     </button>
   );
