@@ -311,6 +311,18 @@ function Home() {
     setRecommendedIndex(0);
   }, [query]);
 
+  // Aprende com o que o cliente pesquisa (só no aparelho dele).
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 3) return;
+    const timer = window.setTimeout(() => {
+      recordSearch(q);
+      setInterests(loadInterests());
+    }, 1200);
+    return () => window.clearTimeout(timer);
+  }, [query]);
+
+
   useEffect(() => {
     if (recommendedProducts.length <= 1 || query.trim()) return;
     const timer = window.setInterval(() => {
