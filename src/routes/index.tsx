@@ -401,14 +401,15 @@ function Home() {
               params={{ id: recommended.id }}
               className="group relative block overflow-hidden rounded-[2rem] border border-border bg-card shadow-md"
             >
-              <div className="grid min-h-[210px] grid-cols-[42%_58%] items-center sm:min-h-[260px]">
-                <div className="relative h-full min-h-[210px] overflow-hidden bg-muted sm:min-h-[260px]">
+              <div className="grid min-h-[150px] grid-cols-[44%_56%] items-center sm:min-h-[200px]">
+                <div className="relative h-full min-h-[150px] overflow-hidden bg-muted p-2 sm:min-h-[200px] sm:p-3">
                   {recommended.image ? (
                     <ProductImage
                       src={recommended.image}
                       alt={recommended.name}
                       priority
                       eager
+                      contain
                     />
                   ) : (
                     <div className="grid h-full place-items-center">
@@ -416,28 +417,26 @@ function Home() {
                     </div>
                   )}
                   {recommended.badge && (
-                    <span className="absolute left-3 top-3 rounded-full bg-primary px-3 py-1 text-xs font-black text-primary-foreground shadow">
+                    <span className="absolute left-2 top-2 rounded-full bg-primary px-2.5 py-0.5 text-[11px] font-black text-primary-foreground shadow">
                       {recommended.badge.label}
                     </span>
                   )}
                 </div>
-                <div className="p-5 sm:p-7">
-                  <p className="text-xs font-black uppercase tracking-[0.12em] text-primary">
+                <div className="p-3 sm:p-6">
+                  <p className="text-[11px] font-black uppercase tracking-[0.12em] text-primary">
                     Destaque SPERB
                   </p>
-                  <h3 className="mt-2 line-clamp-3 text-xl font-black leading-tight text-foreground sm:text-2xl">
+                  <h3 className="mt-1 line-clamp-2 text-base font-black leading-tight text-foreground sm:text-xl">
                     {recommended.name}
                   </h3>
-                  <p className="mt-3 text-sm font-semibold text-muted-foreground">
-                    Confira este produto em destaque na nossa vitrine.
-                  </p>
-                  <p className="mt-4 text-2xl font-black text-primary">
+                  <p className="mt-2 text-xl font-black text-primary sm:text-2xl">
                     {formatPrice(recommended.price)}
                   </p>
-                  <span className="mt-4 inline-flex rounded-full bg-muted px-4 py-2 text-sm font-black text-foreground">
+                  <span className="mt-2 inline-flex rounded-full bg-muted px-3 py-1.5 text-xs font-black text-foreground sm:text-sm">
                     Ver produto →
                   </span>
                 </div>
+
               </div>
             </Link>
 
