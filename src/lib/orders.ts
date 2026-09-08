@@ -41,6 +41,8 @@ export type Order = {
   coinsUsed?: number;
   coinsDiscount?: number;
   sellerDiscount?: number;
+  /** Opção escolhida no Loyverse: Consumir no local, Entrega… */
+  diningOption?: string | null;
 };
 
 /** true quando o pedido foi lançado pelo vendedor na loja física. */
