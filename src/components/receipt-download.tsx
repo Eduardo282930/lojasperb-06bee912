@@ -1,8 +1,16 @@
-import { useState } from "react";
-import { Download } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Download, Eye, LoaderCircle } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { getOrderReceipt, type ReceiptData } from "@/lib/order-receipt.functions";
 import { formatPrice } from "@/lib/cart";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 /**
  * Botão "Baixar recibo": monta a imagem do recibo no aparelho, no momento em
@@ -10,7 +18,8 @@ import { formatPrice } from "@/lib/cart";
  */
 
 const W = 760;
-const PAD = 48;
+const PAD = 52;
+const CONTENT_W = W - PAD * 2;
 
 function loadImage(src: string): Promise<HTMLImageElement | null> {
   return new Promise((resolve) => {
@@ -49,20 +58,25 @@ async function drawReceipt(r: ReceiptData): Promise<Blob | null> {
     ]);
   }
 
-  const logoH = logo ? 150 : 0;
+  const logoBoxH = logo ? 150 : 0;
+  const itemHeights = r.items.map((item) => {
+    const label = `${item.qty}x ${item.name}`;
+    return label.length > 37 ? 68 : 48;
+  });
   const height =
     PAD +
-    logoH +
+    logoBoxH +
     (logo ? 24 : 0) +
     56 + // nome da loja
     (r.storeAddress ? 34 : 0) +
     56 + // agradecimento
-    96 + // total em destaque
-    lines.length * 38 +
+    100 + // total em destaque
+    (r.refunded ? 78 : 0) +
+    lines.length * 44 +
     36 +
-    r.items.length * 44 +
+    itemHeights.reduce((sum, value) => sum + value, 0) +
     36 +
-    totals.length * 36 +
+    totals.length * 42 +
     64 + // total final
     140 + // rodapé
     PAD;
@@ -82,16 +96,20 @@ async function drawReceipt(r: ReceiptData): Promise<Blob | null> {
   const center = W / 2;
 
   if (logo) {
-    const ratio = logo.width > 0 ? logo.height / logo.width : 1;
-    const w = Math.min(260, W - PAD * 2);
-    const h = Math.min(logoH, w * ratio);
+    const maxW = 280;
+    const maxH = logoBoxH;
+    const naturalW = Math.max(1, logo.naturalWidth || logo.width);
+    const naturalH = Math.max(1, logo.naturalHeight || logo.height);
+    const scaleToFit = Math.min(maxW / naturalW, maxH / naturalH, 1);
+    const w = naturalW * scaleToFit;
+    const h = naturalH * scaleToFit;
     ctx.drawImage(logo, center - w / 2, y, w, h);
-    y += h + 24;
+    y += logoBoxH + 24;
   }
 
   ctx.fillStyle = "#111111";
   ctx.textAlign = "center";
-  ctx.font = "700 34px system-ui, sans-serif";
+  ctx.font = "700 38px system-ui, sans-serif";
   ctx.fillText(r.storeName, center, y + 26);
   y += 50;
 
@@ -108,21 +126,32 @@ async function drawReceipt(r: ReceiptData): Promise<Blob | null> {
   y += 60;
 
   ctx.fillStyle = "#111111";
-  ctx.font = "700 56px system-ui, sans-serif";
+  ctx.font = "700 60px system-ui, sans-serif";
   ctx.fillText(formatPrice(r.total), center, y + 44);
-  y += 96;
+  y += 100;
+
+  if (r.refunded) {
+    ctx.fillStyle = "#111111";
+    ctx.strokeStyle = "#111111";
+    ctx.lineWidth = 3;
+    ctx.strokeRect(center - 180, y, 360, 54);
+    ctx.font = "800 29px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("REEMBOLSADO", center, y + 37);
+    y += 78;
+  }
 
   ctx.textAlign = "left";
   const left = PAD;
   const right = W - PAD;
 
   function row(label: string, value: string, bold = false) {
-    ctx!.font = `${bold ? 700 : 400} 22px system-ui, sans-serif`;
+    ctx!.font = `${bold ? 700 : 500} 24px system-ui, sans-serif`;
     ctx!.fillStyle = bold ? "#111111" : "#555555";
     ctx!.textAlign = "left";
     ctx!.fillText(label, left, y + 18);
     ctx!.fillStyle = "#111111";
-    ctx!.font = `${bold ? 700 : 500} 22px system-ui, sans-serif`;
+    ctx!.font = `${bold ? 700 : 600} 24px system-ui, sans-serif`;
     ctx!.textAlign = "right";
     ctx!.fillText(value, right, y + 18);
     ctx!.textAlign = "left";
@@ -140,24 +169,46 @@ async function drawReceipt(r: ReceiptData): Promise<Blob | null> {
 
   for (const [label, value] of lines) {
     row(label, value);
-    y += 38;
+    y += 44;
   }
 
   divider();
 
-  for (const item of r.items) {
-    row(`${item.qty}x ${item.name}`, formatPrice(item.price * item.qty));
-    y += 44;
+  for (const [index, item] of r.items.entries()) {
+    const label = `${item.qty}x ${item.name}`;
+    const price = formatPrice(item.price * item.qty);
+    ctx.font = "500 24px system-ui, sans-serif";
+    ctx.fillStyle = "#333333";
+    ctx.textAlign = "left";
+    if (label.length > 37) {
+      const words = label.split(" ");
+      let first = "";
+      let second = "";
+      for (const word of words) {
+        const candidate = first ? `${first} ${word}` : word;
+        if (!second && ctx.measureText(candidate).width <= CONTENT_W - 160) first = candidate;
+        else second = second ? `${second} ${word}` : word;
+      }
+      ctx.fillText(first, left, y + 20);
+      ctx.fillText(second, left, y + 50, CONTENT_W - 160);
+      ctx.textAlign = "right";
+      ctx.font = "600 24px system-ui, sans-serif";
+      ctx.fillStyle = "#111111";
+      ctx.fillText(price, right, y + 20);
+    } else {
+      row(label, price);
+    }
+    y += itemHeights[index] ?? 48;
   }
 
   divider();
 
   for (const [label, value] of totals) {
     row(label, value);
-    y += 36;
+    y += 42;
   }
 
-  row("Total pago", formatPrice(r.total), true);
+  row(r.refunded ? "Total reembolsado" : "Total pago", formatPrice(r.total), true);
   y += 64;
 
   ctx.fillStyle = "#777777";
@@ -182,10 +233,23 @@ export function ReceiptDownload({
   phone: string;
 }) {
   const [busy, setBusy] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [receipt, setReceipt] = useState<ReceiptData | null>(null);
   const fetchReceipt = useServerFn(getOrderReceipt);
 
-  async function baixar() {
+  useEffect(() => {
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
+  }, [previewUrl]);
+
+  async function verRecibo() {
     if (busy) return;
+    if (previewUrl) {
+      setOpen(true);
+      return;
+    }
     setBusy(true);
     try {
       const data = await fetchReceipt({ data: { orderId, phone } });
@@ -193,25 +257,57 @@ export function ReceiptDownload({
       const blob = await drawReceipt(data as ReceiptData);
       if (!blob) return;
       const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `recibo-${(data as ReceiptData).number}.png`;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 4000);
+      setReceipt(data as ReceiptData);
+      setPreviewUrl(url);
+      setOpen(true);
     } finally {
       setBusy(false);
     }
   }
 
+  function baixar() {
+    if (!previewUrl || !receipt) return;
+    const a = document.createElement("a");
+    a.href = previewUrl;
+    a.download = `recibo-${receipt.number}.png`;
+    a.click();
+  }
+
   return (
-    <button
-      type="button"
-      onClick={() => void baixar()}
-      disabled={busy}
-      className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-border px-4 py-3 text-base font-semibold text-foreground disabled:opacity-60"
-    >
-      <Download className="h-5 w-5" />
-      {busy ? "Gerando recibo…" : "Baixar recibo"}
-    </button>
+    <>
+      <Button
+        type="button"
+        variant="outline"
+        size="lg"
+        onClick={() => void verRecibo()}
+        disabled={busy}
+        className="mt-3 h-12 w-full rounded-lg text-base font-semibold"
+      >
+        {busy ? <LoaderCircle className="animate-spin" /> : <Eye />}
+        {busy ? "Abrindo recibo…" : "Ver recibo"}
+      </Button>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="flex max-h-[92dvh] w-[calc(100%-1rem)] max-w-xl flex-col gap-3 overflow-hidden rounded-lg p-3 sm:p-4">
+          <DialogHeader className="pr-10 text-left">
+            <DialogTitle>{receipt?.refunded ? "Recibo reembolsado" : "Recibo do pedido"}</DialogTitle>
+            <DialogDescription>Confira o recibo antes de baixar.</DialogDescription>
+          </DialogHeader>
+          {previewUrl && (
+            <div className="min-h-0 flex-1 overflow-auto rounded-md border border-border bg-muted p-2">
+              <img
+                src={previewUrl}
+                alt={receipt?.refunded ? "Recibo marcado como reembolsado" : "Recibo do pedido"}
+                className="mx-auto h-auto w-full max-w-md"
+              />
+            </div>
+          )}
+          <Button type="button" size="lg" onClick={baixar} className="h-12 w-full text-base font-semibold">
+            <Download />
+            Baixar recibo
+          </Button>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
