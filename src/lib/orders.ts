@@ -215,6 +215,7 @@ export async function fetchOrders(): Promise<Order[]> {
     coinsUsed: num((r as { coins_used?: number }).coins_used),
     coinsDiscount: num((r as { coins_discount?: number }).coins_discount),
     sellerDiscount: num((r as { seller_discount?: number }).seller_discount),
+    diningOption: (r as { dining_option?: string | null }).dining_option ?? null,
   }));
 }
 
@@ -252,6 +253,7 @@ export async function fetchMyOrders(phone: string): Promise<Order[]> {
     coinsUsed: num((r as { coins_used?: number }).coins_used),
     coinsDiscount: num((r as { coins_discount?: number }).coins_discount),
     sellerDiscount: num((r as { seller_discount?: number }).seller_discount),
+    diningOption: (r as { dining_option?: string | null }).dining_option ?? null,
   }));
 }
 
