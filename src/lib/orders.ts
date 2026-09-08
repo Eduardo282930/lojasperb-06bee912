@@ -41,6 +41,8 @@ export type Order = {
   coinsUsed?: number;
   coinsDiscount?: number;
   sellerDiscount?: number;
+  /** Opção escolhida no Loyverse: Consumir no local, Entrega… */
+  diningOption?: string | null;
 };
 
 /** true quando o pedido foi lançado pelo vendedor na loja física. */
@@ -101,10 +103,14 @@ export function statusLabel(v: string): string {
 export function displayStatusLabel(order: {
   status: string;
   paymentStatus: string;
+  origin?: string;
 }): string {
   // Reembolso feito no Loyverse: o cliente vê cancelado e reembolsado.
   if (order.paymentStatus === "refunded") return "Reembolsado e cancelado";
   if (order.status === "canceled") return "Cancelado";
+  if (order.status === "delivered" && isStoreOrder(order)) {
+    return "Entregue e finalizado na loja";
+  }
   if (order.status === "sent" && order.paymentStatus !== "paid") {
     return "Aguardando pagamento";
   }
@@ -209,6 +215,7 @@ export async function fetchOrders(): Promise<Order[]> {
     coinsUsed: num((r as { coins_used?: number }).coins_used),
     coinsDiscount: num((r as { coins_discount?: number }).coins_discount),
     sellerDiscount: num((r as { seller_discount?: number }).seller_discount),
+    diningOption: (r as { dining_option?: string | null }).dining_option ?? null,
   }));
 }
 
@@ -246,6 +253,7 @@ export async function fetchMyOrders(phone: string): Promise<Order[]> {
     coinsUsed: num((r as { coins_used?: number }).coins_used),
     coinsDiscount: num((r as { coins_discount?: number }).coins_discount),
     sellerDiscount: num((r as { seller_discount?: number }).seller_discount),
+    diningOption: (r as { dining_option?: string | null }).dining_option ?? null,
   }));
 }
 

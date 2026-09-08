@@ -40,6 +40,9 @@ type LoyverseReceipt = {
   order?: string | null;
   cancelled_at?: string | null;
   customer_id?: string | null;
+  store_id?: string | null;
+  employee_id?: string | null;
+  dining_option?: string | null;
   total_money?: number | null;
   total_discount?: number | null;
   points_deducted?: number | null;
@@ -54,6 +57,14 @@ type LoyverseCustomer = {
   phone_number?: string | null;
   email?: string | null;
 };
+
+type LoyverseStore = {
+  id: string;
+  name?: string | null;
+  address?: string | null;
+};
+
+type LoyverseEmployee = { id: string; name?: string | null };
 
 async function loyverse<T>(path: string, token: string): Promise<T> {
   const res = await fetch(`https://api.loyverse.com/v1.0/${path}`, {
@@ -105,8 +116,10 @@ export async function importStoreReceipts(days = 90): Promise<ImportResult> {
 
   let receipts: LoyverseReceipt[] = [];
   let customers: LoyverseCustomer[] = [];
+  let stores: LoyverseStore[] = [];
+  let employees: LoyverseEmployee[] = [];
   try {
-    const [r, c] = await Promise.all([
+    const [r, c, s, e] = await Promise.all([
       receiptsSince(days)
         .catch(() => receiptsSince(30))
         .catch(() => ({ receipts: [] as LoyverseReceipt[] })),
@@ -114,9 +127,18 @@ export async function importStoreReceipts(days = 90): Promise<ImportResult> {
         "customers?limit=250",
         token,
       ).catch(() => ({ customers: [] as LoyverseCustomer[] })),
+      loyverse<{ stores?: LoyverseStore[] }>("stores?limit=250", token).catch(
+        () => ({ stores: [] as LoyverseStore[] }),
+      ),
+      loyverse<{ employees?: LoyverseEmployee[] }>(
+        "employees?limit=250",
+        token,
+      ).catch(() => ({ employees: [] as LoyverseEmployee[] })),
     ]);
     receipts = r.receipts ?? [];
     customers = c.customers ?? [];
+    stores = s.stores ?? [];
+    employees = e.employees ?? [];
   } catch (err) {
     console.error("[recibos-loja] falha ao ler o Loyverse", err);
     return { ok: false, imported: 0, reason: "loyverse_error" };
@@ -124,6 +146,10 @@ export async function importStoreReceipts(days = 90): Promise<ImportResult> {
 
   const byCustomer = new Map<string, LoyverseCustomer>();
   for (const c of customers) byCustomer.set(c.id, c);
+  const byStore = new Map<string, LoyverseStore>();
+  for (const s of stores) byStore.set(s.id, s);
+  const byEmployee = new Map<string, LoyverseEmployee>();
+  for (const e of employees) byEmployee.set(e.id, e);
 
   /* Imagens do catálogo oficial para o pedido ficar bonito na tela. */
   const imageByVariant = new Map<string, string>();
@@ -226,6 +252,8 @@ export async function importStoreReceipts(days = 90): Promise<ImportResult> {
     if (coinsDiscount === 0 && points > 0) coinsDiscount = money(points / 100);
 
     const customer = r.customer_id ? byCustomer.get(r.customer_id) : undefined;
+    const store = r.store_id ? byStore.get(r.store_id) : undefined;
+    const employee = r.employee_id ? byEmployee.get(r.employee_id) : undefined;
 
     const { error } = await rpc("import_store_receipt", {
       p_receipt_id: r.receipt_number,
@@ -243,6 +271,10 @@ export async function importStoreReceipts(days = 90): Promise<ImportResult> {
       p_seller_discount: money(sellerDiscount),
       p_total: money(r.total_money),
       p_payment_type: paymentLabel(r),
+      p_dining_option: (r.dining_option ?? "").trim(),
+      p_store_name: store?.name?.trim() ?? "",
+      p_store_address: store?.address?.trim() ?? "",
+      p_employee_name: employee?.name?.trim() ?? "",
     });
 
     if (error) {

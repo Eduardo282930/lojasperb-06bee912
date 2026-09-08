@@ -7,6 +7,7 @@ import {
   Package,
 } from "lucide-react";
 import { BackButton } from "@/components/back-button";
+import { ReceiptDownload } from "@/components/receipt-download";
 import { useProfile } from "@/lib/coupons";
 import { useServerFn } from "@tanstack/react-start";
 import { createOrderCheckout } from "@/lib/payments.functions";
@@ -384,6 +385,10 @@ function OrderCard({
               </a>
             </div>
           )}
+
+        {order.paymentStatus === "paid" && !refunded && (
+          <ReceiptDownload orderId={order.id} phone={phone} />
+        )}
 
         {refunded && (
           <div className="mt-3 flex items-center justify-between gap-3 rounded-xl bg-green-50 px-3 py-2.5 dark:bg-green-950/20">
