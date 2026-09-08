@@ -32,6 +32,7 @@ export type ReceiptData = {
   coinsDiscount: number;
   total: number;
   logoDataUrl: string | null;
+  refunded: boolean;
 };
 
 function digits(v: string): string {
@@ -91,7 +92,10 @@ export const getOrderReceipt = createServerFn({ method: "POST" })
     if (orderPhone && orderPhone.slice(-8) !== askPhone.slice(-8)) {
       return { ok: false };
     }
-    if (String(row["payment_status"] ?? "") !== "paid") return { ok: false };
+    const paymentStatus = String(row["payment_status"] ?? "");
+    const refundState = String(row["refund_state"] ?? "");
+    const refunded = paymentStatus === "refunded" || refundState === "refunded";
+    if (paymentStatus !== "paid" && !refunded) return { ok: false };
 
     const items = Array.isArray(row["items"])
       ? (row["items"] as Array<Record<string, unknown>>).map((i) => ({
@@ -131,5 +135,6 @@ export const getOrderReceipt = createServerFn({ method: "POST" })
       coinsDiscount: num(row["coins_discount"]),
       total: num(row["total"]),
       logoDataUrl: await logoAsDataUrl(),
+      refunded,
     };
   });

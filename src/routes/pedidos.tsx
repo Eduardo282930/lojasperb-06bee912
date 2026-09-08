@@ -386,31 +386,8 @@ function OrderCard({
             </div>
           )}
 
-        {order.paymentStatus === "paid" && !refunded && (
+        {(order.paymentStatus === "paid" || refunded) && (
           <ReceiptDownload orderId={order.id} phone={phone} />
-        )}
-
-        {refunded && (
-          <div className="mt-3 flex items-center justify-between gap-3 rounded-xl bg-green-50 px-3 py-2.5 dark:bg-green-950/20">
-            <span
-              className="text-sm font-semibold"
-              style={{ color: GREEN }}
-            >
-              ✅ Reembolso realizado
-            </span>
-
-            {order.refundProofUrl && (
-              <a
-                href={order.refundProofUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="text-sm font-semibold underline"
-                style={{ color: BLUE }}
-              >
-                Comprovante
-              </a>
-            )}
-          </div>
         )}
 
         <button
