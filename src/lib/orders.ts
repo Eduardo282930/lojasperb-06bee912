@@ -34,15 +34,33 @@ export type Order = {
   paymentOrderNsu?: string | null;
   paymentTransactionNsu?: string | null;
   paymentSlug?: string | null;
+  /** "store" quando a venda foi feita pelo vendedor no balcão. */
+  origin?: string;
+  /** Como o cliente pagou na loja: Dinheiro, Pix, Cartão… */
+  paymentTypeLabel?: string | null;
+  coinsUsed?: number;
+  coinsDiscount?: number;
+  sellerDiscount?: number;
 };
+
+/** true quando o pedido foi lançado pelo vendedor na loja física. */
+export function isStoreOrder(order: { origin?: string }): boolean {
+  return order.origin === "store";
+}
 
 /** Pagamento na entrega tem rótulo próprio, nunca aparece só como "Pago". */
 export function paymentDisplayLabel(order: {
   paymentStatus: string;
   paymentMethod?: string;
+  origin?: string;
+  paymentTypeLabel?: string | null;
 }): string {
   if (order.paymentStatus === "paid" && order.paymentMethod === "delivery") {
     return "Pagamento na entrega";
+  }
+  if (order.paymentStatus === "paid" && isStoreOrder(order)) {
+    const tipo = (order.paymentTypeLabel ?? "").trim();
+    return tipo ? `Pago na loja · ${tipo}` : "Pago na loja";
   }
   return paymentLabel(order.paymentStatus);
 }
@@ -185,6 +203,12 @@ export async function fetchOrders(): Promise<Order[]> {
       (r as { payment_id?: string | null }).payment_id ??
       null,
     paymentSlug: (r as { payment_slug?: string | null }).payment_slug ?? null,
+    origin: (r as { origin?: string }).origin ?? "app",
+    paymentTypeLabel:
+      (r as { payment_type_label?: string | null }).payment_type_label ?? null,
+    coinsUsed: num((r as { coins_used?: number }).coins_used),
+    coinsDiscount: num((r as { coins_discount?: number }).coins_discount),
+    sellerDiscount: num((r as { seller_discount?: number }).seller_discount),
   }));
 }
 
@@ -216,6 +240,12 @@ export async function fetchMyOrders(phone: string): Promise<Order[]> {
       (r as { payment_receipt_url?: string | null }).payment_receipt_url ?? null,
     refundState: (r as { refund_state?: string }).refund_state ?? "none",
     refundProofUrl: (r as { refund_proof_url?: string | null }).refund_proof_url ?? null,
+    origin: (r as { origin?: string }).origin ?? "app",
+    paymentTypeLabel:
+      (r as { payment_type_label?: string | null }).payment_type_label ?? null,
+    coinsUsed: num((r as { coins_used?: number }).coins_used),
+    coinsDiscount: num((r as { coins_discount?: number }).coins_discount),
+    sellerDiscount: num((r as { seller_discount?: number }).seller_discount),
   }));
 }
 

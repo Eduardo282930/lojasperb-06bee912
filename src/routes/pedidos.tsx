@@ -228,6 +228,12 @@ function OrderCard({
             <p className="mt-0.5 text-sm text-muted-foreground">
               {paymentDisplayLabel(order)}
             </p>
+
+            {order.origin === "store" && (
+              <p className="mt-1 inline-block rounded-lg bg-muted px-2 py-1 text-xs font-semibold text-foreground">
+                Pedido feito pelo vendedor da loja
+              </p>
+            )}
           </div>
 
           <div className="shrink-0 text-right">
@@ -294,7 +300,9 @@ function OrderCard({
         {order.discount > 0 && (
           <div className="mt-3 flex items-center justify-between text-sm">
             <span className="text-muted-foreground">
-              Desconto
+              {order.couponCode
+                ? `Desconto do cupom ${order.couponCode}`
+                : "Desconto"}
             </span>
 
             <span
@@ -302,6 +310,26 @@ function OrderCard({
               style={{ color: GREEN }}
             >
               -{formatPrice(order.discount)}
+            </span>
+          </div>
+        )}
+
+        {(order.sellerDiscount ?? 0) > 0 && (
+          <div className="mt-2 flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">Desconto do vendedor</span>
+            <span className="font-semibold" style={{ color: GREEN }}>
+              -{formatPrice(order.sellerDiscount ?? 0)}
+            </span>
+          </div>
+        )}
+
+        {(order.coinsDiscount ?? 0) > 0 && (
+          <div className="mt-2 flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">
+              Moedas usadas ({(order.coinsUsed ?? 0).toLocaleString("pt-BR")})
+            </span>
+            <span className="font-semibold" style={{ color: GREEN }}>
+              -{formatPrice(order.coinsDiscount ?? 0)}
             </span>
           </div>
         )}

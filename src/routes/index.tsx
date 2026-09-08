@@ -646,7 +646,7 @@ function ProductCard({
   eager = false,
 }: {
   product: CatalogProduct;
-  badge?: { label: string; tone: "featured" | "top" | "offer" } | null;
+  badge?: { label: string; tone: "featured" | "top" | "offer" | "automatic-top" } | null;
   priority?: boolean;
   eager?: boolean;
 }) {

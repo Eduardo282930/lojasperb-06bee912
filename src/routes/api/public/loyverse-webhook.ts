@@ -97,6 +97,16 @@ async function handle(request: Request): Promise<Response> {
     receiptsHandled += 1;
   }
 
+  /* Venda feita no balcão: entra em "Minhas compras" do cliente na hora. */
+  if (receipts.length > 0) {
+    try {
+      const { importStoreReceipts } = await import("@/lib/loyverse-receipts.functions");
+      await importStoreReceipts(2);
+    } catch (err) {
+      console.error("[loyverse-webhook] recibos da loja", err);
+    }
+  }
+
   /*
    * Estoque/vendas alterados direto no Loyverse: a cópia oficial é atualizada
    * na hora e os aparelhos abertos trocam só os produtos que mudaram.
