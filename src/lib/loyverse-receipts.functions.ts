@@ -272,7 +272,7 @@ export async function importStoreReceipts(days = 90): Promise<ImportResult> {
       p_total: money(r.total_money),
       p_payment_type: paymentLabel(r),
       p_dining_option: (r.dining_option ?? "").trim(),
-      p_store_name: store?.name?.trim() ?? "",
+      p_store_name: "SPERB",
       p_store_address: store?.address?.trim() ?? "",
       p_employee_name: employee?.name?.trim() ?? "",
     });

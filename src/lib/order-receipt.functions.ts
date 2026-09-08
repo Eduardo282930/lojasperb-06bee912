@@ -114,7 +114,7 @@ export const getOrderReceipt = createServerFn({ method: "POST" })
       number: String(row["receipt_number"] ?? row["loyverse_receipt_id"] ?? "")
         || String(row["id"] ?? "").slice(0, 8).toUpperCase(),
       dateLabel: date.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" }),
-      storeName: String(row["store_name"] ?? "") || "SPERB",
+      storeName: "SPERB",
       storeAddress: String(row["store_address"] ?? ""),
       employeeName: String(row["employee_name"] ?? ""),
       customerName: String(row["customer_name"] ?? ""),
