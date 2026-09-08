@@ -40,6 +40,9 @@ type LoyverseReceipt = {
   order?: string | null;
   cancelled_at?: string | null;
   customer_id?: string | null;
+  store_id?: string | null;
+  employee_id?: string | null;
+  dining_option?: string | null;
   total_money?: number | null;
   total_discount?: number | null;
   points_deducted?: number | null;
@@ -54,6 +57,14 @@ type LoyverseCustomer = {
   phone_number?: string | null;
   email?: string | null;
 };
+
+type LoyverseStore = {
+  id: string;
+  name?: string | null;
+  address?: string | null;
+};
+
+type LoyverseEmployee = { id: string; name?: string | null };
 
 async function loyverse<T>(path: string, token: string): Promise<T> {
   const res = await fetch(`https://api.loyverse.com/v1.0/${path}`, {
