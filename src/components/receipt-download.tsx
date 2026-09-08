@@ -13,8 +13,8 @@ import {
 } from "@/components/ui/dialog";
 
 /**
- * Botão "Baixar recibo": monta a imagem do recibo no aparelho, no momento em
- * que o cliente pede, sempre com as informações salvas do pedido.
+ * Abre a prévia e só baixa quando o cliente confirma, sempre usando as
+ * informações salvas do pedido.
  */
 
 const W = 760;
@@ -87,7 +87,8 @@ async function drawReceipt(r: ReceiptData): Promise<Blob | null> {
   canvas.height = height * scale;
   const ctx = canvas.getContext("2d");
   if (!ctx) return null;
-  ctx.scale(scale, scale);
+  const context = ctx;
+  context.scale(scale, scale);
 
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, W, height);
@@ -146,24 +147,24 @@ async function drawReceipt(r: ReceiptData): Promise<Blob | null> {
   const right = W - PAD;
 
   function row(label: string, value: string, bold = false) {
-    ctx!.font = `${bold ? 700 : 500} 24px system-ui, sans-serif`;
-    ctx!.fillStyle = bold ? "#111111" : "#555555";
-    ctx!.textAlign = "left";
-    ctx!.fillText(label, left, y + 18);
-    ctx!.fillStyle = "#111111";
-    ctx!.font = `${bold ? 700 : 600} 24px system-ui, sans-serif`;
-    ctx!.textAlign = "right";
-    ctx!.fillText(value, right, y + 18);
-    ctx!.textAlign = "left";
+    context.font = `${bold ? 700 : 500} 24px system-ui, sans-serif`;
+    context.fillStyle = bold ? "#111111" : "#555555";
+    context.textAlign = "left";
+    context.fillText(label, left, y + 18);
+    context.fillStyle = "#111111";
+    context.font = `${bold ? 700 : 600} 24px system-ui, sans-serif`;
+    context.textAlign = "right";
+    context.fillText(value, right, y + 18);
+    context.textAlign = "left";
   }
 
   function divider() {
-    ctx!.strokeStyle = "#e5e5e5";
-    ctx!.lineWidth = 1;
-    ctx!.beginPath();
-    ctx!.moveTo(left, y + 12);
-    ctx!.lineTo(right, y + 12);
-    ctx!.stroke();
+    context.strokeStyle = "#e5e5e5";
+    context.lineWidth = 1;
+    context.beginPath();
+    context.moveTo(left, y + 12);
+    context.lineTo(right, y + 12);
+    context.stroke();
     y += 36;
   }
 
