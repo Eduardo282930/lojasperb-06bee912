@@ -80,7 +80,7 @@ BEGIN
     'store', coalesce(p_receipt_date, now()),
     coalesce(p_receipt_date, now()), now()
   )
-  ON CONFLICT (loyverse_receipt_id) DO NOTHING
+  ON CONFLICT (loyverse_receipt_id) WHERE loyverse_receipt_id IS NOT NULL DO NOTHING
   RETURNING id INTO v_order_id;
 
   IF v_order_id IS NULL THEN
