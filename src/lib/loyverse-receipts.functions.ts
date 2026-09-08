@@ -252,6 +252,8 @@ export async function importStoreReceipts(days = 90): Promise<ImportResult> {
     if (coinsDiscount === 0 && points > 0) coinsDiscount = money(points / 100);
 
     const customer = r.customer_id ? byCustomer.get(r.customer_id) : undefined;
+    const store = r.store_id ? byStore.get(r.store_id) : undefined;
+    const employee = r.employee_id ? byEmployee.get(r.employee_id) : undefined;
 
     const { error } = await rpc("import_store_receipt", {
       p_receipt_id: r.receipt_number,
@@ -269,6 +271,10 @@ export async function importStoreReceipts(days = 90): Promise<ImportResult> {
       p_seller_discount: money(sellerDiscount),
       p_total: money(r.total_money),
       p_payment_type: paymentLabel(r),
+      p_dining_option: (r.dining_option ?? "").trim(),
+      p_store_name: store?.name?.trim() ?? "",
+      p_store_address: store?.address?.trim() ?? "",
+      p_employee_name: employee?.name?.trim() ?? "",
     });
 
     if (error) {
