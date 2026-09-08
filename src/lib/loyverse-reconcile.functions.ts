@@ -245,6 +245,17 @@ export async function reconcileWithLoyverse(
     );
   }
 
+  /*
+   * 3. Vendas feitas no balcão viram pedidos do cliente ("Em preparação",
+   *    já pagas pelo vendedor da loja). Idempotente pelo número do recibo.
+   */
+  try {
+    const { importStoreReceipts } = await import("./loyverse-receipts.functions");
+    await importStoreReceipts(Math.max(1, Math.ceil(hours / 24)));
+  } catch (error) {
+    console.error("[reconcile] erro ao importar recibos da loja:", error);
+  }
+
   return {
     ok: true,
     refundsApplied,
