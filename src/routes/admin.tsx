@@ -112,11 +112,6 @@ function couponLabel(c: Coupon): string {
 
 type Section =
   | "home"
-  | "operacao"
-  | "clientes-area"
-  | "vitrine"
-  | "sistema"
-  | "estoque-area"
   | "pedidos"
   | "cupons"
   | "recibos"
@@ -128,18 +123,10 @@ type Section =
   | "desenvolvimento";
 
 type AdminItem = {
-  id: Exclude<Section, "home" | "operacao" | "clientes-area" | "vitrine" | "sistema" | "estoque-area">;
+  id: Exclude<Section, "home">;
   label: string;
   hint: string;
   icon: React.ReactNode;
-};
-
-type AdminGroup = {
-  id: Extract<Section, "operacao" | "clientes-area" | "vitrine" | "sistema" | "estoque-area">;
-  label: string;
-  hint: string;
-  icon: React.ReactNode;
-  items: AdminItem[];
 };
 
 const SECTIONS: AdminItem[] = [
@@ -163,13 +150,13 @@ const SECTIONS: AdminItem[] = [
   },
   {
     id: "duplicidades",
-    label: "Revisão de cadastros",
+    label: "Duplicados",
     hint: "Possíveis clientes repetidos",
     icon: <UserSearch className="h-6 w-6" />,
   },
   {
     id: "destaques",
-    label: "Destaques da vitrine",
+    label: "Destaques",
     hint: "Produtos que aparecem primeiro",
     icon: <Star className="h-6 w-6" />,
   },
@@ -181,91 +168,37 @@ const SECTIONS: AdminItem[] = [
   },
   {
     id: "estoque",
-    label: "Meu estoque",
+    label: "Estoque",
     hint: "Estoque, custos e valor da mercadoria",
     icon: <PackageSearch className="h-6 w-6" />,
   },
   {
     id: "recibos",
-    label: "Recibos Loyverse",
+    label: "Recibos",
     hint: "Vendas registradas na loja",
     icon: <Receipt className="h-6 w-6" />,
   },
   {
     id: "desenvolvimento",
-    label: "Modo desenvolvimento",
+    label: "Manutenção",
     hint: "Bloquear a loja durante manutenção",
     icon: <LockKeyhole className="h-6 w-6" />,
   },
 ];
 
-const ADMIN_GROUPS: AdminGroup[] = [
-  {
-    id: "operacao",
-    label: "Operação",
-    hint: "Pedidos, pagamentos e acompanhamento",
-    icon: <ClipboardList className="h-7 w-7" />,
-    items: SECTIONS.filter((item) =>
-      ["pedidos", "pagamentos"].includes(item.id),
-    ),
-  },
-  {
-    id: "estoque-area",
-    label: "Meu estoque",
-    hint: "Mercadoria, custos, valores e disponibilidade",
-    icon: <PackageSearch className="h-7 w-7" />,
-    items: SECTIONS.filter((item) => item.id === "estoque"),
-  },
-  {
-    id: "clientes-area",
-    label: "Clientes",
-    hint: "Cadastros, histórico e revisão",
-    icon: <Users className="h-7 w-7" />,
-    items: SECTIONS.filter((item) =>
-      ["clientes", "duplicidades"].includes(item.id),
-    ),
-  },
-  {
-    id: "vitrine",
-    label: "Vitrine e vendas",
-    hint: "Destaques e cupons da loja",
-    icon: <Star className="h-7 w-7" />,
-    items: SECTIONS.filter((item) =>
-      ["destaques", "cupons"].includes(item.id),
-    ),
-  },
-  {
-    id: "sistema",
-    label: "Sistema e registros",
-    hint: "Loyverse e informações da operação",
-    icon: <Receipt className="h-7 w-7" />,
-    items: SECTIONS.filter((item) => ["recibos", "desenvolvimento"].includes(item.id)),
-  },
-];
-
-const SECTION_TO_GROUP: Record<AdminItem["id"], AdminGroup["id"]> = {
-  pedidos: "operacao",
-  pagamentos: "operacao",
-  clientes: "clientes-area",
-  duplicidades: "clientes-area",
-  destaques: "vitrine",
-  cupons: "vitrine",
-  recibos: "sistema",
-  estoque: "estoque-area",
-  desenvolvimento: "sistema",
-};
 
 function AdminPage() {
-  // Pedidos novos e mudanças de pagamento aparecem sozinhos no painel.
+  // Atualização em tempo real dos pedidos sem alterar a lógica existente.
   useLiveInvalidate([
     { table: "orders", keys: [["orders"], ["admin-orders"]] },
   ]);
+
   const { isAdmin, checking } = useAdmin();
   const [section, setSection] = useState<Section>("home");
 
   if (checking) {
     return (
-      <div className="grid min-h-screen place-items-center bg-background text-lg font-bold text-muted-foreground">
+      <div className="grid min-h-screen place-items-center bg-slate-50 text-sm font-bold text-slate-500">
         Carregando…
       </div>
     );
@@ -273,57 +206,74 @@ function AdminPage() {
 
   if (!isAdmin) return <AdminLogin />;
 
-  const current = SECTIONS.find((s) => s.id === section);
-  const currentGroup = ADMIN_GROUPS.find((group) => group.id === section);
-  const parentGroup = current
-    ? ADMIN_GROUPS.find((group) => group.id === SECTION_TO_GROUP[current.id])
-    : null;
+  const current = SECTIONS.find((item) => item.id === section);
+  const pageTitle = current?.label ?? "Admin SPERB";
 
-  const goHome = () => setSection("home");
-  const goBack = () => {
-    if (current) {
-      setSection(parentGroup?.id ?? "home");
-      return;
-    }
-    if (currentGroup) {
-      goHome();
-    }
+  const goBack = () => setSection("home");
+
+  const itemColors: Record<AdminItem["id"], string> = {
+    pedidos: "#2563eb",
+    pagamentos: "#06b6d4",
+    clientes: "#10b981",
+    duplicidades: "#f97316",
+    destaques: "#a855f7",
+    cupons: "#eab308",
+    estoque: "#f59e0b",
+    recibos: "#6366f1",
+    desenvolvimento: "#64748b",
   };
 
-  const pageTitle = current?.label ?? currentGroup?.label ?? "Administração SPERB";
-  const pageHint = current?.hint ?? currentGroup?.hint;
-
   return (
-    <div className="min-h-screen bg-background pb-28">
-      <header className="layer-header safe-top sticky top-0 border-b bg-background/95 backdrop-blur">
-        <div className="mx-auto max-w-5xl px-4 py-3">
-          <div className="flex items-center gap-3">
+    <div className="sperb-admin min-h-screen bg-[#f6f8fc] pb-8 text-slate-950">
+      <style>{`
+        .sperb-admin { --admin-ink: #0f172a; --admin-muted: #64748b; }
+        .sperb-admin main { font-size: 0.92rem; }
+        .sperb-admin .border-2 { border-width: 1px !important; }
+        .sperb-admin .rounded-3xl { border-radius: 1rem !important; }
+        .sperb-admin .rounded-[2rem] { border-radius: 1.25rem !important; }
+        .sperb-admin main .p-6 { padding: 1rem !important; }
+        .sperb-admin main .p-5 { padding: 0.9rem !important; }
+        .sperb-admin main .p-4 { padding: 0.8rem !important; }
+        .sperb-admin main .text-3xl { font-size: 1.45rem !important; line-height: 1.15 !important; }
+        .sperb-admin main .text-2xl { font-size: 1.3rem !important; line-height: 1.2 !important; }
+        .sperb-admin main .text-xl { font-size: 1.1rem !important; line-height: 1.25 !important; }
+        .sperb-admin main .text-lg { font-size: 0.98rem !important; line-height: 1.3 !important; }
+        .sperb-admin main .text-base { font-size: 0.88rem !important; line-height: 1.35 !important; }
+        .sperb-admin input, .sperb-admin textarea, .sperb-admin select { border-width: 1px !important; border-radius: 0.8rem !important; }
+        .sperb-admin button { -webkit-tap-highlight-color: transparent; }
+        .sperb-admin main h1, .sperb-admin main h2, .sperb-admin main h3 { letter-spacing: -0.02em; }
+        .sperb-admin .shadow-sm { box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06) !important; }
+        .sperb-admin .shadow-lg { box-shadow: 0 12px 32px rgba(15, 23, 42, 0.10) !important; }
+        .sperb-admin .admin-module > div > .rounded-3xl { background: rgba(255,255,255,.94); }
+      `}</style>
+
+      <header className="safe-top sticky top-0 z-30 border-b border-slate-200/80 bg-white/90 backdrop-blur-xl">
+        <div className="mx-auto max-w-5xl px-3 py-2.5 sm:px-5">
+          <div className="flex items-center gap-2.5">
             {section === "home" ? (
               <Link
                 to="/"
                 aria-label="Voltar à loja"
-                className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-muted text-foreground transition-transform active:scale-95"
+                className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-sm transition-transform active:scale-90"
               >
-                <ArrowLeft className="h-5 w-5" strokeWidth={2.5} />
+                <ArrowLeft className="h-4 w-4" strokeWidth={2.5} />
               </Link>
             ) : (
               <button
                 type="button"
                 onClick={goBack}
-                aria-label="Voltar"
-                className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-muted text-foreground transition-transform active:scale-95"
+                aria-label="Voltar ao painel"
+                className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-sm transition-transform active:scale-90"
               >
-                <ArrowLeft className="h-5 w-5" strokeWidth={2.5} />
+                <ArrowLeft className="h-4 w-4" strokeWidth={2.5} />
               </button>
             )}
 
             <div className="min-w-0 flex-1">
-              {parentGroup && (
-                <p className="mb-0.5 truncate text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
-                  {parentGroup.label}
-                </p>
-              )}
-              <h1 className="truncate text-lg font-black text-foreground sm:text-xl">
+              <p className="text-[9px] font-extrabold uppercase tracking-[0.16em] text-slate-400">
+                SPERB · Administração
+              </p>
+              <h1 className="truncate text-base font-extrabold tracking-tight text-slate-900">
                 {pageTitle}
               </h1>
             </div>
@@ -331,173 +281,115 @@ function AdminPage() {
             <button
               type="button"
               onClick={() => adminSignOut()}
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-muted px-3 py-2 text-sm font-black text-foreground"
+              aria-label="Sair"
+              className="grid h-9 w-9 place-items-center rounded-full bg-slate-100 text-slate-600 transition-transform active:scale-90"
             >
               <LogOut className="h-4 w-4" />
-              <span className="hidden sm:inline">Sair</span>
             </button>
           </div>
-
-          {pageHint && (
-            <p className="mt-1 pl-14 text-xs font-medium text-muted-foreground sm:text-sm">
-              {pageHint}
-            </p>
-          )}
         </div>
       </header>
 
-      <main className="mx-auto max-w-5xl px-4 pt-5">
+      <main className="mx-auto max-w-5xl px-3 pt-4 sm:px-5 sm:pt-6">
         {section === "home" && (
           <div className="space-y-5">
-            <section className="rounded-[2rem] border bg-card p-5 shadow-sm sm:p-6">
-              <div className="flex items-center gap-4">
-                <div
-                  className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl text-white shadow-sm"
-                  style={{ backgroundColor: BLUE }}
-                >
-                  <ClipboardList className="h-7 w-7" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">
-                    Painel rápido
+            <section className="rounded-[1.35rem] border border-slate-200 bg-white px-4 py-4 shadow-sm sm:px-5">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-blue-600">
+                    Painel de controle
                   </p>
-                  <h2 className="mt-1 text-2xl font-black tracking-tight text-foreground">
-                    Administração SPERB
+                  <h2 className="mt-0.5 text-xl font-black tracking-tight text-slate-950 sm:text-2xl">
+                    Olá! 👋
                   </h2>
-                  <p className="mt-1 text-sm font-semibold text-muted-foreground">
-                    Tudo que você precisa para cuidar da loja em poucos toques.
+                  <p className="mt-1 text-xs font-medium text-slate-500">
+                    Acesse qualquer função da SPERB rapidamente.
                   </p>
+                </div>
+                <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-blue-600 text-white shadow-sm">
+                  <TrendingUp className="h-5 w-5" />
                 </div>
               </div>
             </section>
 
             <section>
-              <div className="mb-3 px-1">
-                <p className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">
-                  Acesso direto
-                </p>
-                <h2 className="mt-1 text-xl font-black text-foreground">
-                  O que você quer fazer?
-                </h2>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                {SECTIONS.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => setSection(item.id)}
-                    className="group flex min-h-[126px] flex-col items-start justify-between rounded-3xl border bg-card p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md active:scale-[0.98]"
-                  >
-                    <span
-                      className="grid h-12 w-12 place-items-center rounded-2xl text-white shadow-sm"
-                      style={{ backgroundColor: item.id === "estoque" ? GREEN : BLUE }}
-                    >
-                      {item.icon}
-                    </span>
-                    <span className="mt-4 min-w-0">
-                      <span className="block text-base font-black leading-tight text-foreground">
-                        {item.label}
-                      </span>
-                      <span className="mt-1 block text-xs font-semibold leading-4 text-muted-foreground">
-                        {item.hint}
-                      </span>
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </section>
-
-            <section className="rounded-3xl border bg-muted/40 p-4">
-              <div className="flex items-start gap-3">
-                <TrendingUp className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+              <div className="mb-3 flex items-end justify-between px-1">
                 <div>
-                  <p className="text-sm font-black text-foreground">Atalhos da operação</p>
-                  <p className="mt-1 text-xs font-semibold leading-5 text-muted-foreground">
-                    Pedidos, pagamentos, estoque e clientes ficam a um toque. As funções mais técnicas continuam separadas para não deixar a tela inicial pesada.
+                  <p className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-slate-400">
+                    Acesso rápido
                   </p>
-                </div>
-              </div>
-            </section>
-          </div>
-        )}
-
-        {currentGroup && (
-          <div className="space-y-4">
-            <div className="rounded-3xl border bg-card p-5 shadow-sm">
-              <div className="flex items-center gap-4">
-                <div
-                  className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl text-white"
-                  style={{ backgroundColor: BLUE }}
-                >
-                  {currentGroup.icon}
-                </div>
-                <div>
-                  <p className="text-xs font-black uppercase tracking-[0.08em] text-muted-foreground">
-                    Área administrativa
-                  </p>
-                  <h2 className="mt-1 text-xl font-black text-foreground">
-                    {currentGroup.label}
+                  <h2 className="mt-0.5 text-base font-extrabold text-slate-900">
+                    Controle da loja
                   </h2>
-                  <p className="mt-1 text-sm font-medium text-muted-foreground">
-                    {currentGroup.hint}
+                </div>
+                <span className="text-[10px] font-bold text-slate-400">{SECTIONS.length} funções</span>
+              </div>
+
+              <div className="grid grid-cols-4 gap-x-2 gap-y-5 sm:grid-cols-5 sm:gap-x-4 sm:gap-y-6">
+                {SECTIONS.map((item) => {
+                  const colors = itemColors[item.id];
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setSection(item.id)}
+                      className="group flex min-w-0 flex-col items-center text-center transition-transform active:scale-90"
+                    >
+                      <span
+                        className="relative grid h-[58px] w-[58px] place-items-center rounded-full text-white shadow-sm transition-transform group-hover:-translate-y-0.5 sm:h-[62px] sm:w-[62px]"
+                        style={{ backgroundColor: colors }}
+                      >
+                        {item.icon}
+                        {(item.id === "pedidos" || item.id === "estoque") && (
+                          <span
+                            className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-[#f6f8fc]"
+                            style={{ backgroundColor: item.id === "pedidos" ? "#ef4444" : "#f59e0b" }}
+                          />
+                        )}
+                      </span>
+                      <span className="mt-1.5 line-clamp-2 max-w-[78px] text-[11px] font-extrabold leading-4 text-slate-700 sm:text-xs">
+                        {item.label}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+
+            <section className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm">
+              <div className="flex items-center gap-2.5">
+                <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-emerald-100 text-emerald-600">
+                  <Check className="h-4 w-4" strokeWidth={3} />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-extrabold text-slate-800">Tudo em um só lugar</p>
+                  <p className="text-[11px] font-medium leading-4 text-slate-500">
+                    Pedidos, clientes, estoque, vendas e sistema continuam com as mesmas funções.
                   </p>
                 </div>
               </div>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2">
-              {currentGroup.items.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => setSection(item.id)}
-                  className="group flex min-h-[118px] w-full items-center gap-4 rounded-3xl border bg-card p-5 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md active:scale-[0.99]"
-                >
-                  <span
-                    className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl text-white"
-                    style={{ backgroundColor: BLUE }}
-                  >
-                    {item.icon}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="flex items-center gap-2">
-                      <span className="text-base font-black text-foreground sm:text-lg">
-                        {item.label}
-                      </span>
-                      <span className="text-lg font-black text-muted-foreground transition-transform group-hover:translate-x-0.5">
-                        →
-                      </span>
-                    </span>
-                    <span className="mt-1 block text-sm font-semibold leading-5 text-muted-foreground">
-                      {item.hint}
-                    </span>
-                  </span>
-                </button>
-              ))}
-            </div>
+            </section>
           </div>
         )}
 
         {section === "pedidos" && (
-          <>
+          <div className="admin-module space-y-3">
             <SyncPanel />
             <OrdersPanel />
-          </>
+          </div>
         )}
-        {section === "cupons" && <CouponsPanel />}
-        {section === "recibos" && <ReceiptsPanel />}
-        {section === "estoque" && <StockPanel />}
-        {section === "clientes" && <CustomersPanel />}
-        {section === "destaques" && <FeaturedPanel />}
-        {section === "pagamentos" && <PaymentsPanel />}
-        {section === "duplicidades" && <DuplicatesPanel />}
-        {section === "desenvolvimento" && <DevelopmentPanel />}
+        {section === "cupons" && <div className="admin-module"><CouponsPanel /></div>}
+        {section === "recibos" && <div className="admin-module"><ReceiptsPanel /></div>}
+        {section === "estoque" && <div className="admin-module"><StockPanel /></div>}
+        {section === "clientes" && <div className="admin-module"><CustomersPanel /></div>}
+        {section === "destaques" && <div className="admin-module"><FeaturedPanel /></div>}
+        {section === "pagamentos" && <div className="admin-module"><PaymentsPanel /></div>}
+        {section === "duplicidades" && <div className="admin-module"><DuplicatesPanel /></div>}
+        {section === "desenvolvimento" && <div className="admin-module"><DevelopmentPanel /></div>}
       </main>
     </div>
   );
 }
-
 function DevelopmentPanel() {
   const [enabled, setEnabled] = useState(false);
   const [loading, setLoading] = useState(true);
