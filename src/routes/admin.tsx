@@ -1084,23 +1084,6 @@ function StockPanel() {
 
 /* ------------------------------- Recibos ------------------------------- */
 
-const WHATSAPP_COUNTRY = "55";
-
-function receiptText(r: SimpleReceipt): string {
-  const linhas = r.lines
-    .map((l) => `- ${l.name} x${l.quantity} — ${formatPrice(l.total)}`)
-    .join("\n");
-  const data = new Date(r.date).toLocaleString("pt-BR");
-  return `*Recibo SPERB*\nPedido: ${r.number}\nData: ${data}\nCliente: ${r.customerName}\n\n${linhas}\n\nTotal: ${formatPrice(r.total)}\n\nObrigado pela preferência!`;
-}
-
-function whatsappLink(r: SimpleReceipt): string | null {
-  const digits = onlyDigits(r.customerPhone);
-  if (digits.length < 10) return null;
-  const phone = digits.startsWith(WHATSAPP_COUNTRY) ? digits : `${WHATSAPP_COUNTRY}${digits}`;
-  return `https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(receiptText(r))}`;
-}
-
 function useReceipts() {
   return useQuery({
     queryKey: ["loyverse-receipts"],
@@ -1109,69 +1092,93 @@ function useReceipts() {
   });
 }
 
-function ReceiptCard({ r }: { r: SimpleReceipt }) {
-  const link = whatsappLink(r);
+function ReceiptRow({ order }: { order: Order }) {
+  const [open, setOpen] = useState(false);
+  const paid = order.paymentStatus === "paid";
+  const refunded = order.paymentStatus === "refunded" || order.refundState === "refunded";
   return (
-    <li className="rounded-2xl border border-border bg-background p-3">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="truncate text-base font-black text-foreground">{r.customerName}</p>
+    <li className="rounded-xl border border-border bg-background px-3 py-2">
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="flex min-w-0 flex-1 items-center gap-3 text-left"
+        >
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-sm font-black text-foreground">
+              {order.customerName || "Cliente sem nome"}
+            </span>
+            <span className="block truncate text-[11px] font-semibold text-muted-foreground">
+              {order.id.slice(0, 8).toUpperCase()} · {new Date(order.createdAt).toLocaleString("pt-BR")}
+            </span>
+          </span>
+          <span
+            className="shrink-0 text-sm font-black"
+            style={{ color: refunded ? RED : paid ? GREEN : "var(--muted-foreground)" }}
+          >
+            {formatPrice(order.total)}
+          </span>
+          <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
+        </button>
+      </div>
+      {open && (
+        <div className="mt-2 border-t border-border pt-2">
           <p className="text-xs font-semibold text-muted-foreground">
-            {r.number} · {new Date(r.date).toLocaleString("pt-BR")}
+            {displayStatusLabel(order)} · {paymentDisplayLabel(order)}
+            {order.customerPhone ? ` · ${order.customerPhone}` : ""}
           </p>
-          {r.refunded && (
-            <span
-              className="mt-1 inline-flex rounded-full px-2 py-0.5 text-xs font-black text-white"
-              style={{ backgroundColor: RED }}
-            >
-              Reembolsado no Loyverse
+          <ul className="mt-1 flex flex-col gap-0.5">
+            {order.items.map((l, i) => (
+              <li key={i} className="text-xs text-muted-foreground">
+                {l.qty}x {l.name} — {formatPrice(l.price * l.qty)}
+              </li>
+            ))}
+          </ul>
+          {refunded && (
+            <span className="mt-2 inline-flex rounded-full px-2 py-0.5 text-[11px] font-black text-white" style={{ backgroundColor: RED }}>
+              Reembolsado
             </span>
           )}
+          <div className="mt-2">
+            {paid || refunded ? (
+              <ReceiptDownload orderId={order.id} phone={order.customerPhone} showWhatsApp />
+            ) : (
+              <p className="text-xs font-bold text-muted-foreground">
+                O recibo fica disponível depois do pagamento.
+              </p>
+            )}
+          </div>
         </div>
-        <span
-          className="shrink-0 text-lg font-black"
-          style={{ color: r.refunded ? RED : GREEN }}
-        >
-          {formatPrice(r.total)}
-        </span>
-      </div>
-      <ul className="mt-2 flex flex-col gap-0.5">
-        {r.lines.map((l, i) => (
-          <li key={i} className="text-sm text-muted-foreground">
-            {l.quantity}x {l.name} — {formatPrice(l.total)}
-          </li>
-        ))}
-      </ul>
-      {link ? (
-        <a
-          href={link}
-          target="_blank"
-          rel="noreferrer"
-          className="mt-2 inline-flex rounded-xl px-3 py-2 text-sm font-black text-white"
-          style={{ backgroundColor: GREEN }}
-        >
-          Enviar recibo no WhatsApp
-        </a>
-      ) : (
-        <p className="mt-2 text-xs font-bold text-muted-foreground">
-          Cliente sem telefone cadastrado no Loyverse.
-        </p>
       )}
     </li>
   );
 }
 
 function ReceiptsPanel() {
-  const { data, isLoading, error, refetch, isFetching } = useReceipts();
-
+  const { data, isLoading, refetch, isFetching } = useQuery({
+    queryKey: ["admin-orders"],
+    queryFn: fetchOrders,
+    staleTime: 30 * 1000,
+  });
+  const [q, setQ] = useState("");
   const color = moduleById("recibos")?.color ?? BLUE;
+
+  const term = q.trim().toLowerCase();
+  const list = (data ?? []).filter((o) =>
+    !term
+      ? true
+      : (o.customerName ?? "").toLowerCase().includes(term) ||
+        onlyDigits(o.customerPhone).includes(onlyDigits(term)) ||
+        o.id.toLowerCase().includes(term),
+  );
+
   return (
     <section className="rounded-3xl border bg-card p-4 shadow-sm">
       <ModuleHeader
         color={color}
         icon={<Receipt className="h-6 w-6" />}
-        title="Recibos Loyverse"
-        hint="Vendas registradas na loja física"
+        title="Recibos"
+        hint={`${list.length} pedido(s)`}
         action={
           <button
             onClick={() => void refetch()}
@@ -1183,24 +1190,23 @@ function ReceiptsPanel() {
         }
       />
 
+      <Toolbar value={q} onChange={setQ} placeholder="Buscar por nome, telefone ou número" />
 
-      {isLoading && <p className="mt-3 text-base text-muted-foreground">Carregando vendas…</p>}
-      {error && (
-        <p className="mt-3 text-base font-bold" style={{ color: RED }}>
-          Não foi possível carregar os recibos do Loyverse.
-        </p>
+      {isLoading ? (
+        <p className="mt-3 text-base text-muted-foreground">Carregando pedidos…</p>
+      ) : list.length === 0 ? (
+        <EmptyState
+          icon={<Receipt className="h-9 w-9" />}
+          title="Nenhum recibo por aqui"
+          hint="Os recibos aparecem conforme os pedidos entram."
+        />
+      ) : (
+        <ul className="mt-3 flex flex-col gap-1.5">
+          {list.map((o) => (
+            <ReceiptRow key={o.id} order={o} />
+          ))}
+        </ul>
       )}
-      {data && (
-        <p className="mt-1 text-sm font-bold text-muted-foreground">
-          {data.length} venda(s) sincronizada(s).
-        </p>
-      )}
-
-      <ul className="mt-3 flex flex-col gap-2">
-        {(data ?? []).map((r) => (
-          <ReceiptCard key={r.id} r={r} />
-        ))}
-      </ul>
     </section>
   );
 }
