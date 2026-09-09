@@ -125,7 +125,10 @@ function AdminPage() {
   const navigate = Route.useNavigate();
   const active: ModuleId = isModuleId(search.m) ? search.m : "inicio";
 
-  const open = (id: ModuleId) => {
+  const [focusOrderId, setFocusOrderId] = useState<string | null>(null);
+
+  const open = (id: ModuleId, orderId?: string) => {
+    setFocusOrderId(orderId ?? null);
     void navigate({ search: id === "inicio" ? {} : { m: id }, replace: false });
     if (typeof window !== "undefined") window.scrollTo({ top: 0 });
   };
@@ -143,7 +146,7 @@ function AdminPage() {
   return (
     <AdminShell active={active} onSelect={open} onSignOut={() => adminSignOut()}>
       {active === "inicio" && <DashboardPanel onOpen={open} />}
-      {active === "pedidos" && <OrdersPanel />}
+      {active === "pedidos" && <OrdersPanel focusOrderId={focusOrderId} />}
       {active === "cupons" && <CouponsPanel />}
       {active === "recibos" && <ReceiptsPanel />}
       {active === "estoque" && <StockPanel />}
@@ -1511,7 +1514,7 @@ function waitingLabel(iso: string): string {
   return `${Math.floor(hours / 24)} dias`;
 }
 
-function OrdersPanel() {
+function OrdersPanel({ focusOrderId }: { focusOrderId?: string | null }) {
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["admin-orders"],
     queryFn: fetchOrders,
@@ -1563,13 +1566,11 @@ function OrdersPanel() {
     return Boolean(provider.includes("infinite") || o.paymentTransactionNsu || o.paymentSlug || o.paymentOrderNsu || o.receiptUrl);
   }
 
-  async function refundWithInfinitePay(o: Order) {
-    openInfinitePaySale(o);
-    const proof = window.prompt(
-      "Depois de devolver o dinheiro na InfinitePay, cole aqui o link do comprovante do reembolso (opcional):",
-      o.receiptUrl ?? "",
-    );
-    if (proof === null) return;
+  async function askTwiceAndConfirm(o: Order, proof: string) {
+    const num = o.id.slice(0, 8).toUpperCase();
+    const nome = o.customerName || "cliente sem nome";
+    if (!window.confirm(`Confirmar o reembolso do pedido ${num} de ${nome}?`)) return;
+    if (!window.confirm(`Tem certeza de que você realizou o reembolso do pedido ${num} de ${nome}?`)) return;
     setBusy(o.id);
     const ok = await confirmRefund(o.id, proof.trim());
     setBusy(null);
@@ -1577,14 +1578,13 @@ function OrdersPanel() {
     void refetch();
   }
 
+  async function refundWithInfinitePay(o: Order) {
+    openInfinitePaySale(o);
+    await askTwiceAndConfirm(o, o.receiptUrl ?? "");
+  }
+
   async function markRefunded(o: Order) {
-    const proof = window.prompt("Link do comprovante do reembolso (opcional):", "");
-    if (proof === null) return;
-    setBusy(o.id);
-    const ok = await confirmRefund(o.id, proof.trim());
-    setBusy(null);
-    if (!ok) window.alert("Não foi possível registrar o reembolso.");
-    void refetch();
+    await askTwiceAndConfirm(o, o.receiptUrl ?? "");
   }
 
   function openInfinitePaySale(o: Order) {
