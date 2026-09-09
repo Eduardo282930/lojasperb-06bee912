@@ -78,9 +78,15 @@ import {
   sectionLabel,
   type FeaturedSection,
 } from "@/lib/merchandising";
+import { AdminShell } from "@/components/admin/admin-shell";
+import { DashboardPanel } from "@/components/admin/dashboard-panel";
+import { isModuleId, moduleById, type ModuleId } from "@/components/admin/admin-modules";
+import { ModuleHeader, Toolbar, FilterPill, EmptyState } from "@/components/admin/admin-ui";
 
 export const Route = createFileRoute("/admin")({
   ssr: false,
+  validateSearch: (s: Record<string, unknown>): { m?: ModuleId } =>
+    isModuleId(s["m"]) ? { m: s["m"] } : {},
   head: () => ({
     meta: [
       { title: "Administração — SPERB" },
@@ -110,159 +116,20 @@ function couponLabel(c: Coupon): string {
   return c.type === "percent" ? `${c.value}% OFF` : `${formatPrice(c.value)} OFF`;
 }
 
-type Section =
-  | "home"
-  | "operacao"
-  | "clientes-area"
-  | "vitrine"
-  | "sistema"
-  | "estoque-area"
-  | "pedidos"
-  | "cupons"
-  | "recibos"
-  | "clientes"
-  | "destaques"
-  | "pagamentos"
-  | "duplicidades"
-  | "estoque"
-  | "desenvolvimento";
-
-type AdminItem = {
-  id: Exclude<Section, "home" | "operacao" | "clientes-area" | "vitrine" | "sistema" | "estoque-area">;
-  label: string;
-  hint: string;
-  icon: React.ReactNode;
-};
-
-type AdminGroup = {
-  id: Extract<Section, "operacao" | "clientes-area" | "vitrine" | "sistema" | "estoque-area">;
-  label: string;
-  hint: string;
-  icon: React.ReactNode;
-  items: AdminItem[];
-};
-
-const SECTIONS: AdminItem[] = [
-  {
-    id: "pedidos",
-    label: "Pedidos",
-    hint: "Status, pagamento e entrega",
-    icon: <ClipboardList className="h-6 w-6" />,
-  },
-  {
-    id: "pagamentos",
-    label: "Pagamentos",
-    hint: "InfinitePay: Pix e cartão",
-    icon: <CreditCard className="h-6 w-6" />,
-  },
-  {
-    id: "clientes",
-    label: "Clientes",
-    hint: "Histórico, compras e cupons",
-    icon: <Users className="h-6 w-6" />,
-  },
-  {
-    id: "duplicidades",
-    label: "Revisão de cadastros",
-    hint: "Possíveis clientes repetidos",
-    icon: <UserSearch className="h-6 w-6" />,
-  },
-  {
-    id: "destaques",
-    label: "Destaques da vitrine",
-    hint: "Produtos que aparecem primeiro",
-    icon: <Star className="h-6 w-6" />,
-  },
-  {
-    id: "cupons",
-    label: "Cupons",
-    hint: "Criar, editar e desativar",
-    icon: <Ticket className="h-6 w-6" />,
-  },
-  {
-    id: "estoque",
-    label: "Meu estoque",
-    hint: "Estoque, custos e valor da mercadoria",
-    icon: <PackageSearch className="h-6 w-6" />,
-  },
-  {
-    id: "recibos",
-    label: "Recibos Loyverse",
-    hint: "Vendas registradas na loja",
-    icon: <Receipt className="h-6 w-6" />,
-  },
-  {
-    id: "desenvolvimento",
-    label: "Modo desenvolvimento",
-    hint: "Bloquear a loja durante manutenção",
-    icon: <LockKeyhole className="h-6 w-6" />,
-  },
-];
-
-const ADMIN_GROUPS: AdminGroup[] = [
-  {
-    id: "operacao",
-    label: "Operação",
-    hint: "Pedidos, pagamentos e acompanhamento",
-    icon: <ClipboardList className="h-7 w-7" />,
-    items: SECTIONS.filter((item) =>
-      ["pedidos", "pagamentos"].includes(item.id),
-    ),
-  },
-  {
-    id: "estoque-area",
-    label: "Meu estoque",
-    hint: "Mercadoria, custos, valores e disponibilidade",
-    icon: <PackageSearch className="h-7 w-7" />,
-    items: SECTIONS.filter((item) => item.id === "estoque"),
-  },
-  {
-    id: "clientes-area",
-    label: "Clientes",
-    hint: "Cadastros, histórico e revisão",
-    icon: <Users className="h-7 w-7" />,
-    items: SECTIONS.filter((item) =>
-      ["clientes", "duplicidades"].includes(item.id),
-    ),
-  },
-  {
-    id: "vitrine",
-    label: "Vitrine e vendas",
-    hint: "Destaques e cupons da loja",
-    icon: <Star className="h-7 w-7" />,
-    items: SECTIONS.filter((item) =>
-      ["destaques", "cupons"].includes(item.id),
-    ),
-  },
-  {
-    id: "sistema",
-    label: "Sistema e registros",
-    hint: "Loyverse e informações da operação",
-    icon: <Receipt className="h-7 w-7" />,
-    items: SECTIONS.filter((item) => ["recibos", "desenvolvimento"].includes(item.id)),
-  },
-];
-
-const SECTION_TO_GROUP: Record<AdminItem["id"], AdminGroup["id"]> = {
-  pedidos: "operacao",
-  pagamentos: "operacao",
-  clientes: "clientes-area",
-  duplicidades: "clientes-area",
-  destaques: "vitrine",
-  cupons: "vitrine",
-  recibos: "sistema",
-  estoque: "estoque-area",
-  desenvolvimento: "sistema",
-};
-
 function AdminPage() {
   // Pedidos novos e mudanças de pagamento aparecem sozinhos no painel.
   useLiveInvalidate([
     { table: "orders", keys: [["orders"], ["admin-orders"]] },
   ]);
   const { isAdmin, checking } = useAdmin();
-  const [section, setSection] = useState<Section>("home");
-  const [sectionHistory, setSectionHistory] = useState<Section[]>(["home"]);
+  const search = Route.useSearch();
+  const navigate = Route.useNavigate();
+  const active: ModuleId = isModuleId(search.m) ? search.m : "inicio";
+
+  const open = (id: ModuleId) => {
+    void navigate({ search: id === "inicio" ? {} : { m: id }, replace: false });
+    if (typeof window !== "undefined") window.scrollTo({ top: 0 });
+  };
 
   if (checking) {
     return (
@@ -274,237 +141,19 @@ function AdminPage() {
 
   if (!isAdmin) return <AdminLogin />;
 
-  const current = SECTIONS.find((s) => s.id === section);
-  const currentGroup = ADMIN_GROUPS.find((group) => group.id === section);
-  const parentGroup = current
-    ? ADMIN_GROUPS.find((group) => group.id === SECTION_TO_GROUP[current.id])
-    : null;
-
-  const navigateSection = (next: Section) => {
-    setSectionHistory((history) => [...history, next]);
-    setSection(next);
-  };
-
-  const goHome = () => {
-    setSectionHistory(["home"]);
-    setSection("home");
-  };
-
-  const goBack = () => {
-    setSectionHistory((history) => {
-      if (history.length <= 1) {
-        setSection("home");
-        return ["home"];
-      }
-
-      const nextHistory = history.slice(0, -1);
-      const previousSection = nextHistory[nextHistory.length - 1] ?? "home";
-      setSection(previousSection);
-      return nextHistory;
-    });
-  };
-
-  const pageTitle = current?.label ?? currentGroup?.label ?? "Administração SPERB";
-  const pageHint = current?.hint ?? currentGroup?.hint;
-
   return (
-    <div className="min-h-screen bg-background pb-28">
-      <header className="layer-header safe-top sticky top-0 border-b bg-background/95 backdrop-blur">
-        <div className="mx-auto max-w-5xl px-4 py-3">
-          <div className="flex items-center gap-3">
-            {section === "home" ? (
-              <button
-                type="button"
-                aria-label="Dashboard do Admin"
-                disabled
-                className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-muted text-foreground opacity-50"
-              >
-                <ArrowLeft className="h-5 w-5" strokeWidth={2.5} />
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={goBack}
-                aria-label="Voltar"
-                className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-muted text-foreground transition-transform active:scale-95"
-              >
-                <ArrowLeft className="h-5 w-5" strokeWidth={2.5} />
-              </button>
-            )}
-
-            <div className="min-w-0 flex-1">
-              {parentGroup && (
-                <p className="mb-0.5 truncate text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
-                  {parentGroup.label}
-                </p>
-              )}
-              <h1 className="truncate text-lg font-black text-foreground sm:text-xl">
-                {pageTitle}
-              </h1>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => adminSignOut()}
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-muted px-3 py-2 text-sm font-black text-foreground"
-            >
-              <LogOut className="h-4 w-4" />
-              <span className="hidden sm:inline">Sair</span>
-            </button>
-          </div>
-
-          {pageHint && (
-            <p className="mt-1 pl-14 text-xs font-medium text-muted-foreground sm:text-sm">
-              {pageHint}
-            </p>
-          )}
-        </div>
-      </header>
-
-      <main className="mx-auto max-w-5xl px-4 pt-5">
-        {section === "home" && (
-          <div className="space-y-5">
-            <section className="rounded-[2rem] border bg-card p-5 shadow-sm sm:p-6">
-              <div className="flex items-center gap-4">
-                <div
-                  className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl text-white shadow-sm"
-                  style={{ backgroundColor: BLUE }}
-                >
-                  <ClipboardList className="h-7 w-7" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">
-                    Painel rápido
-                  </p>
-                  <h2 className="mt-1 text-2xl font-black tracking-tight text-foreground">
-                    Administração SPERB
-                  </h2>
-                  <p className="mt-1 text-sm font-semibold text-muted-foreground">
-                    Tudo que você precisa para cuidar da loja em poucos toques.
-                  </p>
-                </div>
-              </div>
-            </section>
-
-            <section>
-              <div className="mb-3 px-1">
-                <p className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">
-                  Acesso direto
-                </p>
-                <h2 className="mt-1 text-xl font-black text-foreground">
-                  O que você quer fazer?
-                </h2>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                {SECTIONS.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => navigateSection(item.id)}
-                    className="group flex min-h-[126px] flex-col items-start justify-between rounded-3xl border bg-card p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md active:scale-[0.98]"
-                  >
-                    <span
-                      className="grid h-12 w-12 place-items-center rounded-2xl text-white shadow-sm"
-                      style={{ backgroundColor: item.id === "estoque" ? GREEN : BLUE }}
-                    >
-                      {item.icon}
-                    </span>
-                    <span className="mt-4 min-w-0">
-                      <span className="block text-base font-black leading-tight text-foreground">
-                        {item.label}
-                      </span>
-                      <span className="mt-1 block text-xs font-semibold leading-4 text-muted-foreground">
-                        {item.hint}
-                      </span>
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </section>
-
-            <section className="rounded-3xl border bg-muted/40 p-4">
-              <div className="flex items-start gap-3">
-                <TrendingUp className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
-                <div>
-                  <p className="text-sm font-black text-foreground">Atalhos da operação</p>
-                  <p className="mt-1 text-xs font-semibold leading-5 text-muted-foreground">
-                    Pedidos, pagamentos, estoque e clientes ficam a um toque. As funções mais técnicas continuam separadas para não deixar a tela inicial pesada.
-                  </p>
-                </div>
-              </div>
-            </section>
-          </div>
-        )}
-
-        {currentGroup && (
-          <div className="space-y-4">
-            <div className="rounded-3xl border bg-card p-5 shadow-sm">
-              <div className="flex items-center gap-4">
-                <div
-                  className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl text-white"
-                  style={{ backgroundColor: BLUE }}
-                >
-                  {currentGroup.icon}
-                </div>
-                <div>
-                  <p className="text-xs font-black uppercase tracking-[0.08em] text-muted-foreground">
-                    Área administrativa
-                  </p>
-                  <h2 className="mt-1 text-xl font-black text-foreground">
-                    {currentGroup.label}
-                  </h2>
-                  <p className="mt-1 text-sm font-medium text-muted-foreground">
-                    {currentGroup.hint}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2">
-              {currentGroup.items.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => navigateSection(item.id)}
-                  className="group flex min-h-[118px] w-full items-center gap-4 rounded-3xl border bg-card p-5 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md active:scale-[0.99]"
-                >
-                  <span
-                    className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl text-white"
-                    style={{ backgroundColor: BLUE }}
-                  >
-                    {item.icon}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="flex items-center gap-2">
-                      <span className="text-base font-black text-foreground sm:text-lg">
-                        {item.label}
-                      </span>
-                      <span className="text-lg font-black text-muted-foreground transition-transform group-hover:translate-x-0.5">
-                        →
-                      </span>
-                    </span>
-                    <span className="mt-1 block text-sm font-semibold leading-5 text-muted-foreground">
-                      {item.hint}
-                    </span>
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {section === "pedidos" && <OrdersPanel />}
-        {section === "cupons" && <CouponsPanel />}
-        {section === "recibos" && <ReceiptsPanel />}
-        {section === "estoque" && <StockPanel />}
-        {section === "clientes" && <CustomersPanel />}
-        {section === "destaques" && <FeaturedPanel />}
-        {section === "pagamentos" && <PaymentsPanel />}
-        {section === "duplicidades" && <DuplicatesPanel />}
-        {section === "desenvolvimento" && <DevelopmentPanel />}
-      </main>
-    </div>
+    <AdminShell active={active} onSelect={open} onSignOut={() => adminSignOut()}>
+      {active === "inicio" && <DashboardPanel onOpen={open} />}
+      {active === "pedidos" && <OrdersPanel />}
+      {active === "cupons" && <CouponsPanel />}
+      {active === "recibos" && <ReceiptsPanel />}
+      {active === "estoque" && <StockPanel />}
+      {active === "clientes" && <CustomersPanel />}
+      {active === "destaques" && <FeaturedPanel />}
+      {active === "pagamentos" && <PaymentsPanel />}
+      {active === "duplicidades" && <DuplicatesPanel />}
+      {active === "desenvolvimento" && <DevelopmentPanel />}
+    </AdminShell>
   );
 }
 
@@ -1120,13 +769,21 @@ function CouponsPanel() {
   const coupons = useCoupons();
   const refresh = useCouponsRefresh();
 
+  const color = moduleById("cupons")?.color ?? BLUE;
   return (
-    <section className="rounded-3xl border-2 border-border bg-card p-4">
-      <h2 className="text-xl font-black text-foreground">Cupons dos clientes SPERB</h2>
-      <CouponForm onSaved={() => void refresh()} />
-      <h3 className="mt-6 text-lg font-black text-foreground">Cupons cadastrados</h3>
-      <CouponList coupons={coupons} onChanged={() => void refresh()} />
-    </section>
+    <div>
+      <ModuleHeader
+        color={color}
+        icon={<Ticket className="h-6 w-6" />}
+        title="Cupons"
+        hint={`${coupons.length} cupom(ns) cadastrado(s)`}
+      />
+      <section className="rounded-3xl border bg-card p-4 shadow-sm">
+        <CouponForm onSaved={() => void refresh()} />
+        <h3 className="mt-6 text-lg font-black text-foreground">Cupons cadastrados</h3>
+        <CouponList coupons={coupons} onChanged={() => void refresh()} />
+      </section>
+    </div>
   );
 }
 
@@ -1509,17 +1166,25 @@ function ReceiptCard({ r }: { r: SimpleReceipt }) {
 function ReceiptsPanel() {
   const { data, isLoading, error, refetch, isFetching } = useReceipts();
 
+  const color = moduleById("recibos")?.color ?? BLUE;
   return (
-    <section className="rounded-3xl border-2 border-border bg-card p-4">
-      <div className="flex items-center justify-between gap-2">
-        <h2 className="text-xl font-black text-foreground">Recibos do Loyverse</h2>
-        <button
-          onClick={() => void refetch()}
-          className="rounded-xl bg-muted px-3 py-2 text-sm font-black text-foreground active:scale-95"
-        >
-          {isFetching ? "..." : "Atualizar"}
-        </button>
-      </div>
+    <section className="rounded-3xl border bg-card p-4 shadow-sm">
+      <ModuleHeader
+        color={color}
+        icon={<Receipt className="h-6 w-6" />}
+        title="Recibos Loyverse"
+        hint="Vendas registradas na loja física"
+        action={
+          <button
+            onClick={() => void refetch()}
+            className="rounded-2xl px-3 py-2 text-sm font-black text-white active:scale-95"
+            style={{ backgroundColor: color }}
+          >
+            {isFetching ? "..." : "Atualizar"}
+          </button>
+        }
+      />
+
 
       {isLoading && <p className="mt-3 text-base text-muted-foreground">Carregando vendas…</p>}
       {error && (
@@ -1856,6 +1521,7 @@ function OrdersPanel() {
   });
   const [busy, setBusy] = useState<string | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState("all");
+  const [q, setQ] = useState("");
   const [activeStatus, setActiveStatus] = useState<"topay" | "preparing" | "shipping" | "delivered" | "canceled">("topay");
   const syncReceipt = useServerFn(retryLoyverseSync);
   const quickSync = useServerFn(runLoyverseQuickSync);
@@ -1955,9 +1621,18 @@ function OrdersPanel() {
     ).values(),
   ).sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
 
-  const customerOrders = selectedCustomer === "all"
+  const term = q.trim().toLowerCase();
+  const customerOrders = (selectedCustomer === "all"
     ? orders
-    : orders.filter((o) => onlyDigits(o.customerPhone) === selectedCustomer);
+    : orders.filter((o) => onlyDigits(o.customerPhone) === selectedCustomer)
+  ).filter((o) => {
+    if (!term) return true;
+    return (
+      (o.customerName ?? "").toLowerCase().includes(term) ||
+      onlyDigits(o.customerPhone).includes(onlyDigits(term)) ||
+      o.id.toLowerCase().includes(term)
+    );
+  });
 
   const groups = [
     { value: "topay" as const, label: "A pagar" },
@@ -1975,24 +1650,44 @@ function OrdersPanel() {
 
   return (
     <div className="min-h-0">
-      <div className="sticky top-0 z-10 border-b border-border bg-background/95 backdrop-blur">
-        <div className="px-4 py-3">
-          <label className="block text-xs font-semibold text-muted-foreground">Cliente</label>
-          <select
-            value={selectedCustomer}
-            onChange={(e) => setSelectedCustomer(e.target.value)}
-            className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm font-semibold text-foreground outline-none"
+      <ModuleHeader
+        color={moduleById("pedidos")?.color ?? BLUE}
+        icon={<ClipboardList className="h-6 w-6" />}
+        title="Pedidos"
+        hint={`${customerOrders.length} pedido(s) em vista`}
+        action={
+          <button
+            type="button"
+            onClick={() => void refetch()}
+            className="rounded-2xl px-3 py-2 text-sm font-black text-white active:scale-95"
+            style={{ backgroundColor: BLUE }}
           >
-            <option value="all">Todos os clientes</option>
-            {customerOptions.map((customer) => (
-              <option key={customer.phone} value={customer.phone}>
-                {customer.name} · {customer.phone}
-              </option>
-            ))}
-          </select>
-        </div>
+            Atualizar
+          </button>
+        }
+      />
 
-        <div className="relative flex overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <Toolbar
+        value={q}
+        onChange={setQ}
+        placeholder="Buscar por nome, telefone ou número do pedido"
+      >
+        <select
+          value={selectedCustomer}
+          onChange={(e) => setSelectedCustomer(e.target.value)}
+          className="rounded-2xl border bg-card px-3 py-2.5 text-sm font-black text-foreground outline-none"
+        >
+          <option value="all">Todos os clientes</option>
+          {customerOptions.map((customer) => (
+            <option key={customer.phone} value={customer.phone}>
+              {customer.name} · {customer.phone}
+            </option>
+          ))}
+        </select>
+      </Toolbar>
+
+      <div className="sticky top-0 z-10 -mx-4 mb-3 border-b border-border bg-background/95 px-1 backdrop-blur sm:-mx-6">
+        <div className="relative flex overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {groups.map((group) => (
             <button
               key={group.value}
@@ -2017,19 +1712,19 @@ function OrdersPanel() {
         </div>
       </div>
 
-      <main className="pt-4">
+      <main>
         {currentGroup.list.length === 0 ? (
-          <div className="mx-4 flex min-h-[260px] flex-col items-center justify-center px-6 text-center">
-            <div className="grid h-20 w-20 place-items-center rounded-3xl bg-muted/50">
-              <ClipboardList className="h-10 w-10" style={{ color: BLUE }} />
-            </div>
-            <p className="mt-4 text-lg font-semibold text-foreground">Nenhum pedido nesta seção</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {selectedCustomer === "all" ? "Nenhum cliente possui pedidos nesta etapa." : "Este cliente não possui pedidos nesta etapa."}
-            </p>
-          </div>
+          <EmptyState
+            icon={<ClipboardList className="h-9 w-9" />}
+            title="Nenhum pedido nesta seção"
+            hint={
+              term || selectedCustomer !== "all"
+                ? "Nenhum pedido corresponde à busca nesta etapa."
+                : "Assim que um pedido chegar nesta etapa ele aparece aqui."
+            }
+          />
         ) : (
-          <ul className="flex flex-col gap-3 px-4">
+          <ul className="flex flex-col gap-3">
             {currentGroup.list.map((o) => (
               <AdminOrderCard
                 key={o.id}
