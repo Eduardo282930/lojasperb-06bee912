@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   ArrowLeft,
+  ChevronDown,
   Check,
   ClipboardList,
   UserSearch,
@@ -51,16 +52,14 @@ import {
   confirmRefund,
   cancelExpiredUnpaidOrders,
   paymentDisplayLabel,
-  canChangeStatus,
+  displayStatusLabel,
   fetchDuplicates,
   resolveDuplicate,
   statusLabel,
   minutesLeftToPay,
-  ORDER_STATUSES,
   type Order,
 } from "@/lib/orders";
 import { useServerFn } from "@tanstack/react-start";
-import { supabase } from "@/integrations/supabase/client";
 import { retryLoyverseSync } from "@/lib/loyverse-sync.functions";
 import { runLoyverseQuickSync } from "@/lib/loyverse-reconcile.functions";
 import { useAdmin, adminSignIn, adminSignOut } from "@/lib/admin";
@@ -70,6 +69,7 @@ import { broadcastNotification } from "@/lib/notifications";
 import { fetchDevelopmentMode, setDevelopmentMode } from "@/lib/desenvolvimento";
 import { fetchCatalog, type CatalogProduct } from "@/lib/loyverse.functions";
 import { useLiveInvalidate } from "@/lib/live";
+import { ReceiptDownload } from "@/components/receipt-download";
 import {
   FEATURED_SECTIONS,
   fetchFeatured,
@@ -112,6 +112,11 @@ function couponLabel(c: Coupon): string {
 
 type Section =
   | "home"
+  | "operacao"
+  | "clientes-area"
+  | "vitrine"
+  | "sistema"
+  | "estoque-area"
   | "pedidos"
   | "cupons"
   | "recibos"
@@ -123,10 +128,18 @@ type Section =
   | "desenvolvimento";
 
 type AdminItem = {
-  id: Exclude<Section, "home">;
+  id: Exclude<Section, "home" | "operacao" | "clientes-area" | "vitrine" | "sistema" | "estoque-area">;
   label: string;
   hint: string;
   icon: React.ReactNode;
+};
+
+type AdminGroup = {
+  id: Extract<Section, "operacao" | "clientes-area" | "vitrine" | "sistema" | "estoque-area">;
+  label: string;
+  hint: string;
+  icon: React.ReactNode;
+  items: AdminItem[];
 };
 
 const SECTIONS: AdminItem[] = [
@@ -150,13 +163,13 @@ const SECTIONS: AdminItem[] = [
   },
   {
     id: "duplicidades",
-    label: "Duplicados",
+    label: "Revisão de cadastros",
     hint: "Possíveis clientes repetidos",
     icon: <UserSearch className="h-6 w-6" />,
   },
   {
     id: "destaques",
-    label: "Destaques",
+    label: "Destaques da vitrine",
     hint: "Produtos que aparecem primeiro",
     icon: <Star className="h-6 w-6" />,
   },
@@ -168,37 +181,92 @@ const SECTIONS: AdminItem[] = [
   },
   {
     id: "estoque",
-    label: "Estoque",
+    label: "Meu estoque",
     hint: "Estoque, custos e valor da mercadoria",
     icon: <PackageSearch className="h-6 w-6" />,
   },
   {
     id: "recibos",
-    label: "Recibos",
+    label: "Recibos Loyverse",
     hint: "Vendas registradas na loja",
     icon: <Receipt className="h-6 w-6" />,
   },
   {
     id: "desenvolvimento",
-    label: "Manutenção",
+    label: "Modo desenvolvimento",
     hint: "Bloquear a loja durante manutenção",
     icon: <LockKeyhole className="h-6 w-6" />,
   },
 ];
 
+const ADMIN_GROUPS: AdminGroup[] = [
+  {
+    id: "operacao",
+    label: "Operação",
+    hint: "Pedidos, pagamentos e acompanhamento",
+    icon: <ClipboardList className="h-7 w-7" />,
+    items: SECTIONS.filter((item) =>
+      ["pedidos", "pagamentos"].includes(item.id),
+    ),
+  },
+  {
+    id: "estoque-area",
+    label: "Meu estoque",
+    hint: "Mercadoria, custos, valores e disponibilidade",
+    icon: <PackageSearch className="h-7 w-7" />,
+    items: SECTIONS.filter((item) => item.id === "estoque"),
+  },
+  {
+    id: "clientes-area",
+    label: "Clientes",
+    hint: "Cadastros, histórico e revisão",
+    icon: <Users className="h-7 w-7" />,
+    items: SECTIONS.filter((item) =>
+      ["clientes", "duplicidades"].includes(item.id),
+    ),
+  },
+  {
+    id: "vitrine",
+    label: "Vitrine e vendas",
+    hint: "Destaques e cupons da loja",
+    icon: <Star className="h-7 w-7" />,
+    items: SECTIONS.filter((item) =>
+      ["destaques", "cupons"].includes(item.id),
+    ),
+  },
+  {
+    id: "sistema",
+    label: "Sistema e registros",
+    hint: "Loyverse e informações da operação",
+    icon: <Receipt className="h-7 w-7" />,
+    items: SECTIONS.filter((item) => ["recibos", "desenvolvimento"].includes(item.id)),
+  },
+];
+
+const SECTION_TO_GROUP: Record<AdminItem["id"], AdminGroup["id"]> = {
+  pedidos: "operacao",
+  pagamentos: "operacao",
+  clientes: "clientes-area",
+  duplicidades: "clientes-area",
+  destaques: "vitrine",
+  cupons: "vitrine",
+  recibos: "sistema",
+  estoque: "estoque-area",
+  desenvolvimento: "sistema",
+};
 
 function AdminPage() {
-  // Atualização em tempo real dos pedidos sem alterar a lógica existente.
+  // Pedidos novos e mudanças de pagamento aparecem sozinhos no painel.
   useLiveInvalidate([
     { table: "orders", keys: [["orders"], ["admin-orders"]] },
   ]);
-
   const { isAdmin, checking } = useAdmin();
   const [section, setSection] = useState<Section>("home");
+  const [sectionHistory, setSectionHistory] = useState<Section[]>(["home"]);
 
   if (checking) {
     return (
-      <div className="grid min-h-screen place-items-center bg-slate-50 text-sm font-bold text-slate-500">
+      <div className="grid min-h-screen place-items-center bg-background text-lg font-bold text-muted-foreground">
         Carregando…
       </div>
     );
@@ -206,74 +274,71 @@ function AdminPage() {
 
   if (!isAdmin) return <AdminLogin />;
 
-  const current = SECTIONS.find((item) => item.id === section);
-  const pageTitle = current?.label ?? "Admin SPERB";
+  const current = SECTIONS.find((s) => s.id === section);
+  const currentGroup = ADMIN_GROUPS.find((group) => group.id === section);
+  const parentGroup = current
+    ? ADMIN_GROUPS.find((group) => group.id === SECTION_TO_GROUP[current.id])
+    : null;
 
-  const goBack = () => setSection("home");
-
-  const itemColors: Record<AdminItem["id"], string> = {
-    pedidos: "#2563eb",
-    pagamentos: "#06b6d4",
-    clientes: "#10b981",
-    duplicidades: "#f97316",
-    destaques: "#a855f7",
-    cupons: "#eab308",
-    estoque: "#f59e0b",
-    recibos: "#6366f1",
-    desenvolvimento: "#64748b",
+  const navigateSection = (next: Section) => {
+    setSectionHistory((history) => [...history, next]);
+    setSection(next);
   };
 
-  return (
-    <div className="sperb-admin min-h-screen bg-[#f6f8fc] pb-8 text-slate-950">
-      <style>{`
-        .sperb-admin { --admin-ink: #0f172a; --admin-muted: #64748b; }
-        .sperb-admin main { font-size: 0.92rem; }
-        .sperb-admin .border-2 { border-width: 1px !important; }
-        .sperb-admin .rounded-3xl { border-radius: 1rem !important; }
-        .sperb-admin .rounded-[2rem] { border-radius: 1.25rem !important; }
-        .sperb-admin main .p-6 { padding: 1rem !important; }
-        .sperb-admin main .p-5 { padding: 0.9rem !important; }
-        .sperb-admin main .p-4 { padding: 0.8rem !important; }
-        .sperb-admin main .text-3xl { font-size: 1.45rem !important; line-height: 1.15 !important; }
-        .sperb-admin main .text-2xl { font-size: 1.3rem !important; line-height: 1.2 !important; }
-        .sperb-admin main .text-xl { font-size: 1.1rem !important; line-height: 1.25 !important; }
-        .sperb-admin main .text-lg { font-size: 0.98rem !important; line-height: 1.3 !important; }
-        .sperb-admin main .text-base { font-size: 0.88rem !important; line-height: 1.35 !important; }
-        .sperb-admin input, .sperb-admin textarea, .sperb-admin select { border-width: 1px !important; border-radius: 0.8rem !important; }
-        .sperb-admin button { -webkit-tap-highlight-color: transparent; }
-        .sperb-admin main h1, .sperb-admin main h2, .sperb-admin main h3 { letter-spacing: -0.02em; }
-        .sperb-admin .shadow-sm { box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06) !important; }
-        .sperb-admin .shadow-lg { box-shadow: 0 12px 32px rgba(15, 23, 42, 0.10) !important; }
-        .sperb-admin .admin-module > div > .rounded-3xl { background: rgba(255,255,255,.94); }
-      `}</style>
+  const goHome = () => {
+    setSectionHistory(["home"]);
+    setSection("home");
+  };
 
-      <header className="safe-top sticky top-0 z-30 border-b border-slate-200/80 bg-white/90 backdrop-blur-xl">
-        <div className="mx-auto max-w-5xl px-3 py-2.5 sm:px-5">
-          <div className="flex items-center gap-2.5">
+  const goBack = () => {
+    setSectionHistory((history) => {
+      if (history.length <= 1) {
+        setSection("home");
+        return ["home"];
+      }
+
+      const nextHistory = history.slice(0, -1);
+      const previousSection = nextHistory[nextHistory.length - 1] ?? "home";
+      setSection(previousSection);
+      return nextHistory;
+    });
+  };
+
+  const pageTitle = current?.label ?? currentGroup?.label ?? "Administração SPERB";
+  const pageHint = current?.hint ?? currentGroup?.hint;
+
+  return (
+    <div className="min-h-screen bg-background pb-28">
+      <header className="layer-header safe-top sticky top-0 border-b bg-background/95 backdrop-blur">
+        <div className="mx-auto max-w-5xl px-4 py-3">
+          <div className="flex items-center gap-3">
             {section === "home" ? (
-              <Link
-                to="/"
-                aria-label="Voltar à loja"
-                className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-sm transition-transform active:scale-90"
+              <button
+                type="button"
+                aria-label="Dashboard do Admin"
+                disabled
+                className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-muted text-foreground opacity-50"
               >
-                <ArrowLeft className="h-4 w-4" strokeWidth={2.5} />
-              </Link>
+                <ArrowLeft className="h-5 w-5" strokeWidth={2.5} />
+              </button>
             ) : (
               <button
                 type="button"
                 onClick={goBack}
-                aria-label="Voltar ao painel"
-                className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-sm transition-transform active:scale-90"
+                aria-label="Voltar"
+                className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-muted text-foreground transition-transform active:scale-95"
               >
-                <ArrowLeft className="h-4 w-4" strokeWidth={2.5} />
+                <ArrowLeft className="h-5 w-5" strokeWidth={2.5} />
               </button>
             )}
 
             <div className="min-w-0 flex-1">
-              <p className="text-[9px] font-extrabold uppercase tracking-[0.16em] text-slate-400">
-                SPERB · Administração
-              </p>
-              <h1 className="truncate text-base font-extrabold tracking-tight text-slate-900">
+              {parentGroup && (
+                <p className="mb-0.5 truncate text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
+                  {parentGroup.label}
+                </p>
+              )}
+              <h1 className="truncate text-lg font-black text-foreground sm:text-xl">
                 {pageTitle}
               </h1>
             </div>
@@ -281,90 +346,90 @@ function AdminPage() {
             <button
               type="button"
               onClick={() => adminSignOut()}
-              aria-label="Sair"
-              className="grid h-9 w-9 place-items-center rounded-full bg-slate-100 text-slate-600 transition-transform active:scale-90"
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-muted px-3 py-2 text-sm font-black text-foreground"
             >
               <LogOut className="h-4 w-4" />
+              <span className="hidden sm:inline">Sair</span>
             </button>
           </div>
+
+          {pageHint && (
+            <p className="mt-1 pl-14 text-xs font-medium text-muted-foreground sm:text-sm">
+              {pageHint}
+            </p>
+          )}
         </div>
       </header>
 
-      <main className="mx-auto max-w-5xl px-3 pt-4 sm:px-5 sm:pt-6">
+      <main className="mx-auto max-w-5xl px-4 pt-5">
         {section === "home" && (
           <div className="space-y-5">
-            <section className="rounded-[1.35rem] border border-slate-200 bg-white px-4 py-4 shadow-sm sm:px-5">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-blue-600">
-                    Painel de controle
-                  </p>
-                  <h2 className="mt-0.5 text-xl font-black tracking-tight text-slate-950 sm:text-2xl">
-                    Olá! 👋
-                  </h2>
-                  <p className="mt-1 text-xs font-medium text-slate-500">
-                    Acesse qualquer função da SPERB rapidamente.
-                  </p>
+            <section className="rounded-[2rem] border bg-card p-5 shadow-sm sm:p-6">
+              <div className="flex items-center gap-4">
+                <div
+                  className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl text-white shadow-sm"
+                  style={{ backgroundColor: BLUE }}
+                >
+                  <ClipboardList className="h-7 w-7" />
                 </div>
-                <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-blue-600 text-white shadow-sm">
-                  <TrendingUp className="h-5 w-5" />
+                <div className="min-w-0">
+                  <p className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">
+                    Painel rápido
+                  </p>
+                  <h2 className="mt-1 text-2xl font-black tracking-tight text-foreground">
+                    Administração SPERB
+                  </h2>
+                  <p className="mt-1 text-sm font-semibold text-muted-foreground">
+                    Tudo que você precisa para cuidar da loja em poucos toques.
+                  </p>
                 </div>
               </div>
             </section>
 
             <section>
-              <div className="mb-3 flex items-end justify-between px-1">
-                <div>
-                  <p className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-slate-400">
-                    Acesso rápido
-                  </p>
-                  <h2 className="mt-0.5 text-base font-extrabold text-slate-900">
-                    Controle da loja
-                  </h2>
-                </div>
-                <span className="text-[10px] font-bold text-slate-400">{SECTIONS.length} funções</span>
+              <div className="mb-3 px-1">
+                <p className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">
+                  Acesso direto
+                </p>
+                <h2 className="mt-1 text-xl font-black text-foreground">
+                  O que você quer fazer?
+                </h2>
               </div>
 
-              <div className="grid grid-cols-4 gap-x-2 gap-y-5 sm:grid-cols-5 sm:gap-x-4 sm:gap-y-6">
-                {SECTIONS.map((item) => {
-                  const colors = itemColors[item.id];
-                  return (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => setSection(item.id)}
-                      className="group flex min-w-0 flex-col items-center text-center transition-transform active:scale-90"
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                {SECTIONS.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => navigateSection(item.id)}
+                    className="group flex min-h-[126px] flex-col items-start justify-between rounded-3xl border bg-card p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md active:scale-[0.98]"
+                  >
+                    <span
+                      className="grid h-12 w-12 place-items-center rounded-2xl text-white shadow-sm"
+                      style={{ backgroundColor: item.id === "estoque" ? GREEN : BLUE }}
                     >
-                      <span
-                        className="relative grid h-[58px] w-[58px] place-items-center rounded-full text-white shadow-sm transition-transform group-hover:-translate-y-0.5 sm:h-[62px] sm:w-[62px]"
-                        style={{ backgroundColor: colors }}
-                      >
-                        {item.icon}
-                        {(item.id === "pedidos" || item.id === "estoque") && (
-                          <span
-                            className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-[#f6f8fc]"
-                            style={{ backgroundColor: item.id === "pedidos" ? "#ef4444" : "#f59e0b" }}
-                          />
-                        )}
-                      </span>
-                      <span className="mt-1.5 line-clamp-2 max-w-[78px] text-[11px] font-extrabold leading-4 text-slate-700 sm:text-xs">
+                      {item.icon}
+                    </span>
+                    <span className="mt-4 min-w-0">
+                      <span className="block text-base font-black leading-tight text-foreground">
                         {item.label}
                       </span>
-                    </button>
-                  );
-                })}
+                      <span className="mt-1 block text-xs font-semibold leading-4 text-muted-foreground">
+                        {item.hint}
+                      </span>
+                    </span>
+                  </button>
+                ))}
               </div>
             </section>
 
-            <section className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm">
-              <div className="flex items-center gap-2.5">
-                <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-emerald-100 text-emerald-600">
-                  <Check className="h-4 w-4" strokeWidth={3} />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs font-extrabold text-slate-800">Tudo em um só lugar</p>
-                  <p className="text-[11px] font-medium leading-4 text-slate-500">
-                    Pedidos, clientes, estoque, vendas e sistema continuam com as mesmas funções.
+            <section className="rounded-3xl border bg-muted/40 p-4">
+              <div className="flex items-start gap-3">
+                <TrendingUp className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+                <div>
+                  <p className="text-sm font-black text-foreground">Atalhos da operação</p>
+                  <p className="mt-1 text-xs font-semibold leading-5 text-muted-foreground">
+                    Pedidos, pagamentos, estoque e clientes ficam a um toque. As funções mais técnicas continuam separadas para não deixar a tela inicial pesada.
                   </p>
                 </div>
               </div>
@@ -372,24 +437,77 @@ function AdminPage() {
           </div>
         )}
 
-        {section === "pedidos" && (
-          <div className="admin-module space-y-3">
-            <SyncPanel />
-            <OrdersPanel />
+        {currentGroup && (
+          <div className="space-y-4">
+            <div className="rounded-3xl border bg-card p-5 shadow-sm">
+              <div className="flex items-center gap-4">
+                <div
+                  className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl text-white"
+                  style={{ backgroundColor: BLUE }}
+                >
+                  {currentGroup.icon}
+                </div>
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.08em] text-muted-foreground">
+                    Área administrativa
+                  </p>
+                  <h2 className="mt-1 text-xl font-black text-foreground">
+                    {currentGroup.label}
+                  </h2>
+                  <p className="mt-1 text-sm font-medium text-muted-foreground">
+                    {currentGroup.hint}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              {currentGroup.items.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => navigateSection(item.id)}
+                  className="group flex min-h-[118px] w-full items-center gap-4 rounded-3xl border bg-card p-5 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md active:scale-[0.99]"
+                >
+                  <span
+                    className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl text-white"
+                    style={{ backgroundColor: BLUE }}
+                  >
+                    {item.icon}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-2">
+                      <span className="text-base font-black text-foreground sm:text-lg">
+                        {item.label}
+                      </span>
+                      <span className="text-lg font-black text-muted-foreground transition-transform group-hover:translate-x-0.5">
+                        →
+                      </span>
+                    </span>
+                    <span className="mt-1 block text-sm font-semibold leading-5 text-muted-foreground">
+                      {item.hint}
+                    </span>
+                  </span>
+                </button>
+              ))}
+            </div>
           </div>
         )}
-        {section === "cupons" && <div className="admin-module"><CouponsPanel /></div>}
-        {section === "recibos" && <div className="admin-module"><ReceiptsPanel /></div>}
-        {section === "estoque" && <div className="admin-module"><StockPanel /></div>}
-        {section === "clientes" && <div className="admin-module"><CustomersPanel /></div>}
-        {section === "destaques" && <div className="admin-module"><FeaturedPanel /></div>}
-        {section === "pagamentos" && <div className="admin-module"><PaymentsPanel /></div>}
-        {section === "duplicidades" && <div className="admin-module"><DuplicatesPanel /></div>}
-        {section === "desenvolvimento" && <div className="admin-module"><DevelopmentPanel /></div>}
+
+        {section === "pedidos" && <OrdersPanel />}
+        {section === "cupons" && <CouponsPanel />}
+        {section === "recibos" && <ReceiptsPanel />}
+        {section === "estoque" && <StockPanel />}
+        {section === "clientes" && <CustomersPanel />}
+        {section === "destaques" && <FeaturedPanel />}
+        {section === "pagamentos" && <PaymentsPanel />}
+        {section === "duplicidades" && <DuplicatesPanel />}
+        {section === "desenvolvimento" && <DevelopmentPanel />}
       </main>
     </div>
   );
 }
+
 function DevelopmentPanel() {
   const [enabled, setEnabled] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -1737,10 +1855,11 @@ function OrdersPanel() {
     staleTime: 30 * 1000,
   });
   const [busy, setBusy] = useState<string | null>(null);
+  const [selectedCustomer, setSelectedCustomer] = useState("all");
+  const [activeStatus, setActiveStatus] = useState<"topay" | "preparing" | "shipping" | "delivered" | "canceled">("topay");
   const syncReceipt = useServerFn(retryLoyverseSync);
-
-  // Abrir a lista já traz reembolsos e recibos recentes do Loyverse.
   const quickSync = useServerFn(runLoyverseQuickSync);
+
   useEffect(() => {
     let alive = true;
     void (async () => {
@@ -1751,12 +1870,10 @@ function OrdersPanel() {
           void refetch();
         }
       } catch {
-        /* rede de segurança: o webhook continua sendo o canal principal */
+        /* o webhook continua sendo o canal principal */
       }
     })();
-    return () => {
-      alive = false;
-    };
+    return () => { alive = false; };
   }, [quickSync, refetch]);
 
   async function change(o: Order, status: string) {
@@ -1770,27 +1887,18 @@ function OrdersPanel() {
   async function payOnDelivery(o: Order) {
     setBusy(o.id);
     const ok = await setPayOnDelivery(o.id);
-    // O recibo do Loyverse é criado logo após o pagamento ser registrado.
     if (ok) await syncReceipt({ data: { orderId: o.id } }).catch(() => null);
     setBusy(null);
     if (!ok) window.alert("Não foi possível marcar o pagamento na entrega.");
     void refetch();
   }
 
-  /** Pedido pago pela InfinitePay (nunca pagamento na entrega/dinheiro). */
   function isInfinitePayPaid(o: Order): boolean {
     if (o.paymentMethod === "delivery") return false;
     const provider = `${o.paymentProvider ?? ""}`.toLowerCase();
-    return Boolean(
-      provider.includes("infinite") ||
-        o.paymentTransactionNsu ||
-        o.paymentSlug ||
-        o.paymentOrderNsu ||
-        o.receiptUrl,
-    );
+    return Boolean(provider.includes("infinite") || o.paymentTransactionNsu || o.paymentSlug || o.paymentOrderNsu || o.receiptUrl);
   }
 
-  /** Abre a venda na InfinitePay e depois registra o comprovante do estorno. */
   async function refundWithInfinitePay(o: Order) {
     openInfinitePaySale(o);
     const proof = window.prompt(
@@ -1806,10 +1914,7 @@ function OrdersPanel() {
   }
 
   async function markRefunded(o: Order) {
-    const proof = window.prompt(
-      "Link do comprovante do reembolso (opcional):",
-      "",
-    );
+    const proof = window.prompt("Link do comprovante do reembolso (opcional):", "");
     if (proof === null) return;
     setBusy(o.id);
     const ok = await confirmRefund(o.id, proof.trim());
@@ -1818,178 +1923,281 @@ function OrdersPanel() {
     void refetch();
   }
 
-  /**
-   * A InfinitePay não publica API nem deep link para abrir uma venda
-   * específica: a documentação oficial só tem /links e /payment_check.
-   * O que existe oficialmente é o comprovante (receipt_url) da transação —
-   * é ele que abrimos, junto com os identificadores da venda.
-   */
   function openInfinitePaySale(o: Order) {
     const ids = [
       o.paymentTransactionNsu ? `transaction_nsu: ${o.paymentTransactionNsu}` : "",
       o.paymentSlug ? `slug: ${o.paymentSlug}` : "",
       o.paymentOrderNsu ? `order_nsu: ${o.paymentOrderNsu}` : "",
-    ]
-      .filter(Boolean)
-      .join("\n");
+    ].filter(Boolean).join("\n");
     if (o.receiptUrl) {
       window.open(o.receiptUrl, "_blank", "noopener");
       return;
     }
-    window.alert(
-      ids
-        ? `Abra o app InfinitePay em Vendas e localize a venda:\n\n${ids}`
-        : "Sem identificadores da InfinitePay para este pedido.",
-    );
+    window.alert(ids ? `Abra o app InfinitePay em Vendas e localize a venda:\n\n${ids}` : "Sem identificadores da InfinitePay para este pedido.");
   }
 
-  if (isLoading) {
-    return <p className="text-lg font-semibold text-muted-foreground">Carregando…</p>;
+  function bucket(order: Order): "topay" | "preparing" | "shipping" | "delivered" | "canceled" {
+    if (order.status === "canceled" || order.paymentStatus === "refunded") return "canceled";
+    if (order.status === "delivered") return "delivered";
+    if (order.paymentStatus !== "paid") return "topay";
+    if (order.status === "shipping") return "shipping";
+    return "preparing";
   }
-  if ((data ?? []).length === 0) {
-    return (
-      <p className="text-lg font-semibold text-muted-foreground">Nenhum pedido ainda.</p>
-    );
-  }
+
+  if (isLoading) return <p className="px-4 text-base text-muted-foreground">Carregando pedidos…</p>;
+
+  const orders = data ?? [];
+  const customerOptions = Array.from(
+    new Map(
+      orders
+        .filter((o) => o.customerPhone)
+        .map((o) => [onlyDigits(o.customerPhone), { phone: onlyDigits(o.customerPhone), name: o.customerName || o.customerPhone }]),
+    ).values(),
+  ).sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+
+  const customerOrders = selectedCustomer === "all"
+    ? orders
+    : orders.filter((o) => onlyDigits(o.customerPhone) === selectedCustomer);
+
+  const groups = [
+    { value: "topay" as const, label: "A pagar" },
+    { value: "preparing" as const, label: "Preparando" },
+    { value: "shipping" as const, label: "A caminho" },
+    { value: "delivered" as const, label: "Finalizado" },
+    { value: "canceled" as const, label: "Cancelado" },
+  ].map((section) => ({
+    ...section,
+    list: customerOrders.filter((o) => bucket(o) === section.value),
+  }));
+
+  const currentGroup = groups.find((g) => g.value === activeStatus) ?? groups[0];
+  const refunded = (o: Order) => o.paymentStatus === "refunded" || o.refundState === "refunded";
 
   return (
-    <>
-    <ul className="flex flex-col gap-3">
-      {(data ?? []).map((o) => (
-        <li key={o.id} className="rounded-3xl border-2 border-border bg-card p-4 shadow-sm">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-lg font-black text-foreground">
-                {o.customerName || "Sem nome"}
-              </p>
-              <p className="text-sm font-bold text-muted-foreground">
-                {o.customerPhone} · {new Date(o.createdAt).toLocaleString("pt-BR")}
-              </p>
-            </div>
-            <span className="shrink-0 text-xl font-black" style={{ color: BLUE }}>
-              {formatPrice(o.total)}
-            </span>
-          </div>
+    <div className="min-h-0">
+      <div className="sticky top-0 z-10 border-b border-border bg-background/95 backdrop-blur">
+        <div className="px-4 py-3">
+          <label className="block text-xs font-semibold text-muted-foreground">Cliente</label>
+          <select
+            value={selectedCustomer}
+            onChange={(e) => setSelectedCustomer(e.target.value)}
+            className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm font-semibold text-foreground outline-none"
+          >
+            <option value="all">Todos os clientes</option>
+            {customerOptions.map((customer) => (
+              <option key={customer.phone} value={customer.phone}>
+                {customer.name} · {customer.phone}
+              </option>
+            ))}
+          </select>
+        </div>
 
-          <ul className="mt-2 flex flex-col gap-1">
-            {o.items.map((it, i) => (
-              <li key={i} className="text-base font-semibold text-foreground">
-                {it.qty}x {it.name} — {formatPrice(it.price * it.qty)}
+        <div className="relative flex overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {groups.map((group) => (
+            <button
+              key={group.value}
+              type="button"
+              onClick={() => setActiveStatus(group.value)}
+              className="relative flex min-w-[84px] flex-1 flex-col items-center justify-end whitespace-nowrap px-1 pb-3 pt-1 text-[13px] font-medium transition-colors sm:px-2 sm:text-sm"
+              style={{ color: activeStatus === group.value ? BLUE : "var(--muted-foreground)" }}
+            >
+              <span className="mb-0.5 flex h-4 items-center justify-center">
+                {group.list.length > 0 ? (
+                  <span className="grid h-4 min-w-4 place-items-center rounded-full px-1 text-[10px] font-bold leading-none text-white" style={{ backgroundColor: BLUE }}>
+                    {group.list.length}
+                  </span>
+                ) : <span aria-hidden="true" className="h-4" />}
+              </span>
+              <span className="leading-5">{group.label}</span>
+              {activeStatus === group.value && (
+                <span aria-hidden="true" className="absolute bottom-0 left-2 right-2 h-0.5 rounded-full" style={{ backgroundColor: BLUE }} />
+              )}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <main className="pt-4">
+        {currentGroup.list.length === 0 ? (
+          <div className="mx-4 flex min-h-[260px] flex-col items-center justify-center px-6 text-center">
+            <div className="grid h-20 w-20 place-items-center rounded-3xl bg-muted/50">
+              <ClipboardList className="h-10 w-10" style={{ color: BLUE }} />
+            </div>
+            <p className="mt-4 text-lg font-semibold text-foreground">Nenhum pedido nesta seção</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {selectedCustomer === "all" ? "Nenhum cliente possui pedidos nesta etapa." : "Este cliente não possui pedidos nesta etapa."}
+            </p>
+          </div>
+        ) : (
+          <ul className="flex flex-col gap-3 px-4">
+            {currentGroup.list.map((o) => (
+              <AdminOrderCard
+                key={o.id}
+                order={o}
+                busy={busy === o.id}
+                onChange={change}
+                onPayOnDelivery={payOnDelivery}
+                onRefundInfinite={refundWithInfinitePay}
+                onMarkRefunded={markRefunded}
+                isInfinitePayPaid={isInfinitePayPaid(o)}
+                refunded={refunded(o)}
+              />
+            ))}
+          </ul>
+        )}
+      </main>
+    </div>
+  );
+}
+
+function AdminOrderCard({
+  order,
+  busy,
+  onChange,
+  onPayOnDelivery,
+  onRefundInfinite,
+  onMarkRefunded,
+  isInfinitePayPaid,
+  refunded,
+}: {
+  order: Order;
+  busy: boolean;
+  onChange: (order: Order, status: string) => Promise<void>;
+  onPayOnDelivery: (order: Order) => Promise<void>;
+  onRefundInfinite: (order: Order) => Promise<void>;
+  onMarkRefunded: (order: Order) => Promise<void>;
+  isInfinitePayPaid: boolean;
+  refunded: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const unpaid = order.paymentStatus !== "paid" && order.status !== "canceled" && !refunded;
+  const refundText = order.refundState === "money_pending"
+    ? "Pedido cancelado · Reembolso pendente de confirmação."
+    : null;
+
+  return (
+    <li className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+      <div className="p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-xs font-medium text-muted-foreground">{new Date(order.createdAt).toLocaleString("pt-BR")}</p>
+            <p className="mt-1 text-lg font-semibold text-foreground">{displayStatusLabel(order)}</p>
+            <p className="mt-0.5 text-sm text-muted-foreground">{paymentDisplayLabel(order)}</p>
+            <p className="mt-1 text-sm font-semibold text-foreground">{order.customerName || "Cliente sem nome"}</p>
+            <p className="text-xs text-muted-foreground">{order.customerPhone}</p>
+            {order.origin === "store" && (
+              <p className="mt-1 inline-block rounded-lg bg-muted px-2 py-1 text-xs font-semibold text-foreground">Pedido feito pelo vendedor da loja</p>
+            )}
+          </div>
+          <div className="shrink-0 text-right">
+            <p className="text-xs font-medium text-muted-foreground">Total</p>
+            <p className="text-xl font-semibold" style={{ color: BLUE }}>{formatPrice(order.total)}</p>
+          </div>
+        </div>
+
+        {order.status !== "canceled" && (
+          <div className="mt-4">
+            <div className="flex items-center gap-1.5">
+              {["sent", "preparing", "shipping", "delivered"].map((step, index) => {
+                const steps = ["sent", "preparing", "shipping", "delivered"];
+                const current = Math.max(0, steps.indexOf(order.status));
+                return <div key={step} className="h-1.5 flex-1 rounded-full" style={{ backgroundColor: index <= current ? GREEN : "var(--muted)" }} />;
+              })}
+            </div>
+            <div className="mt-1.5 flex justify-between text-[11px] font-medium text-muted-foreground">
+              <span>Recebido</span><span>Preparando</span><span>A caminho</span><span>Entregue</span>
+            </div>
+          </div>
+        )}
+
+        <div className="mt-4 rounded-xl bg-muted/50 p-3">
+          <p className="mb-2 text-sm font-semibold text-foreground">Produtos do pedido</p>
+          <ul className="space-y-3">
+            {order.items.map((item, index) => (
+              <li key={`${item.id}-${index}`} className="flex items-center gap-3">
+                {item.image ? (
+                  <img src={item.image} alt="" loading="lazy" className="h-14 w-14 shrink-0 rounded-xl bg-background object-cover" />
+                ) : (
+                  <span className="grid h-14 w-14 shrink-0 place-items-center rounded-xl bg-background"><Boxes className="h-6 w-6 text-muted-foreground" /></span>
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="line-clamp-2 text-sm font-medium leading-5 text-foreground">{item.name}</p>
+                  <p className="mt-0.5 text-sm text-muted-foreground">Quantidade: <span className="font-semibold text-foreground">{item.qty}</span></p>
+                </div>
+                <p className="shrink-0 text-sm font-semibold text-foreground">{formatPrice(item.price * item.qty)}</p>
               </li>
             ))}
           </ul>
+        </div>
 
-          {o.discount > 0 && (
-            <p className="mt-1 text-base font-bold text-muted-foreground">
-              Cupom {o.couponCode}: -{formatPrice(o.discount)}
-            </p>
+        {order.discount > 0 && (
+          <div className="mt-3 flex items-center justify-between text-sm"><span className="text-muted-foreground">{order.couponCode ? `Desconto do cupom ${order.couponCode}` : "Desconto"}</span><span className="font-semibold" style={{ color: GREEN }}>-{formatPrice(order.discount)}</span></div>
+        )}
+        {(order.sellerDiscount ?? 0) > 0 && (
+          <div className="mt-2 flex items-center justify-between text-sm"><span className="text-muted-foreground">Desconto do vendedor</span><span className="font-semibold" style={{ color: GREEN }}>-{formatPrice(order.sellerDiscount ?? 0)}</span></div>
+        )}
+        {(order.coinsDiscount ?? 0) > 0 && (
+          <div className="mt-2 flex items-center justify-between text-sm"><span className="text-muted-foreground">Moedas usadas ({(order.coinsUsed ?? 0).toLocaleString("pt-BR")})</span><span className="font-semibold" style={{ color: GREEN }}>-{formatPrice(order.coinsDiscount ?? 0)}</span></div>
+        )}
+
+        {unpaid && order.paymentDeadlineAt && (
+          <div className="mt-3 rounded-xl bg-blue-50 px-3 py-2.5 text-sm text-foreground dark:bg-blue-950/30"><span className="font-semibold">Pagamento pendente.</span> Aguardando pagamento.</div>
+        )}
+        {refundText && <div className="mt-3 rounded-xl border border-orange-200 bg-orange-50 p-3 dark:border-orange-900/40 dark:bg-orange-950/20"><p className="text-sm font-medium leading-5 text-foreground">{refundText}</p></div>}
+
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <select
+            value={order.status}
+            disabled={busy}
+            onChange={(e) => void onChange(order, e.target.value)}
+            aria-label={`Status do pedido de ${order.customerName}`}
+            className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground"
+          >
+            <option value="sent">Recebido</option>
+            <option value="preparing">Preparando</option>
+            <option value="shipping">A caminho</option>
+            <option value="delivered">Entregue</option>
+            <option value="canceled">Cancelado</option>
+          </select>
+
+          {order.paymentStatus !== "paid" && order.status !== "canceled" && (
+            <button type="button" disabled={busy} onClick={() => void onPayOnDelivery(order)} className="rounded-xl px-3 py-2 text-sm font-black text-white" style={{ backgroundColor: GREEN }}>Pagamento na entrega</button>
           )}
 
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <select
-              value={o.status}
-              disabled={busy === o.id}
-              onChange={(e) => void change(o, e.target.value)}
-              aria-label={`Status do pedido de ${o.customerName}`}
-              className="rounded-xl border-2 border-border bg-background px-3 py-2 text-base font-black text-foreground"
-            >
-              {ORDER_STATUSES.map((s) => (
-                <option
-                  key={s.value}
-                  value={s.value}
-                  disabled={!canChangeStatus(o, s.value, o.updatedAt)}
-                >
-                  {s.label}
-                </option>
-              ))}
-            </select>
-            {o.paymentStatus !== "paid" && o.status !== "canceled" && (
-                <button
-                  type="button"
-                  disabled={busy === o.id}
-                  onClick={() => void payOnDelivery(o)}
-                  className="rounded-xl px-3 py-2 text-base font-black text-white"
-                  style={{ backgroundColor: GREEN }}
-                >
-                  Pagamento na entrega
-                </button>
-              )}
-            {o.status === "canceled" && o.refundState !== "refunded" && (
-              <>
-                <span
-                  className="text-sm font-black"
-                  style={{ color: "oklch(0.72 0.17 62)" }}
-                >
-                  Reembolso pendente de confirmação
-                </span>
-                {isInfinitePayPaid(o) ? (
-                  <button
-                    type="button"
-                    disabled={busy === o.id}
-                    onClick={() => void refundWithInfinitePay(o)}
-                    className="rounded-xl px-3 py-2 text-base font-black text-white"
-                    style={{ backgroundColor: BLUE }}
-                  >
-                    💳 Devolver dinheiro com InfinitePay
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    disabled={busy === o.id}
-                    onClick={() => void markRefunded(o)}
-                    className="rounded-xl border-2 border-border bg-background px-3 py-2 text-base font-black text-foreground"
-                  >
-                    Confirmar reembolso
-                  </button>
-                )}
-              </>
-            )}
-            <span className="text-sm font-bold text-muted-foreground">
-              {statusLabel(o.status)} · {paymentDisplayLabel(o)}
-              {o.paymentMethod && o.paymentMethod !== "delivery"
-                ? ` · ${o.paymentMethod === "pix" ? "Pix" : "Cartão"}`
-                : ""}
-            </span>
-            {o.paymentStatus !== "paid" && o.status !== "canceled" && (
-              <span className="text-sm font-black" style={{ color: BLUE }}>
-                {o.paymentDeadlineAt
-                  ? `Aguardando pagamento · ${minutesLeftToPay(o)} min restantes`
-                  : `Aguardando pagamento há ${waitingLabel(o.createdAt)}`}
-              </span>
-            )}
-            {o.refundState === "refunded" && (
-              <span className="text-sm font-black" style={{ color: GREEN }}>
-                ✅ Reembolso realizado
-                {o.refundProofUrl ? "" : " (sem comprovante)"}
-              </span>
-            )}
-            {o.refundProofUrl && (
-              <a
-                href={o.refundProofUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="text-sm font-black underline"
-                style={{ color: GREEN }}
-              >
-                Comprovante do reembolso
-              </a>
-            )}
-            {o.receiptUrl && (
-              <a
-                href={o.receiptUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="text-sm font-black underline"
-                style={{ color: BLUE }}
-              >
-                Comprovante
-              </a>
+          {(order.paymentStatus === "paid" || refunded) && <ReceiptDownload orderId={order.id} phone={order.customerPhone} showWhatsApp />}
+        </div>
+
+        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs font-semibold text-muted-foreground">
+          <span>{statusLabel(order.status)} · {paymentDisplayLabel(order)}</span>
+          {order.refundState === "refunded" && <span style={{ color: GREEN }}>✅ Reembolso realizado</span>}
+          {order.refundProofUrl && <a href={order.refundProofUrl} target="_blank" rel="noreferrer" className="underline" style={{ color: GREEN }}>Comprovante do reembolso</a>}
+          {order.receiptUrl && <a href={order.receiptUrl} target="_blank" rel="noreferrer" className="underline" style={{ color: BLUE }}>Comprovante do pagamento</a>}
+        </div>
+
+        {order.status === "canceled" && order.refundState !== "refunded" && (
+          <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl bg-muted/50 p-3">
+            <span className="text-sm font-black" style={{ color: "oklch(0.72 0.17 62)" }}>Reembolso pendente de confirmação</span>
+            {isInfinitePayPaid ? (
+              <button type="button" disabled={busy} onClick={() => void onRefundInfinite(order)} className="rounded-xl px-3 py-2 text-sm font-black text-white" style={{ backgroundColor: BLUE }}>💳 Devolver dinheiro com InfinitePay</button>
+            ) : (
+              <button type="button" disabled={busy} onClick={() => void onMarkRefunded(order)} className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-black text-foreground">Confirmar reembolso</button>
             )}
           </div>
-        </li>
-      ))}
-    </ul>
-    </>
+        )}
+
+        <button type="button" onClick={() => setOpen((v) => !v)} className="mt-3 flex w-full items-center justify-between rounded-xl border border-border px-3 py-2.5 text-sm font-semibold text-foreground">
+          <span>{open ? "Ocultar detalhes" : "Ver detalhes do pedido"}</span>
+          <ChevronDown className={`h-5 w-5 transition-transform ${open ? "rotate-180" : ""}`} />
+        </button>
+        {open && (
+          <div className="mt-3 border-t border-border pt-3">
+            <p className="text-sm font-semibold text-foreground">Pedido nº {order.id.slice(0, 8).toUpperCase()}</p>
+            <p className="mt-1 text-sm leading-5 text-muted-foreground">{displayStatusLabel(order)} · {paymentDisplayLabel(order)}</p>
+            <p className="mt-2 text-sm leading-5 text-muted-foreground">Cliente: <span className="font-semibold text-foreground">{order.customerName || "Sem nome"}</span> · {order.customerPhone}</p>
+          </div>
+        )}
+      </div>
+    </li>
   );
 }
 
@@ -2240,127 +2448,6 @@ function PaymentsPanel() {
           <li>• Pago automaticamente muda o pedido para “Em preparação”.</li>
         </ul>
       </div>
-    </div>
-  );
-}
-
-
-/* ------------------- Sincronização com o Loyverse ---------------------- */
-
-type SyncRow = {
-  id: string;
-  customer_name: string | null;
-  total: number | null;
-  flow_state: string | null;
-  sync_error: string | null;
-  refund_state: string | null;
-  loyverse_receipt_id: string | null;
-};
-
-/**
- * Mostra os pedidos que falharam ao virar recibo no Loyverse (SYNC_ERROR) e os
- * reembolsos cujo dinheiro ainda precisa ser devolvido manualmente no
- * InfinitePay. Nada é criado pelo valor cheio: o pedido espera aqui.
- */
-function SyncPanel() {
-  const [busy, setBusy] = useState<string | null>(null);
-  const [msg, setMsg] = useState("");
-  const retry = useServerFn(retryLoyverseSync);
-
-  const { data, refetch, isLoading } = useQuery({
-    queryKey: ["admin-sync"],
-    queryFn: async (): Promise<SyncRow[]> => {
-      const { data, error } = await supabase
-        .from("orders")
-        .select(
-          "id, customer_name, total, flow_state, sync_error, refund_state, loyverse_receipt_id",
-        )
-        .or("flow_state.eq.SYNC_ERROR,refund_state.eq.money_pending")
-        .order("created_at", { ascending: false })
-        .limit(50);
-      if (error) throw error;
-      return (data ?? []) as unknown as SyncRow[];
-    },
-    staleTime: 20 * 1000,
-  });
-
-  const rows = data ?? [];
-
-  return (
-    <div className="mb-4 rounded-3xl border-2 border-border bg-card p-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-lg font-black text-foreground">Sincronização com o Loyverse</h3>
-        <button
-          disabled={busy !== null}
-          onClick={async () => {
-            setBusy("all");
-            setMsg("");
-            try {
-              const res = await fetch("/api/public/loyverse-reconcile", { method: "POST" });
-              const json = (await res.json()) as {
-                refundsApplied?: number;
-                resynced?: number;
-              };
-              setMsg(
-                `Reembolsos aplicados: ${json.refundsApplied ?? 0} · Recibos reenviados: ${json.resynced ?? 0}`,
-              );
-            } catch {
-              setMsg("Não foi possível reconciliar agora.");
-            }
-            setBusy(null);
-            void refetch();
-          }}
-          className="rounded-xl bg-muted px-3 py-2 text-sm font-black text-foreground active:scale-95 disabled:opacity-60"
-        >
-          {busy === "all" ? "Verificando…" : "Verificar agora"}
-        </button>
-      </div>
-
-      {msg && <p className="mt-1 text-sm font-bold text-muted-foreground">{msg}</p>}
-
-      {isLoading ? (
-        <p className="mt-2 text-sm font-semibold text-muted-foreground">Carregando…</p>
-      ) : rows.length === 0 ? (
-        <p className="mt-2 text-sm font-semibold text-muted-foreground">
-          Tudo sincronizado. Nenhum recibo pendente e nenhum reembolso a devolver.
-        </p>
-      ) : (
-        <ul className="mt-2 flex flex-col gap-2">
-          {rows.map((r) => (
-            <li key={r.id} className="rounded-2xl border border-border p-3">
-              <p className="text-base font-black text-foreground">
-                {r.customer_name || "Sem nome"} · {formatPrice(Number(r.total) || 0)}
-              </p>
-              {r.flow_state === "SYNC_ERROR" && (
-                <p className="text-sm font-bold text-destructive">
-                  Recibo não criado: {r.sync_error || "erro desconhecido"}
-                </p>
-              )}
-              {r.refund_state === "money_pending" && (
-                <p className="text-sm font-bold" style={{ color: "oklch(0.72 0.17 62)" }}>
-                  Reembolsado no Loyverse — devolver o dinheiro pelo InfinitePay.
-                </p>
-              )}
-              {r.flow_state === "SYNC_ERROR" && (
-                <button
-                  disabled={busy === r.id}
-                  onClick={async () => {
-                    setBusy(r.id);
-                    const out = await retry({ data: { orderId: r.id } });
-                    setMsg(out.ok ? "Recibo criado no Loyverse." : `Falhou: ${out.reason}`);
-                    setBusy(null);
-                    void refetch();
-                  }}
-                  className="mt-2 rounded-xl px-3 py-2 text-sm font-black text-white active:scale-95 disabled:opacity-60"
-                  style={{ backgroundColor: BLUE }}
-                >
-                  {busy === r.id ? "Enviando…" : "Tentar criar o recibo"}
-                </button>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
     </div>
   );
 }
