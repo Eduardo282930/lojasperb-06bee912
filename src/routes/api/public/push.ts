@@ -43,13 +43,26 @@ export const Route = createFileRoute("/api/public/push")({
           const title = String(data.title ?? "").trim();
           const message = String(data.body ?? "").trim();
           if (!title || !message) return Response.json({ error: "Título e descrição são obrigatórios." }, { status: 400 });
-          const result = await sendNotificationToAll({
-            kind: String(data.kind ?? "info"),
-            title,
-            body: message,
-            targetUrl: String(data.targetUrl ?? "/"),
-          });
-          return Response.json({ count: result.sent, created: result.created });
+          try {
+            const result = await sendNotificationToAll({
+              kind: String(data.kind ?? "info"),
+              title,
+              body: message,
+              targetUrl: String(data.targetUrl ?? "/"),
+            });
+            return Response.json({
+              count: result.sent,
+              created: result.created,
+              total: result.total,
+              failed: result.failed,
+              detail: result.lastError || undefined,
+            });
+          } catch (error) {
+            return Response.json(
+              { error: error instanceof Error ? error.message : "Falha ao enviar as notificações." },
+              { status: 500 },
+            );
+          }
         }
 
         return Response.json({ error: "Ação inválida." }, { status: 400 });
