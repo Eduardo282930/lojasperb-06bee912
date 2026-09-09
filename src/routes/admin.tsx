@@ -1505,6 +1505,7 @@ function OrdersPanel() {
   });
   const [busy, setBusy] = useState<string | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState("all");
+  const [q, setQ] = useState("");
   const [activeStatus, setActiveStatus] = useState<"topay" | "preparing" | "shipping" | "delivered" | "canceled">("topay");
   const syncReceipt = useServerFn(retryLoyverseSync);
   const quickSync = useServerFn(runLoyverseQuickSync);
