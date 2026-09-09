@@ -1605,9 +1605,18 @@ function OrdersPanel() {
     ).values(),
   ).sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
 
-  const customerOrders = selectedCustomer === "all"
+  const term = q.trim().toLowerCase();
+  const customerOrders = (selectedCustomer === "all"
     ? orders
-    : orders.filter((o) => onlyDigits(o.customerPhone) === selectedCustomer);
+    : orders.filter((o) => onlyDigits(o.customerPhone) === selectedCustomer)
+  ).filter((o) => {
+    if (!term) return true;
+    return (
+      (o.customerName ?? "").toLowerCase().includes(term) ||
+      onlyDigits(o.customerPhone).includes(onlyDigits(term)) ||
+      o.id.toLowerCase().includes(term)
+    );
+  });
 
   const groups = [
     { value: "topay" as const, label: "A pagar" },
@@ -1625,24 +1634,44 @@ function OrdersPanel() {
 
   return (
     <div className="min-h-0">
-      <div className="sticky top-0 z-10 border-b border-border bg-background/95 backdrop-blur">
-        <div className="px-4 py-3">
-          <label className="block text-xs font-semibold text-muted-foreground">Cliente</label>
-          <select
-            value={selectedCustomer}
-            onChange={(e) => setSelectedCustomer(e.target.value)}
-            className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm font-semibold text-foreground outline-none"
+      <ModuleHeader
+        color={moduleById("pedidos")?.color ?? BLUE}
+        icon={<ClipboardList className="h-6 w-6" />}
+        title="Pedidos"
+        hint={`${customerOrders.length} pedido(s) em vista`}
+        action={
+          <button
+            type="button"
+            onClick={() => void refetch()}
+            className="rounded-2xl px-3 py-2 text-sm font-black text-white active:scale-95"
+            style={{ backgroundColor: BLUE }}
           >
-            <option value="all">Todos os clientes</option>
-            {customerOptions.map((customer) => (
-              <option key={customer.phone} value={customer.phone}>
-                {customer.name} · {customer.phone}
-              </option>
-            ))}
-          </select>
-        </div>
+            Atualizar
+          </button>
+        }
+      />
 
-        <div className="relative flex overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <Toolbar
+        value={q}
+        onChange={setQ}
+        placeholder="Buscar por nome, telefone ou número do pedido"
+      >
+        <select
+          value={selectedCustomer}
+          onChange={(e) => setSelectedCustomer(e.target.value)}
+          className="rounded-2xl border bg-card px-3 py-2.5 text-sm font-black text-foreground outline-none"
+        >
+          <option value="all">Todos os clientes</option>
+          {customerOptions.map((customer) => (
+            <option key={customer.phone} value={customer.phone}>
+              {customer.name} · {customer.phone}
+            </option>
+          ))}
+        </select>
+      </Toolbar>
+
+      <div className="sticky top-0 z-10 -mx-4 mb-3 border-b border-border bg-background/95 px-1 backdrop-blur sm:-mx-6">
+        <div className="relative flex overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {groups.map((group) => (
             <button
               key={group.value}
@@ -1667,19 +1696,19 @@ function OrdersPanel() {
         </div>
       </div>
 
-      <main className="pt-4">
+      <main>
         {currentGroup.list.length === 0 ? (
-          <div className="mx-4 flex min-h-[260px] flex-col items-center justify-center px-6 text-center">
-            <div className="grid h-20 w-20 place-items-center rounded-3xl bg-muted/50">
-              <ClipboardList className="h-10 w-10" style={{ color: BLUE }} />
-            </div>
-            <p className="mt-4 text-lg font-semibold text-foreground">Nenhum pedido nesta seção</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {selectedCustomer === "all" ? "Nenhum cliente possui pedidos nesta etapa." : "Este cliente não possui pedidos nesta etapa."}
-            </p>
-          </div>
+          <EmptyState
+            icon={<ClipboardList className="h-9 w-9" />}
+            title="Nenhum pedido nesta seção"
+            hint={
+              term || selectedCustomer !== "all"
+                ? "Nenhum pedido corresponde à busca nesta etapa."
+                : "Assim que um pedido chegar nesta etapa ele aparece aqui."
+            }
+          />
         ) : (
-          <ul className="flex flex-col gap-3 px-4">
+          <ul className="flex flex-col gap-3">
             {currentGroup.list.map((o) => (
               <AdminOrderCard
                 key={o.id}
