@@ -72,8 +72,7 @@ function urlBase64ToArrayBuffer(value: string): ArrayBuffer {
 }
 
 async function subscribeToPush(phone: string): Promise<boolean> {
-  const digits = (phone || "").replace(/\D/g, "");
-  if (digits.length < 8 || typeof window === "undefined" || !("PushManager" in window)) return false;
+  if (typeof window === "undefined" || !("PushManager" in window)) return false;
 
   try {
     const keyResponse = await fetch("/api/public/push");
@@ -83,11 +82,12 @@ async function subscribeToPush(phone: string): Promise<boolean> {
     const registration = await registerPushServiceWorker();
     if (!registration) return false;
 
+    const applicationServerKey = urlBase64ToArrayBuffer(keyData.publicKey);
     let subscription = await registration.pushManager.getSubscription();
     if (!subscription) {
       subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(keyData.publicKey),
+        applicationServerKey,
       });
     }
 
