@@ -1,4 +1,4 @@
-import { createHmac, createPrivateKey, createSign, randomBytes, createCipheriv, createECDH } from "node:crypto";
+import { createHash, createHmac, createPrivateKey, createSign, randomBytes, createCipheriv, createECDH } from "node:crypto";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 function b64url(input: Buffer | Uint8Array): string {
@@ -72,7 +72,6 @@ export function encryptPayload(subscription: { p256dh: string; auth: string }, p
   const nonceInfo = Buffer.from("Content-Encoding: nonce\0");
   const key = hkdfExpand(contentPrk, keyInfo, 16);
   const nonce = hkdfExpand(contentPrk, nonceInfo, 12);
-  // RFC 8291 / RFC 8188: payload + delimiter 0x02, one record.
   const padded = Buffer.concat([Buffer.from(payload, "utf8"), Buffer.from([2])]);
   const cipher = createCipheriv("aes-128-gcm", key, nonce);
   const ciphertext = Buffer.concat([cipher.update(padded), cipher.final(), cipher.getAuthTag()]);
@@ -102,7 +101,6 @@ export async function savePushSubscription(phone: string, deviceId: string, subs
   if (!subscription.endpoint || !p256dh || !auth) throw new Error("Assinatura Push inválida.");
   const { data: customerId, error: customerError } = await supabaseAdmin.rpc("resolve_customer", { p_device_id: deviceId || "", p_phone: phone || "" });
   if (customerError || !customerId) throw new Error("Cliente não encontrado.");
-
   const { error } = await supabaseAdmin.from("push_subscriptions" as never).upsert({
     endpoint: subscription.endpoint, customer_id: customerId, device_id: deviceId || null, p256dh, auth, updated_at: new Date().toISOString(),
   } as never, { onConflict: "endpoint" });
@@ -121,7 +119,6 @@ export async function sendNotificationToAll(draft: { kind: string; title: string
     const { error: insertError } = await supabaseAdmin.from("customer_notifications").insert({ customer_id: customer.id, kind, title, body, target_url: targetUrl });
     if (!insertError) created++;
   }
-
   const { data: subscriptions, error: subError } = await supabaseAdmin.from("push_subscriptions" as never).select("id,endpoint,p256dh,auth").limit(5000) as never;
   if (subError) throw subError;
   let sent = 0;
