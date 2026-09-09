@@ -71,6 +71,15 @@ function urlBase64ToArrayBuffer(value: string): ArrayBuffer {
   return bytes.buffer;
 }
 
+function sameKey(a: ArrayBuffer | null | undefined, b: ArrayBuffer): boolean {
+  if (!a) return false;
+  const x = new Uint8Array(a);
+  const y = new Uint8Array(b);
+  if (x.length !== y.length) return false;
+  for (let i = 0; i < x.length; i++) if (x[i] !== y[i]) return false;
+  return true;
+}
+
 async function subscribeToPush(phone: string): Promise<boolean> {
   if (typeof window === "undefined" || !("PushManager" in window)) return false;
 
@@ -84,6 +93,18 @@ async function subscribeToPush(phone: string): Promise<boolean> {
 
     const applicationServerKey = urlBase64ToArrayBuffer(keyData.publicKey);
     let subscription = await registration.pushManager.getSubscription();
+
+    // Inscrição feita com um par VAPID antigo não é aceita pelo serviço de push:
+    // cancela e refaz com a chave atual.
+    if (subscription && !sameKey(subscription.options.applicationServerKey, applicationServerKey)) {
+      try {
+        await subscription.unsubscribe();
+      } catch {
+        /* segue e tenta reinscrever mesmo assim */
+      }
+      subscription = null;
+    }
+
     if (!subscription) {
       subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
