@@ -1166,17 +1166,25 @@ function ReceiptCard({ r }: { r: SimpleReceipt }) {
 function ReceiptsPanel() {
   const { data, isLoading, error, refetch, isFetching } = useReceipts();
 
+  const color = moduleById("recibos")?.color ?? BLUE;
   return (
-    <section className="rounded-3xl border-2 border-border bg-card p-4">
-      <div className="flex items-center justify-between gap-2">
-        <h2 className="text-xl font-black text-foreground">Recibos do Loyverse</h2>
-        <button
-          onClick={() => void refetch()}
-          className="rounded-xl bg-muted px-3 py-2 text-sm font-black text-foreground active:scale-95"
-        >
-          {isFetching ? "..." : "Atualizar"}
-        </button>
-      </div>
+    <section className="rounded-3xl border bg-card p-4 shadow-sm">
+      <ModuleHeader
+        color={color}
+        icon={<Receipt className="h-6 w-6" />}
+        title="Recibos Loyverse"
+        hint="Vendas registradas na loja física"
+        action={
+          <button
+            onClick={() => void refetch()}
+            className="rounded-2xl px-3 py-2 text-sm font-black text-white active:scale-95"
+            style={{ backgroundColor: color }}
+          >
+            {isFetching ? "..." : "Atualizar"}
+          </button>
+        }
+      />
+
 
       {isLoading && <p className="mt-3 text-base text-muted-foreground">Carregando vendas…</p>}
       {error && (
