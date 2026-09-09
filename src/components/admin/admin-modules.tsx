@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 import {
   ClipboardList,
-  CreditCard,
   LockKeyhole,
   PackageSearch,
   Receipt,
@@ -15,7 +14,6 @@ import {
 export type ModuleId =
   | "inicio"
   | "pedidos"
-  | "pagamentos"
   | "clientes"
   | "duplicidades"
   | "destaques"
