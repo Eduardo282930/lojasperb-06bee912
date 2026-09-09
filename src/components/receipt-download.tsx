@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Download, Eye, LoaderCircle } from "lucide-react";
+import { Download, Eye, LoaderCircle, Share2 } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { getOrderReceipt, type ReceiptData } from "@/lib/order-receipt.functions";
 import { formatPrice } from "@/lib/cart";
@@ -229,9 +229,11 @@ async function drawReceipt(r: ReceiptData): Promise<Blob | null> {
 export function ReceiptDownload({
   orderId,
   phone,
+  showWhatsApp = false,
 }: {
   orderId: string;
   phone: string;
+  showWhatsApp?: boolean;
 }) {
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState(false);
@@ -245,21 +247,26 @@ export function ReceiptDownload({
     };
   }, [previewUrl]);
 
+  async function prepareReceipt() {
+    if (previewUrl && receipt) return { url: previewUrl, data: receipt };
+
+    const data = await fetchReceipt({ data: { orderId, phone } });
+    if (!data || !data.ok) return null;
+    const receiptData = data as ReceiptData;
+    const blob = await drawReceipt(receiptData);
+    if (!blob) return null;
+    const url = URL.createObjectURL(blob);
+    setReceipt(receiptData);
+    setPreviewUrl(url);
+    return { url, data: receiptData };
+  }
+
   async function verRecibo() {
     if (busy) return;
-    if (previewUrl) {
-      setOpen(true);
-      return;
-    }
     setBusy(true);
     try {
-      const data = await fetchReceipt({ data: { orderId, phone } });
-      if (!data || !data.ok) return;
-      const blob = await drawReceipt(data as ReceiptData);
-      if (!blob) return;
-      const url = URL.createObjectURL(blob);
-      setReceipt(data as ReceiptData);
-      setPreviewUrl(url);
+      const prepared = await prepareReceipt();
+      if (!prepared) return;
       setOpen(true);
     } finally {
       setBusy(false);
@@ -272,6 +279,36 @@ export function ReceiptDownload({
     a.href = previewUrl;
     a.download = `recibo-${receipt.number}.png`;
     a.click();
+  }
+
+  async function enviarWhatsApp() {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const prepared = await prepareReceipt();
+      if (!prepared) return;
+
+      const response = await fetch(prepared.url);
+      const blob = await response.blob();
+      const file = new File([blob], `recibo-${prepared.data.number}.png`, { type: "image/png" });
+      const text = `Recibo SPERB · Pedido ${prepared.data.number}`;
+
+      if (navigator.share && navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], text, title: "Recibo SPERB" });
+        return;
+      }
+
+      const digits = phone.replace(/\D/g, "");
+      const target = digits.length >= 10
+        ? `https://wa.me/${digits.startsWith("55") ? digits : `55${digits}`}`
+        : "https://wa.me/";
+      window.open(target, "_blank", "noopener");
+      window.alert("Seu aparelho não permite anexar o recibo automaticamente. O recibo é exatamente o mesmo mostrado na tela; anexe a imagem no WhatsApp.");
+    } catch {
+      // Cancelar o compartilhamento não altera o recibo.
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -303,10 +340,18 @@ export function ReceiptDownload({
               />
             </div>
           )}
-          <Button type="button" size="lg" onClick={baixar} className="h-12 w-full text-base font-semibold">
-            <Download />
-            Baixar recibo
-          </Button>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <Button type="button" size="lg" onClick={baixar} className="h-12 w-full text-base font-semibold">
+              <Download />
+              Baixar recibo
+            </Button>
+            {showWhatsApp && (
+              <Button type="button" size="lg" variant="outline" onClick={() => void enviarWhatsApp()} className="h-12 w-full text-base font-semibold">
+                <Share2 />
+                Enviar recibo no WhatsApp
+              </Button>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </>
