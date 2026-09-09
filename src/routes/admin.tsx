@@ -63,7 +63,6 @@ import { useServerFn } from "@tanstack/react-start";
 import { retryLoyverseSync } from "@/lib/loyverse-sync.functions";
 import { runLoyverseQuickSync } from "@/lib/loyverse-reconcile.functions";
 import { useAdmin, adminSignIn, adminSignOut } from "@/lib/admin";
-import { paymentsStatus } from "@/lib/payments.functions";
 import { formatPrice } from "@/lib/cart";
 import { broadcastNotification } from "@/lib/notifications";
 import { fetchDevelopmentMode, setDevelopmentMode } from "@/lib/desenvolvimento";
@@ -150,7 +149,6 @@ function AdminPage() {
       {active === "estoque" && <StockPanel />}
       {active === "clientes" && <CustomersPanel />}
       {active === "destaques" && <FeaturedPanel />}
-      {active === "pagamentos" && <PaymentsPanel />}
       {active === "duplicidades" && <DuplicatesPanel />}
       {active === "desenvolvimento" && <DevelopmentPanel />}
     </AdminShell>
@@ -2098,51 +2096,6 @@ function FeaturedPanel() {
           })}
         </ul>
       )}
-    </div>
-  );
-}
-
-/* --------------------- Configurações · Pagamentos ---------------------- */
-
-function PaymentsPanel() {
-  const status = useQuery({
-    queryKey: ["payments-status"],
-    queryFn: () => paymentsStatus(),
-    staleTime: 60 * 1000,
-  });
-
-  const ok = status.data?.configured ?? false;
-
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="rounded-3xl border-2 border-border bg-card p-5">
-        <h2 className="text-xl font-black text-foreground">InfinitePay · Checkout</h2>
-        <p className="mt-1 text-base font-semibold text-muted-foreground">
-          Pagamento no app por Pix ou cartão. O pedido só vira venda depois da
-          confirmação real do pagamento.
-        </p>
-        <p
-          className="mt-3 inline-block rounded-2xl px-4 py-2 text-base font-black text-white"
-          style={{ backgroundColor: ok ? GREEN : RED }}
-        >
-          {status.isLoading
-            ? "Verificando…"
-            : ok
-              ? "Credenciais configuradas"
-              : "Credenciais pendentes"}
-        </p>
-        {ok && status.data?.handlePreview && (
-          <p className="mt-2 text-base font-bold text-muted-foreground">
-            InfiniteTag: {status.data.handlePreview}
-          </p>
-        )}
-        <ul className="mt-4 flex flex-col gap-1 text-base font-semibold text-muted-foreground">
-          <li>• As chaves ficam guardadas apenas no servidor (Secrets).</li>
-          <li>• Cada pedido usa um identificador único no InfinitePay.</li>
-          <li>• O aviso de pagamento é reconferido antes de liberar o pedido.</li>
-          <li>• Pago automaticamente muda o pedido para “Em preparação”.</li>
-        </ul>
-      </div>
     </div>
   );
 }
