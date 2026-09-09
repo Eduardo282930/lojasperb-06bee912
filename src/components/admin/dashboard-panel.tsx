@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   AlertTriangle,
@@ -6,14 +6,20 @@ import {
   CircleDollarSign,
   ClipboardList,
   PackageSearch,
+  TrendingUp,
   Truck,
-  UserSearch,
 } from "lucide-react";
 
-import { fetchOrders, fetchDuplicates, minutesLeftToPay, type Order } from "@/lib/orders";
+import {
+  fetchOrders,
+  fetchDuplicates,
+  confirmRefund,
+  minutesLeftToPay,
+  type Order,
+} from "@/lib/orders";
 import { fetchCatalog } from "@/lib/loyverse.functions";
 import { formatPrice } from "@/lib/cart";
-import { ADMIN_MODULES, HOME_COLOR, type ModuleId } from "./admin-modules";
+import { HOME_COLOR, type ModuleId } from "./admin-modules";
 import { StatCard } from "./admin-ui";
 
 function isToday(iso: string): boolean {
@@ -32,9 +38,16 @@ type ActionItem = {
   hint: string;
   color: string;
   target: ModuleId;
+  orderId?: string;
+  /** Pedido que pode ter o reembolso confirmado direto na linha. */
+  refundOrder?: Order;
 };
 
-export function DashboardPanel({ onOpen }: { onOpen: (id: ModuleId) => void }) {
+export function DashboardPanel({
+  onOpen,
+}: {
+  onOpen: (id: ModuleId, orderId?: string) => void;
+}) {
   const orders = useQuery({
     queryKey: ["admin-orders"],
     queryFn: fetchOrders,
@@ -50,14 +63,39 @@ export function DashboardPanel({ onOpen }: { onOpen: (id: ModuleId) => void }) {
     queryFn: () => fetchCatalog(),
     staleTime: 60 * 1000,
   });
+  const [busy, setBusy] = useState<string | null>(null);
 
   const list: Order[] = orders.data ?? [];
+
+  /** Custo de cada item, tirado do catálogo do Loyverse (por id ou SKU). */
+  const costByKey = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const p of catalog.data?.products ?? []) {
+      for (const v of p.variants) {
+        const cost = Number(v.cost) || 0;
+        if (v.id) map.set(String(v.id), cost);
+        if (v.sku) map.set(String(v.sku).toLowerCase(), cost);
+      }
+      if (p.sku) map.set(String(p.sku).toLowerCase(), Number(p.variants[0]?.cost) || 0);
+    }
+    return map;
+  }, [catalog.data]);
 
   const kpis = useMemo(() => {
     const paidToday = list.filter(
       (o) => o.paymentStatus === "paid" && o.status !== "canceled" && isToday(o.createdAt),
     );
     const salesToday = paidToday.reduce((sum, o) => sum + (o.total || 0), 0);
+    const profitToday = paidToday.reduce((sum, o) => {
+      const cost = o.items.reduce((inner, i) => {
+        const unit =
+          costByKey.get(String(i.id)) ??
+          (i.sku ? costByKey.get(String(i.sku).toLowerCase()) : undefined) ??
+          0;
+        return inner + unit * (i.qty || 1);
+      }, 0);
+      return sum + (o.total || 0) - cost;
+    }, 0);
     const toPay = list.filter(
       (o) => o.paymentStatus !== "paid" && o.status !== "canceled",
     );
@@ -68,12 +106,14 @@ export function DashboardPanel({ onOpen }: { onOpen: (id: ModuleId) => void }) {
     const deliveredToday = list.filter(
       (o) => o.status === "delivered" && isToday(o.updatedAt || o.createdAt),
     );
-    return { salesToday, paidToday, toPay, preparing, shipping, deliveredToday };
-  }, [list]);
+    return { salesToday, profitToday, paidToday, toPay, preparing, shipping, deliveredToday };
+  }, [list, costByKey]);
 
   const stock = useMemo(() => {
     const products = catalog.data?.products ?? [];
-    const out = products.filter((p) => p.variants.some((v) => v.stock <= 0)).length;
+    const out = products.filter(
+      (p) => p.variants.some((v) => v.stock <= 0) || !p.variants.some((v) => v.availableForSale),
+    ).length;
     const low = products.filter((p) => {
       const hasOut = p.variants.some((v) => v.stock <= 0);
       return !hasOut && p.variants.some((v) => v.stock > 0 && v.stock <= 2);
@@ -93,6 +133,7 @@ export function DashboardPanel({ onOpen }: { onOpen: (id: ModuleId) => void }) {
           hint: `Faltam ${mins} min · ${formatPrice(o.total)}`,
           color: "oklch(0.70 0.16 65)",
           target: "pedidos",
+          orderId: o.id,
         });
       }
     }
@@ -105,15 +146,20 @@ export function DashboardPanel({ onOpen }: { onOpen: (id: ModuleId) => void }) {
           hint: formatPrice(o.total),
           color: "oklch(0.55 0.22 255)",
           target: "pedidos",
+          orderId: o.id,
         });
       }
-      if (o.refundState && o.refundState !== "none" && o.refundState !== "confirmed") {
+      const pendingRefund =
+        o.status === "canceled" && o.refundState !== "refunded" && o.paymentStatus !== "refunded";
+      if (pendingRefund || (o.refundState === "money_pending")) {
         items.push({
           id: `refund-${o.id}`,
           title: `Reembolso pendente — ${o.customerName || "Cliente"}`,
           hint: `Confirme o estorno de ${formatPrice(o.total)}`,
           color: "oklch(0.58 0.22 25)",
           target: "pedidos",
+          orderId: o.id,
+          refundOrder: o,
         });
       }
     }
@@ -139,8 +185,19 @@ export function DashboardPanel({ onOpen }: { onOpen: (id: ModuleId) => void }) {
       });
     }
 
-    return items.slice(0, 8);
+    return items.slice(0, 10);
   }, [kpis.toPay, list, duplicates.data, stock.out]);
+
+  async function confirmarReembolso(o: Order) {
+    const nome = o.customerName || "cliente sem nome";
+    if (!window.confirm(`Você já devolveu o dinheiro do pedido ${o.id.slice(0, 8).toUpperCase()} de ${nome}?`)) return;
+    if (!window.confirm(`Tem certeza de que você realizou o reembolso do pedido ${o.id.slice(0, 8).toUpperCase()} de ${nome}?`)) return;
+    setBusy(o.id);
+    const ok = await confirmRefund(o.id, o.receiptUrl ?? "");
+    setBusy(null);
+    if (!ok) window.alert("Não foi possível registrar o reembolso.");
+    void orders.refetch();
+  }
 
   return (
     <div className="space-y-5">
@@ -148,13 +205,20 @@ export function DashboardPanel({ onOpen }: { onOpen: (id: ModuleId) => void }) {
         <p className="mb-2 px-1 text-[11px] font-black uppercase tracking-[0.1em] text-muted-foreground">
           Hoje
         </p>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-7">
           <StatCard
             label="Vendas hoje"
             value={formatPrice(kpis.salesToday)}
             hint={`${kpis.paidToday.length} pedido(s) pago(s)`}
             color="oklch(0.62 0.19 145)"
             icon={<CircleDollarSign className="h-4 w-4" />}
+          />
+          <StatCard
+            label="Lucro hoje"
+            value={formatPrice(kpis.profitToday)}
+            hint="Vendas menos o custo dos produtos"
+            color="oklch(0.52 0.20 275)"
+            icon={<TrendingUp className="h-4 w-4" />}
           />
           <StatCard
             label="A pagar"
@@ -210,11 +274,14 @@ export function DashboardPanel({ onOpen }: { onOpen: (id: ModuleId) => void }) {
         ) : (
           <ul className="space-y-2">
             {actions.map((a) => (
-              <li key={a.id}>
+              <li
+                key={a.id}
+                className="flex items-center gap-3 rounded-2xl border bg-card p-3.5 shadow-sm"
+              >
                 <button
                   type="button"
-                  onClick={() => onOpen(a.target)}
-                  className="flex w-full items-center gap-3 rounded-2xl border bg-card p-3.5 text-left shadow-sm transition-transform active:scale-[0.99]"
+                  onClick={() => onOpen(a.target, a.orderId)}
+                  className="flex min-w-0 flex-1 items-center gap-3 text-left"
                 >
                   <span
                     className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-white"
@@ -230,44 +297,31 @@ export function DashboardPanel({ onOpen }: { onOpen: (id: ModuleId) => void }) {
                       {a.hint}
                     </span>
                   </span>
-                  <span className="shrink-0 text-lg font-black text-muted-foreground">→</span>
                 </button>
+                {a.refundOrder ? (
+                  <button
+                    type="button"
+                    disabled={busy === a.refundOrder.id}
+                    onClick={() => void confirmarReembolso(a.refundOrder as Order)}
+                    className="shrink-0 rounded-xl px-3 py-2 text-xs font-black text-white disabled:opacity-60"
+                    style={{ backgroundColor: a.color }}
+                  >
+                    {busy === a.refundOrder.id ? "…" : "Confirmar reembolso"}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => onOpen(a.target, a.orderId)}
+                    aria-label="Abrir"
+                    className="shrink-0 text-lg font-black text-muted-foreground"
+                  >
+                    →
+                  </button>
+                )}
               </li>
             ))}
           </ul>
         )}
-      </section>
-
-      <section>
-        <p className="mb-2 px-1 text-[11px] font-black uppercase tracking-[0.1em] text-muted-foreground">
-          Módulos
-        </p>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
-          {ADMIN_MODULES.map((m) => (
-            <button
-              key={m.id}
-              type="button"
-              onClick={() => onOpen(m.id)}
-              className="flex min-h-[118px] flex-col items-start justify-between rounded-3xl border bg-card p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md active:scale-[0.98]"
-              style={{ borderColor: `color-mix(in oklab, ${m.color} 30%, transparent)` }}
-            >
-              <span
-                className="grid h-12 w-12 place-items-center rounded-2xl text-white shadow-sm"
-                style={{ backgroundColor: m.color }}
-              >
-                {m.icon}
-              </span>
-              <span className="mt-3 min-w-0">
-                <span className="block text-base font-black leading-tight text-foreground">
-                  {m.label}
-                </span>
-                <span className="mt-1 block text-xs font-semibold leading-4 text-muted-foreground">
-                  {m.hint}
-                </span>
-              </span>
-            </button>
-          ))}
-        </div>
       </section>
 
       <p className="px-1 text-xs font-semibold text-muted-foreground" style={{ color: HOME_COLOR }}>
