@@ -805,8 +805,10 @@ function StockPanel() {
     const term = search.trim().toLowerCase();
     return products
       .filter((p) => {
-        if (filter === "in") return p.stock > 0;
-        if (filter === "out") return p.stock <= 0;
+        if (filter === "in")
+          return p.stock > 0 && !p.variants.some((v) => v.stock <= 0 || !v.availableForSale);
+        if (filter === "out")
+          return p.variants.some((v) => v.stock <= 0 || !v.availableForSale);
         if (filter === "low") {
           // Estoque baixo da SPERB: qualquer variação com 1 ou 2 unidades.
           // Se houver alguma variação zerada, o produto pertence a "Sem estoque".
@@ -835,7 +837,7 @@ function StockPanel() {
         const profit = saleValue - costValue;
         const hasOutOfStockVariant = p.variants.some((v) => v.stock <= 0);
         const low = !hasOutOfStockVariant && p.variants.some((v) => v.stock > 0 && v.stock <= 2);
-        const out = hasOutOfStockVariant;
+        const out = hasOutOfStockVariant || p.variants.some((v) => !v.availableForSale);
         const active = p.variants.some((v) => v.availableForSale);
         return { product: p, costValue, saleValue, profit, low, out, active };
       });
@@ -868,7 +870,9 @@ function StockPanel() {
       const hasOutOfStockVariant = p.variants.some((v) => v.stock <= 0);
       return !hasOutOfStockVariant && p.variants.some((v) => v.stock > 0 && v.stock <= 2);
     }).length;
-    const out = products.filter((p) => p.variants.some((v) => v.stock <= 0)).length;
+    const out = products.filter((p) =>
+      p.variants.some((v) => v.stock <= 0 || !v.availableForSale),
+    ).length;
     const active = products.filter((p) => p.variants.some((v) => v.availableForSale)).length;
     return { totalUnits, costValue, saleValue, profit: saleValue - costValue, low, out, active };
   }, [products]);
@@ -896,40 +900,33 @@ function StockPanel() {
   return (
     <section className="space-y-4">
       <div
-        className="overflow-hidden rounded-[2rem] p-5 text-white shadow-sm sm:p-6"
+        className="overflow-hidden rounded-2xl px-4 py-3 text-white shadow-sm"
         style={{ backgroundColor: BLUE }}
       >
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-xs font-black uppercase tracking-[0.12em] text-white/75">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[11px] font-black uppercase tracking-[0.12em] text-white/75">
               Meu estoque
             </p>
-            <h2 className="mt-1 text-2xl font-black sm:text-3xl">Patrimônio em mercadoria</h2>
-            <p className="mt-1 text-sm font-semibold text-white/80">
-              Valores calculados a partir dos produtos e estoques do Loyverse.
-            </p>
+            <p className="text-base font-black leading-tight">Patrimônio em mercadoria</p>
           </div>
-          <button
-            type="button"
-            onClick={() => void catalog.refetch()}
-            className="rounded-2xl bg-white/15 px-3 py-2 text-sm font-black backdrop-blur active:scale-95"
-          >
-            {catalog.isFetching ? "…" : "Atualizar"}
-          </button>
-        </div>
-
-        <div className="mt-5 grid gap-2 sm:grid-cols-3">
-          <div className="rounded-2xl bg-white/10 p-4">
-            <p className="text-xs font-bold text-white/70">Custo do estoque</p>
-            <p className="mt-1 text-2xl font-black">{formatPrice(totals.costValue)}</p>
-          </div>
-          <div className="rounded-2xl bg-white/10 p-4">
-            <p className="text-xs font-bold text-white/70">Valor de venda</p>
-            <p className="mt-1 text-2xl font-black">{formatPrice(totals.saleValue)}</p>
-          </div>
-          <div className="rounded-2xl bg-white/10 p-4">
-            <p className="text-xs font-bold text-white/70">Lucro potencial</p>
-            <p className="mt-1 text-2xl font-black">{formatPrice(totals.profit)}</p>
+          <div className="flex flex-wrap items-center gap-4">
+            <span className="text-sm font-bold text-white/85">
+              Custo <b className="font-black text-white">{formatPrice(totals.costValue)}</b>
+            </span>
+            <span className="text-sm font-bold text-white/85">
+              Venda <b className="font-black text-white">{formatPrice(totals.saleValue)}</b>
+            </span>
+            <span className="text-sm font-bold text-white/85">
+              Lucro <b className="font-black text-white">{formatPrice(totals.profit)}</b>
+            </span>
+            <button
+              type="button"
+              onClick={() => void catalog.refetch()}
+              className="rounded-xl bg-white/15 px-3 py-1.5 text-sm font-black backdrop-blur active:scale-95"
+            >
+              {catalog.isFetching ? "…" : "Atualizar"}
+            </button>
           </div>
         </div>
       </div>
