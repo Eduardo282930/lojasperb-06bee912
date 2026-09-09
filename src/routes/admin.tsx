@@ -1471,9 +1471,21 @@ function CustomerDetail({
       {mineReceipts.length === 0 ? (
         <p className="text-muted-foreground">Nenhuma venda no Loyverse para este cliente.</p>
       ) : (
-        <ul className="mt-2 flex flex-col gap-2">
+        <ul className="mt-2 flex flex-col gap-1.5">
           {mineReceipts.map((r) => (
-            <ReceiptCard key={r.id} r={r} />
+            <li key={r.id} className="rounded-xl border border-border bg-background px-3 py-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="min-w-0 truncate text-sm font-black text-foreground">
+                  {r.number} · {new Date(r.date).toLocaleDateString("pt-BR")}
+                </span>
+                <span
+                  className="shrink-0 text-sm font-black"
+                  style={{ color: r.refunded ? RED : GREEN }}
+                >
+                  {formatPrice(r.total)}
+                </span>
+              </div>
+            </li>
           ))}
         </ul>
       )}
