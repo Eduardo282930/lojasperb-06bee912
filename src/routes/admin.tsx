@@ -63,7 +63,6 @@ import { useServerFn } from "@tanstack/react-start";
 import { retryLoyverseSync } from "@/lib/loyverse-sync.functions";
 import { runLoyverseQuickSync } from "@/lib/loyverse-reconcile.functions";
 import { useAdmin, adminSignIn, adminSignOut } from "@/lib/admin";
-import { paymentsStatus } from "@/lib/payments.functions";
 import { formatPrice } from "@/lib/cart";
 import { broadcastNotification } from "@/lib/notifications";
 import { fetchDevelopmentMode, setDevelopmentMode } from "@/lib/desenvolvimento";
@@ -126,7 +125,10 @@ function AdminPage() {
   const navigate = Route.useNavigate();
   const active: ModuleId = isModuleId(search.m) ? search.m : "inicio";
 
-  const open = (id: ModuleId) => {
+  const [focusOrderId, setFocusOrderId] = useState<string | null>(null);
+
+  const open = (id: ModuleId, orderId?: string) => {
+    setFocusOrderId(orderId ?? null);
     void navigate({ search: id === "inicio" ? {} : { m: id }, replace: false });
     if (typeof window !== "undefined") window.scrollTo({ top: 0 });
   };
@@ -144,13 +146,12 @@ function AdminPage() {
   return (
     <AdminShell active={active} onSelect={open} onSignOut={() => adminSignOut()}>
       {active === "inicio" && <DashboardPanel onOpen={open} />}
-      {active === "pedidos" && <OrdersPanel />}
+      {active === "pedidos" && <OrdersPanel focusOrderId={focusOrderId} />}
       {active === "cupons" && <CouponsPanel />}
       {active === "recibos" && <ReceiptsPanel />}
       {active === "estoque" && <StockPanel />}
       {active === "clientes" && <CustomersPanel />}
       {active === "destaques" && <FeaturedPanel />}
-      {active === "pagamentos" && <PaymentsPanel />}
       {active === "duplicidades" && <DuplicatesPanel />}
       {active === "desenvolvimento" && <DevelopmentPanel />}
     </AdminShell>
@@ -365,6 +366,7 @@ function CouponForm({
         : "percent",
   );
   const [notifyClients, setNotifyClients] = useState(false);
+  const [advanced, setAdvanced] = useState(false);
   const [error, setError] = useState("");
   const [ok, setOk] = useState(false);
   const isCoins = benefit === "coins";
@@ -568,6 +570,17 @@ function CouponForm({
         />
       )}
 
+      <button
+        type="button"
+        onClick={() => setAdvanced((v) => !v)}
+        className="flex items-center justify-between rounded-2xl border-2 border-border bg-background px-4 py-3 text-base font-black text-foreground"
+      >
+        <span>Opções avançadas</span>
+        <ChevronDown className={`h-5 w-5 transition-transform ${advanced ? "rotate-180" : ""}`} />
+      </button>
+
+      {advanced && (
+        <>
       <label className="flex items-center gap-3 text-lg font-bold text-foreground">
         <input
           type="checkbox"
@@ -667,6 +680,9 @@ function CouponForm({
         </>
       )}
 
+
+        </>
+      )}
 
       <button
         onClick={() => void submit()}
@@ -768,6 +784,7 @@ function CouponRow({ coupon: c, onChanged }: { coupon: Coupon; onChanged: () => 
 function CouponsPanel() {
   const coupons = useCoupons();
   const refresh = useCouponsRefresh();
+  const [creating, setCreating] = useState(false);
 
   const color = moduleById("cupons")?.color ?? BLUE;
   return (
@@ -777,12 +794,62 @@ function CouponsPanel() {
         icon={<Ticket className="h-6 w-6" />}
         title="Cupons"
         hint={`${coupons.length} cupom(ns) cadastrado(s)`}
+        action={
+          <button
+            type="button"
+            onClick={() => setCreating(true)}
+            className="inline-flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-black text-white active:scale-95"
+            style={{ backgroundColor: color }}
+          >
+            <Plus className="h-5 w-5" strokeWidth={3} />
+            Novo cupom
+          </button>
+        }
       />
+
       <section className="rounded-3xl border bg-card p-4 shadow-sm">
-        <CouponForm onSaved={() => void refresh()} />
-        <h3 className="mt-6 text-lg font-black text-foreground">Cupons cadastrados</h3>
-        <CouponList coupons={coupons} onChanged={() => void refresh()} />
+        {coupons.length === 0 ? (
+          <EmptyState
+            icon={<Ticket className="h-9 w-9" />}
+            title="Nenhum cupom ainda"
+            hint="Toque em “Novo cupom” para criar o primeiro."
+          />
+        ) : (
+          <CouponList coupons={coupons} onChanged={() => void refresh()} />
+        )}
       </section>
+
+      {creating && (
+        <div className="fixed inset-0 z-50 flex justify-end bg-black/40" onClick={() => setCreating(false)}>
+          <div
+            className="h-full w-full max-w-md overflow-y-auto bg-card p-5 shadow-2xl sm:rounded-l-3xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-black uppercase tracking-[0.1em]" style={{ color }}>
+                  Novo cupom
+                </p>
+                <h3 className="text-xl font-black text-foreground">Criar cupom</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCreating(false)}
+                className="rounded-2xl border border-border px-3 py-2 text-sm font-black text-foreground"
+              >
+                Fechar
+              </button>
+            </div>
+            <CouponForm
+              compact
+              onSaved={() => {
+                void refresh();
+                setCreating(false);
+              }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -804,8 +871,10 @@ function StockPanel() {
     const term = search.trim().toLowerCase();
     return products
       .filter((p) => {
-        if (filter === "in") return p.stock > 0;
-        if (filter === "out") return p.stock <= 0;
+        if (filter === "in")
+          return p.stock > 0 && !p.variants.some((v) => v.stock <= 0 || !v.availableForSale);
+        if (filter === "out")
+          return p.variants.some((v) => v.stock <= 0 || !v.availableForSale);
         if (filter === "low") {
           // Estoque baixo da SPERB: qualquer variação com 1 ou 2 unidades.
           // Se houver alguma variação zerada, o produto pertence a "Sem estoque".
@@ -834,7 +903,7 @@ function StockPanel() {
         const profit = saleValue - costValue;
         const hasOutOfStockVariant = p.variants.some((v) => v.stock <= 0);
         const low = !hasOutOfStockVariant && p.variants.some((v) => v.stock > 0 && v.stock <= 2);
-        const out = hasOutOfStockVariant;
+        const out = hasOutOfStockVariant || p.variants.some((v) => !v.availableForSale);
         const active = p.variants.some((v) => v.availableForSale);
         return { product: p, costValue, saleValue, profit, low, out, active };
       });
@@ -867,7 +936,9 @@ function StockPanel() {
       const hasOutOfStockVariant = p.variants.some((v) => v.stock <= 0);
       return !hasOutOfStockVariant && p.variants.some((v) => v.stock > 0 && v.stock <= 2);
     }).length;
-    const out = products.filter((p) => p.variants.some((v) => v.stock <= 0)).length;
+    const out = products.filter((p) =>
+      p.variants.some((v) => v.stock <= 0 || !v.availableForSale),
+    ).length;
     const active = products.filter((p) => p.variants.some((v) => v.availableForSale)).length;
     return { totalUnits, costValue, saleValue, profit: saleValue - costValue, low, out, active };
   }, [products]);
@@ -895,40 +966,33 @@ function StockPanel() {
   return (
     <section className="space-y-4">
       <div
-        className="overflow-hidden rounded-[2rem] p-5 text-white shadow-sm sm:p-6"
+        className="overflow-hidden rounded-2xl px-4 py-3 text-white shadow-sm"
         style={{ backgroundColor: BLUE }}
       >
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-xs font-black uppercase tracking-[0.12em] text-white/75">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[11px] font-black uppercase tracking-[0.12em] text-white/75">
               Meu estoque
             </p>
-            <h2 className="mt-1 text-2xl font-black sm:text-3xl">Patrimônio em mercadoria</h2>
-            <p className="mt-1 text-sm font-semibold text-white/80">
-              Valores calculados a partir dos produtos e estoques do Loyverse.
-            </p>
+            <p className="text-base font-black leading-tight">Patrimônio em mercadoria</p>
           </div>
-          <button
-            type="button"
-            onClick={() => void catalog.refetch()}
-            className="rounded-2xl bg-white/15 px-3 py-2 text-sm font-black backdrop-blur active:scale-95"
-          >
-            {catalog.isFetching ? "…" : "Atualizar"}
-          </button>
-        </div>
-
-        <div className="mt-5 grid gap-2 sm:grid-cols-3">
-          <div className="rounded-2xl bg-white/10 p-4">
-            <p className="text-xs font-bold text-white/70">Custo do estoque</p>
-            <p className="mt-1 text-2xl font-black">{formatPrice(totals.costValue)}</p>
-          </div>
-          <div className="rounded-2xl bg-white/10 p-4">
-            <p className="text-xs font-bold text-white/70">Valor de venda</p>
-            <p className="mt-1 text-2xl font-black">{formatPrice(totals.saleValue)}</p>
-          </div>
-          <div className="rounded-2xl bg-white/10 p-4">
-            <p className="text-xs font-bold text-white/70">Lucro potencial</p>
-            <p className="mt-1 text-2xl font-black">{formatPrice(totals.profit)}</p>
+          <div className="flex flex-wrap items-center gap-4">
+            <span className="text-sm font-bold text-white/85">
+              Custo <b className="font-black text-white">{formatPrice(totals.costValue)}</b>
+            </span>
+            <span className="text-sm font-bold text-white/85">
+              Venda <b className="font-black text-white">{formatPrice(totals.saleValue)}</b>
+            </span>
+            <span className="text-sm font-bold text-white/85">
+              Lucro <b className="font-black text-white">{formatPrice(totals.profit)}</b>
+            </span>
+            <button
+              type="button"
+              onClick={() => void catalog.refetch()}
+              className="rounded-xl bg-white/15 px-3 py-1.5 text-sm font-black backdrop-blur active:scale-95"
+            >
+              {catalog.isFetching ? "…" : "Atualizar"}
+            </button>
           </div>
         </div>
       </div>
@@ -1086,23 +1150,6 @@ function StockPanel() {
 
 /* ------------------------------- Recibos ------------------------------- */
 
-const WHATSAPP_COUNTRY = "55";
-
-function receiptText(r: SimpleReceipt): string {
-  const linhas = r.lines
-    .map((l) => `- ${l.name} x${l.quantity} — ${formatPrice(l.total)}`)
-    .join("\n");
-  const data = new Date(r.date).toLocaleString("pt-BR");
-  return `*Recibo SPERB*\nPedido: ${r.number}\nData: ${data}\nCliente: ${r.customerName}\n\n${linhas}\n\nTotal: ${formatPrice(r.total)}\n\nObrigado pela preferência!`;
-}
-
-function whatsappLink(r: SimpleReceipt): string | null {
-  const digits = onlyDigits(r.customerPhone);
-  if (digits.length < 10) return null;
-  const phone = digits.startsWith(WHATSAPP_COUNTRY) ? digits : `${WHATSAPP_COUNTRY}${digits}`;
-  return `https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(receiptText(r))}`;
-}
-
 function useReceipts() {
   return useQuery({
     queryKey: ["loyverse-receipts"],
@@ -1111,69 +1158,93 @@ function useReceipts() {
   });
 }
 
-function ReceiptCard({ r }: { r: SimpleReceipt }) {
-  const link = whatsappLink(r);
+function ReceiptRow({ order }: { order: Order }) {
+  const [open, setOpen] = useState(false);
+  const paid = order.paymentStatus === "paid";
+  const refunded = order.paymentStatus === "refunded" || order.refundState === "refunded";
   return (
-    <li className="rounded-2xl border border-border bg-background p-3">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="truncate text-base font-black text-foreground">{r.customerName}</p>
+    <li className="rounded-xl border border-border bg-background px-3 py-2">
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="flex min-w-0 flex-1 items-center gap-3 text-left"
+        >
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-sm font-black text-foreground">
+              {order.customerName || "Cliente sem nome"}
+            </span>
+            <span className="block truncate text-[11px] font-semibold text-muted-foreground">
+              {order.id.slice(0, 8).toUpperCase()} · {new Date(order.createdAt).toLocaleString("pt-BR")}
+            </span>
+          </span>
+          <span
+            className="shrink-0 text-sm font-black"
+            style={{ color: refunded ? RED : paid ? GREEN : "var(--muted-foreground)" }}
+          >
+            {formatPrice(order.total)}
+          </span>
+          <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
+        </button>
+      </div>
+      {open && (
+        <div className="mt-2 border-t border-border pt-2">
           <p className="text-xs font-semibold text-muted-foreground">
-            {r.number} · {new Date(r.date).toLocaleString("pt-BR")}
+            {displayStatusLabel(order)} · {paymentDisplayLabel(order)}
+            {order.customerPhone ? ` · ${order.customerPhone}` : ""}
           </p>
-          {r.refunded && (
-            <span
-              className="mt-1 inline-flex rounded-full px-2 py-0.5 text-xs font-black text-white"
-              style={{ backgroundColor: RED }}
-            >
-              Reembolsado no Loyverse
+          <ul className="mt-1 flex flex-col gap-0.5">
+            {order.items.map((l, i) => (
+              <li key={i} className="text-xs text-muted-foreground">
+                {l.qty}x {l.name} — {formatPrice(l.price * l.qty)}
+              </li>
+            ))}
+          </ul>
+          {refunded && (
+            <span className="mt-2 inline-flex rounded-full px-2 py-0.5 text-[11px] font-black text-white" style={{ backgroundColor: RED }}>
+              Reembolsado
             </span>
           )}
+          <div className="mt-2">
+            {paid || refunded ? (
+              <ReceiptDownload orderId={order.id} phone={order.customerPhone} showWhatsApp />
+            ) : (
+              <p className="text-xs font-bold text-muted-foreground">
+                O recibo fica disponível depois do pagamento.
+              </p>
+            )}
+          </div>
         </div>
-        <span
-          className="shrink-0 text-lg font-black"
-          style={{ color: r.refunded ? RED : GREEN }}
-        >
-          {formatPrice(r.total)}
-        </span>
-      </div>
-      <ul className="mt-2 flex flex-col gap-0.5">
-        {r.lines.map((l, i) => (
-          <li key={i} className="text-sm text-muted-foreground">
-            {l.quantity}x {l.name} — {formatPrice(l.total)}
-          </li>
-        ))}
-      </ul>
-      {link ? (
-        <a
-          href={link}
-          target="_blank"
-          rel="noreferrer"
-          className="mt-2 inline-flex rounded-xl px-3 py-2 text-sm font-black text-white"
-          style={{ backgroundColor: GREEN }}
-        >
-          Enviar recibo no WhatsApp
-        </a>
-      ) : (
-        <p className="mt-2 text-xs font-bold text-muted-foreground">
-          Cliente sem telefone cadastrado no Loyverse.
-        </p>
       )}
     </li>
   );
 }
 
 function ReceiptsPanel() {
-  const { data, isLoading, error, refetch, isFetching } = useReceipts();
-
+  const { data, isLoading, refetch, isFetching } = useQuery({
+    queryKey: ["admin-orders"],
+    queryFn: fetchOrders,
+    staleTime: 30 * 1000,
+  });
+  const [q, setQ] = useState("");
   const color = moduleById("recibos")?.color ?? BLUE;
+
+  const term = q.trim().toLowerCase();
+  const list = (data ?? []).filter((o) =>
+    !term
+      ? true
+      : (o.customerName ?? "").toLowerCase().includes(term) ||
+        onlyDigits(o.customerPhone).includes(onlyDigits(term)) ||
+        o.id.toLowerCase().includes(term),
+  );
+
   return (
     <section className="rounded-3xl border bg-card p-4 shadow-sm">
       <ModuleHeader
         color={color}
         icon={<Receipt className="h-6 w-6" />}
-        title="Recibos Loyverse"
-        hint="Vendas registradas na loja física"
+        title="Recibos"
+        hint={`${list.length} pedido(s)`}
         action={
           <button
             onClick={() => void refetch()}
@@ -1185,24 +1256,23 @@ function ReceiptsPanel() {
         }
       />
 
+      <Toolbar value={q} onChange={setQ} placeholder="Buscar por nome, telefone ou número" />
 
-      {isLoading && <p className="mt-3 text-base text-muted-foreground">Carregando vendas…</p>}
-      {error && (
-        <p className="mt-3 text-base font-bold" style={{ color: RED }}>
-          Não foi possível carregar os recibos do Loyverse.
-        </p>
+      {isLoading ? (
+        <p className="mt-3 text-base text-muted-foreground">Carregando pedidos…</p>
+      ) : list.length === 0 ? (
+        <EmptyState
+          icon={<Receipt className="h-9 w-9" />}
+          title="Nenhum recibo por aqui"
+          hint="Os recibos aparecem conforme os pedidos entram."
+        />
+      ) : (
+        <ul className="mt-3 flex flex-col gap-1.5">
+          {list.map((o) => (
+            <ReceiptRow key={o.id} order={o} />
+          ))}
+        </ul>
       )}
-      {data && (
-        <p className="mt-1 text-sm font-bold text-muted-foreground">
-          {data.length} venda(s) sincronizada(s).
-        </p>
-      )}
-
-      <ul className="mt-3 flex flex-col gap-2">
-        {(data ?? []).map((r) => (
-          <ReceiptCard key={r.id} r={r} />
-        ))}
-      </ul>
     </section>
   );
 }
@@ -1467,9 +1537,21 @@ function CustomerDetail({
       {mineReceipts.length === 0 ? (
         <p className="text-muted-foreground">Nenhuma venda no Loyverse para este cliente.</p>
       ) : (
-        <ul className="mt-2 flex flex-col gap-2">
+        <ul className="mt-2 flex flex-col gap-1.5">
           {mineReceipts.map((r) => (
-            <ReceiptCard key={r.id} r={r} />
+            <li key={r.id} className="rounded-xl border border-border bg-background px-3 py-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="min-w-0 truncate text-sm font-black text-foreground">
+                  {r.number} · {new Date(r.date).toLocaleDateString("pt-BR")}
+                </span>
+                <span
+                  className="shrink-0 text-sm font-black"
+                  style={{ color: r.refunded ? RED : GREEN }}
+                >
+                  {formatPrice(r.total)}
+                </span>
+              </div>
+            </li>
           ))}
         </ul>
       )}
@@ -1513,7 +1595,7 @@ function waitingLabel(iso: string): string {
   return `${Math.floor(hours / 24)} dias`;
 }
 
-function OrdersPanel() {
+function OrdersPanel({ focusOrderId }: { focusOrderId?: string | null }) {
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["admin-orders"],
     queryFn: fetchOrders,
@@ -1542,6 +1624,25 @@ function OrdersPanel() {
     return () => { alive = false; };
   }, [quickSync, refetch]);
 
+  useEffect(() => {
+    if (!focusOrderId) return;
+    const found = (data ?? []).find((o) => o.id === focusOrderId);
+    if (!found) return;
+    setQ(focusOrderId.slice(0, 8));
+    setActiveStatus(bucket(found));
+  }, [focusOrderId, data]);
+
+  const [touchX, setTouchX] = useState<number | null>(null);
+
+  function slideTo(dir: 1 | -1) {
+    const order: Array<"topay" | "preparing" | "shipping" | "delivered" | "canceled"> = [
+      "topay", "preparing", "shipping", "delivered", "canceled",
+    ];
+    const i = order.indexOf(activeStatus);
+    const next = order[Math.min(order.length - 1, Math.max(0, i + dir))];
+    if (next) setActiveStatus(next);
+  }
+
   async function change(o: Order, status: string) {
     setBusy(o.id);
     const ok = await setOrderStatus(o.id, status, "");
@@ -1565,13 +1666,11 @@ function OrdersPanel() {
     return Boolean(provider.includes("infinite") || o.paymentTransactionNsu || o.paymentSlug || o.paymentOrderNsu || o.receiptUrl);
   }
 
-  async function refundWithInfinitePay(o: Order) {
-    openInfinitePaySale(o);
-    const proof = window.prompt(
-      "Depois de devolver o dinheiro na InfinitePay, cole aqui o link do comprovante do reembolso (opcional):",
-      o.receiptUrl ?? "",
-    );
-    if (proof === null) return;
+  async function askTwiceAndConfirm(o: Order, proof: string) {
+    const num = o.id.slice(0, 8).toUpperCase();
+    const nome = o.customerName || "cliente sem nome";
+    if (!window.confirm(`Confirmar o reembolso do pedido ${num} de ${nome}?`)) return;
+    if (!window.confirm(`Tem certeza de que você realizou o reembolso do pedido ${num} de ${nome}?`)) return;
     setBusy(o.id);
     const ok = await confirmRefund(o.id, proof.trim());
     setBusy(null);
@@ -1579,14 +1678,13 @@ function OrdersPanel() {
     void refetch();
   }
 
+  async function refundWithInfinitePay(o: Order) {
+    openInfinitePaySale(o);
+    await askTwiceAndConfirm(o, o.receiptUrl ?? "");
+  }
+
   async function markRefunded(o: Order) {
-    const proof = window.prompt("Link do comprovante do reembolso (opcional):", "");
-    if (proof === null) return;
-    setBusy(o.id);
-    const ok = await confirmRefund(o.id, proof.trim());
-    setBusy(null);
-    if (!ok) window.alert("Não foi possível registrar o reembolso.");
-    void refetch();
+    await askTwiceAndConfirm(o, o.receiptUrl ?? "");
   }
 
   function openInfinitePaySale(o: Order) {
@@ -1712,7 +1810,15 @@ function OrdersPanel() {
         </div>
       </div>
 
-      <main>
+      <main
+        onTouchStart={(e) => setTouchX(e.touches[0]?.clientX ?? null)}
+        onTouchEnd={(e) => {
+          if (touchX === null) return;
+          const dx = (e.changedTouches[0]?.clientX ?? touchX) - touchX;
+          setTouchX(null);
+          if (Math.abs(dx) > 60) slideTo(dx < 0 ? 1 : -1);
+        }}
+      >
         {currentGroup.list.length === 0 ? (
           <EmptyState
             icon={<ClipboardList className="h-9 w-9" />}
@@ -1869,14 +1975,17 @@ function AdminOrderCard({
           {order.receiptUrl && <a href={order.receiptUrl} target="_blank" rel="noreferrer" className="underline" style={{ color: BLUE }}>Comprovante do pagamento</a>}
         </div>
 
-        {order.status === "canceled" && order.refundState !== "refunded" && (
+        {!refunded && (
           <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl bg-muted/50 p-3">
-            <span className="text-sm font-black" style={{ color: "oklch(0.72 0.17 62)" }}>Reembolso pendente de confirmação</span>
-            {isInfinitePayPaid ? (
-              <button type="button" disabled={busy} onClick={() => void onRefundInfinite(order)} className="rounded-xl px-3 py-2 text-sm font-black text-white" style={{ backgroundColor: BLUE }}>💳 Devolver dinheiro com InfinitePay</button>
-            ) : (
-              <button type="button" disabled={busy} onClick={() => void onMarkRefunded(order)} className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-black text-foreground">Confirmar reembolso</button>
+            {order.status === "canceled" && (
+              <span className="text-sm font-black" style={{ color: "oklch(0.72 0.17 62)" }}>
+                Reembolso pendente de confirmação
+              </span>
             )}
+            {isInfinitePayPaid && (
+              <button type="button" disabled={busy} onClick={() => void onRefundInfinite(order)} className="rounded-xl px-3 py-2 text-sm font-black text-white" style={{ backgroundColor: BLUE }}>💳 Devolver dinheiro com InfinitePay</button>
+            )}
+            <button type="button" disabled={busy} onClick={() => void onMarkRefunded(order)} className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-black text-foreground">Confirmar reembolso</button>
           </div>
         )}
 
@@ -2098,51 +2207,6 @@ function FeaturedPanel() {
           })}
         </ul>
       )}
-    </div>
-  );
-}
-
-/* --------------------- Configurações · Pagamentos ---------------------- */
-
-function PaymentsPanel() {
-  const status = useQuery({
-    queryKey: ["payments-status"],
-    queryFn: () => paymentsStatus(),
-    staleTime: 60 * 1000,
-  });
-
-  const ok = status.data?.configured ?? false;
-
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="rounded-3xl border-2 border-border bg-card p-5">
-        <h2 className="text-xl font-black text-foreground">InfinitePay · Checkout</h2>
-        <p className="mt-1 text-base font-semibold text-muted-foreground">
-          Pagamento no app por Pix ou cartão. O pedido só vira venda depois da
-          confirmação real do pagamento.
-        </p>
-        <p
-          className="mt-3 inline-block rounded-2xl px-4 py-2 text-base font-black text-white"
-          style={{ backgroundColor: ok ? GREEN : RED }}
-        >
-          {status.isLoading
-            ? "Verificando…"
-            : ok
-              ? "Credenciais configuradas"
-              : "Credenciais pendentes"}
-        </p>
-        {ok && status.data?.handlePreview && (
-          <p className="mt-2 text-base font-bold text-muted-foreground">
-            InfiniteTag: {status.data.handlePreview}
-          </p>
-        )}
-        <ul className="mt-4 flex flex-col gap-1 text-base font-semibold text-muted-foreground">
-          <li>• As chaves ficam guardadas apenas no servidor (Secrets).</li>
-          <li>• Cada pedido usa um identificador único no InfinitePay.</li>
-          <li>• O aviso de pagamento é reconferido antes de liberar o pedido.</li>
-          <li>• Pago automaticamente muda o pedido para “Em preparação”.</li>
-        </ul>
-      </div>
     </div>
   );
 }

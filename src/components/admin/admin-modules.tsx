@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 import {
   ClipboardList,
-  CreditCard,
   LockKeyhole,
   PackageSearch,
   Receipt,
@@ -15,7 +14,6 @@ import {
 export type ModuleId =
   | "inicio"
   | "pedidos"
-  | "pagamentos"
   | "clientes"
   | "duplicidades"
   | "destaques"
@@ -44,14 +42,6 @@ export const ADMIN_MODULES: AdminModule[] = [
     hint: "Status, pagamento e entrega",
     color: "oklch(0.55 0.22 255)",
     icon: <ClipboardList className={ICON} />,
-  },
-  {
-    id: "pagamentos",
-    label: "Pagamentos",
-    short: "Pagamentos",
-    hint: "InfinitePay: Pix e cartão",
-    color: "oklch(0.55 0.24 300)",
-    icon: <CreditCard className={ICON} />,
   },
   {
     id: "clientes",

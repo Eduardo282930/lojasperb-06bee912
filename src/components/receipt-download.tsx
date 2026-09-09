@@ -223,7 +223,7 @@ async function drawReceipt(r: ReceiptData): Promise<Blob | null> {
   y += 30;
   ctx.fillText(`Recibo ${r.number}`, center, y);
 
-  return await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+  return await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.95));
 }
 
 export function ReceiptDownload({
@@ -277,7 +277,7 @@ export function ReceiptDownload({
     if (!previewUrl || !receipt) return;
     const a = document.createElement("a");
     a.href = previewUrl;
-    a.download = `recibo-${receipt.number}.png`;
+    a.download = `recibo-${receipt.number}.jpg`;
     a.click();
   }
 
@@ -290,7 +290,7 @@ export function ReceiptDownload({
 
       const response = await fetch(prepared.url);
       const blob = await response.blob();
-      const file = new File([blob], `recibo-${prepared.data.number}.png`, { type: "image/png" });
+      const file = new File([blob], `recibo-${prepared.data.number}.jpg`, { type: "image/jpeg" });
       const text = `Recibo SPERB · Pedido ${prepared.data.number}`;
 
       if (navigator.share && navigator.canShare?.({ files: [file] })) {
