@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import {
   ClipboardList,
+  Bell,
   LockKeyhole,
   PackageSearch,
   Receipt,
@@ -18,6 +19,7 @@ export type ModuleId =
   | "duplicidades"
   | "destaques"
   | "cupons"
+  | "notificacoes"
   | "estoque"
   | "recibos"
   | "desenvolvimento";
@@ -74,6 +76,14 @@ export const ADMIN_MODULES: AdminModule[] = [
     hint: "Criar, editar e desativar",
     color: "oklch(0.62 0.20 350)",
     icon: <Ticket className={ICON} />,
+  },
+  {
+    id: "notificacoes",
+    label: "Notificações",
+    short: "Avisos",
+    hint: "Enviar avisos aos clientes",
+    color: "oklch(0.60 0.20 250)",
+    icon: <Bell className={ICON} />,
   },
   {
     id: "estoque",
