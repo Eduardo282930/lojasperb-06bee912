@@ -20,6 +20,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as ProdutoIdRouteImport } from './routes/produto.$id'
 import { Route as ApiPublicSyncStockRouteImport } from './routes/api/public/sync-stock'
 import { Route as ApiPublicSyncCatalogRouteImport } from './routes/api/public/sync-catalog'
+import { Route as ApiPublicPushRouteImport } from './routes/api/public/push'
 import { Route as ApiPublicManifestRouteImport } from './routes/api/public/manifest'
 import { Route as ApiPublicLoyverseWebhookRouteImport } from './routes/api/public/loyverse-webhook'
 import { Route as ApiPublicLoyverseReconcileRouteImport } from './routes/api/public/loyverse-reconcile'
@@ -27,7 +28,6 @@ import { Route as ApiPublicInfinitepayWebhookRouteImport } from './routes/api/pu
 import { Route as ApiPublicExpireReservationsRouteImport } from './routes/api/public/expire-reservations'
 import { Route as ApiPublicEnsureWebhooksRouteImport } from './routes/api/public/ensure-webhooks'
 import { Route as ApiPublicCleanupRouteImport } from './routes/api/public/cleanup'
-import { Route as ApiPublicPushRouteImport } from './routes/api/public/push'
 
 const SacolaRoute = SacolaRouteImport.update({
   id: '/sacola',
@@ -84,6 +84,11 @@ const ApiPublicSyncCatalogRoute = ApiPublicSyncCatalogRouteImport.update({
   path: '/api/public/sync-catalog',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicPushRoute = ApiPublicPushRouteImport.update({
+  id: '/api/public/push',
+  path: '/api/public/push',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicManifestRoute = ApiPublicManifestRouteImport.update({
   id: '/api/public/manifest',
   path: '/api/public/manifest',
@@ -118,11 +123,6 @@ const ApiPublicEnsureWebhooksRoute = ApiPublicEnsureWebhooksRouteImport.update({
   path: '/api/public/ensure-webhooks',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiPublicPushRoute = ApiPublicPushRouteImport.update({
-  id: '/api/public/push',
-  path: '/api/public/push',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ApiPublicCleanupRoute = ApiPublicCleanupRouteImport.update({
   id: '/api/public/cleanup',
   path: '/api/public/cleanup',
@@ -140,13 +140,13 @@ export interface FileRoutesByFullPath {
   '/sacola': typeof SacolaRoute
   '/produto/$id': typeof ProdutoIdRoute
   '/api/public/cleanup': typeof ApiPublicCleanupRoute
-  '/api/public/push': typeof ApiPublicPushRoute
   '/api/public/ensure-webhooks': typeof ApiPublicEnsureWebhooksRoute
   '/api/public/expire-reservations': typeof ApiPublicExpireReservationsRoute
   '/api/public/infinitepay-webhook': typeof ApiPublicInfinitepayWebhookRoute
   '/api/public/loyverse-reconcile': typeof ApiPublicLoyverseReconcileRoute
   '/api/public/loyverse-webhook': typeof ApiPublicLoyverseWebhookRoute
   '/api/public/manifest': typeof ApiPublicManifestRoute
+  '/api/public/push': typeof ApiPublicPushRoute
   '/api/public/sync-catalog': typeof ApiPublicSyncCatalogRoute
   '/api/public/sync-stock': typeof ApiPublicSyncStockRoute
 }
@@ -161,13 +161,13 @@ export interface FileRoutesByTo {
   '/sacola': typeof SacolaRoute
   '/produto/$id': typeof ProdutoIdRoute
   '/api/public/cleanup': typeof ApiPublicCleanupRoute
-  '/api/public/push': typeof ApiPublicPushRoute
   '/api/public/ensure-webhooks': typeof ApiPublicEnsureWebhooksRoute
   '/api/public/expire-reservations': typeof ApiPublicExpireReservationsRoute
   '/api/public/infinitepay-webhook': typeof ApiPublicInfinitepayWebhookRoute
   '/api/public/loyverse-reconcile': typeof ApiPublicLoyverseReconcileRoute
   '/api/public/loyverse-webhook': typeof ApiPublicLoyverseWebhookRoute
   '/api/public/manifest': typeof ApiPublicManifestRoute
+  '/api/public/push': typeof ApiPublicPushRoute
   '/api/public/sync-catalog': typeof ApiPublicSyncCatalogRoute
   '/api/public/sync-stock': typeof ApiPublicSyncStockRoute
 }
@@ -183,13 +183,13 @@ export interface FileRoutesById {
   '/sacola': typeof SacolaRoute
   '/produto/$id': typeof ProdutoIdRoute
   '/api/public/cleanup': typeof ApiPublicCleanupRoute
-  '/api/public/push': typeof ApiPublicPushRoute
   '/api/public/ensure-webhooks': typeof ApiPublicEnsureWebhooksRoute
   '/api/public/expire-reservations': typeof ApiPublicExpireReservationsRoute
   '/api/public/infinitepay-webhook': typeof ApiPublicInfinitepayWebhookRoute
   '/api/public/loyverse-reconcile': typeof ApiPublicLoyverseReconcileRoute
   '/api/public/loyverse-webhook': typeof ApiPublicLoyverseWebhookRoute
   '/api/public/manifest': typeof ApiPublicManifestRoute
+  '/api/public/push': typeof ApiPublicPushRoute
   '/api/public/sync-catalog': typeof ApiPublicSyncCatalogRoute
   '/api/public/sync-stock': typeof ApiPublicSyncStockRoute
 }
@@ -206,13 +206,13 @@ export interface FileRouteTypes {
     | '/sacola'
     | '/produto/$id'
     | '/api/public/cleanup'
-    | '/api/public/push'
     | '/api/public/ensure-webhooks'
     | '/api/public/expire-reservations'
     | '/api/public/infinitepay-webhook'
     | '/api/public/loyverse-reconcile'
     | '/api/public/loyverse-webhook'
     | '/api/public/manifest'
+    | '/api/public/push'
     | '/api/public/sync-catalog'
     | '/api/public/sync-stock'
   fileRoutesByTo: FileRoutesByTo
@@ -227,13 +227,13 @@ export interface FileRouteTypes {
     | '/sacola'
     | '/produto/$id'
     | '/api/public/cleanup'
-    | '/api/public/push'
     | '/api/public/ensure-webhooks'
     | '/api/public/expire-reservations'
     | '/api/public/infinitepay-webhook'
     | '/api/public/loyverse-reconcile'
     | '/api/public/loyverse-webhook'
     | '/api/public/manifest'
+    | '/api/public/push'
     | '/api/public/sync-catalog'
     | '/api/public/sync-stock'
   id:
@@ -248,13 +248,13 @@ export interface FileRouteTypes {
     | '/sacola'
     | '/produto/$id'
     | '/api/public/cleanup'
-    | '/api/public/push'
     | '/api/public/ensure-webhooks'
     | '/api/public/expire-reservations'
     | '/api/public/infinitepay-webhook'
     | '/api/public/loyverse-reconcile'
     | '/api/public/loyverse-webhook'
     | '/api/public/manifest'
+    | '/api/public/push'
     | '/api/public/sync-catalog'
     | '/api/public/sync-stock'
   fileRoutesById: FileRoutesById
@@ -276,6 +276,7 @@ export interface RootRouteChildren {
   ApiPublicLoyverseReconcileRoute: typeof ApiPublicLoyverseReconcileRoute
   ApiPublicLoyverseWebhookRoute: typeof ApiPublicLoyverseWebhookRoute
   ApiPublicManifestRoute: typeof ApiPublicManifestRoute
+  ApiPublicPushRoute: typeof ApiPublicPushRoute
   ApiPublicSyncCatalogRoute: typeof ApiPublicSyncCatalogRoute
   ApiPublicSyncStockRoute: typeof ApiPublicSyncStockRoute
 }
@@ -359,6 +360,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicSyncCatalogRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/push': {
+      id: '/api/public/push'
+      path: '/api/public/push'
+      fullPath: '/api/public/push'
+      preLoaderRoute: typeof ApiPublicPushRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/manifest': {
       id: '/api/public/manifest'
       path: '/api/public/manifest'
@@ -408,13 +416,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicCleanupRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/push': {
-      id: '/api/public/push'
-      path: '/api/public/push'
-      fullPath: '/api/public/push'
-      preLoaderRoute: typeof ApiPublicPushRouteImport
-      parentRoute: typeof rootRouteImport
-    }
   }
 }
 
@@ -429,13 +430,13 @@ const rootRouteChildren: RootRouteChildren = {
   SacolaRoute: SacolaRoute,
   ProdutoIdRoute: ProdutoIdRoute,
   ApiPublicCleanupRoute: ApiPublicCleanupRoute,
-  ApiPublicPushRoute: ApiPublicPushRoute,
   ApiPublicEnsureWebhooksRoute: ApiPublicEnsureWebhooksRoute,
   ApiPublicExpireReservationsRoute: ApiPublicExpireReservationsRoute,
   ApiPublicInfinitepayWebhookRoute: ApiPublicInfinitepayWebhookRoute,
   ApiPublicLoyverseReconcileRoute: ApiPublicLoyverseReconcileRoute,
   ApiPublicLoyverseWebhookRoute: ApiPublicLoyverseWebhookRoute,
   ApiPublicManifestRoute: ApiPublicManifestRoute,
+  ApiPublicPushRoute: ApiPublicPushRoute,
   ApiPublicSyncCatalogRoute: ApiPublicSyncCatalogRoute,
   ApiPublicSyncStockRoute: ApiPublicSyncStockRoute,
 }

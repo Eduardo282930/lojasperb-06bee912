@@ -62,16 +62,17 @@ async function registerPushServiceWorker(): Promise<ServiceWorkerRegistration | 
   }
 }
 
-function urlBase64ToUint8Array(value: string): Uint8Array {
+function urlBase64ToArrayBuffer(value: string): ArrayBuffer {
   const padding = "=".repeat((4 - (value.length % 4)) % 4);
   const base64 = (value + padding).replace(/-/g, "+").replace(/_/g, "/");
   const raw = atob(base64);
-  return Uint8Array.from(raw, (c) => c.charCodeAt(0));
+  const bytes = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+  return bytes.buffer;
 }
 
 async function subscribeToPush(phone: string): Promise<boolean> {
-  const digits = (phone || "").replace(/\D/g, "");
-  if (digits.length < 8 || typeof window === "undefined" || !("PushManager" in window)) return false;
+  if (typeof window === "undefined" || !("PushManager" in window)) return false;
 
   try {
     const keyResponse = await fetch("/api/public/push");
@@ -81,11 +82,12 @@ async function subscribeToPush(phone: string): Promise<boolean> {
     const registration = await registerPushServiceWorker();
     if (!registration) return false;
 
+    const applicationServerKey = urlBase64ToArrayBuffer(keyData.publicKey);
     let subscription = await registration.pushManager.getSubscription();
     if (!subscription) {
       subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(keyData.publicKey),
+        applicationServerKey,
       });
     }
 
@@ -181,7 +183,9 @@ export function useNotificationWatcher(phone: string) {
   return query;
 }
 
-export async function sendAdminPushNotification(draft: PushNotificationDraft): Promise<{ count: number; error?: string }> {
+export async function sendAdminPushNotification(
+  draft: PushNotificationDraft,
+): Promise<{ count: number; total?: number; failed?: number; detail?: string; error?: string }> {
   try {
     const { data } = await supabase.auth.getSession();
     const token = data.session?.access_token;
@@ -195,11 +199,22 @@ export async function sendAdminPushNotification(draft: PushNotificationDraft): P
       },
       body: JSON.stringify({ action: "send", ...draft }),
     });
-    const payload = (await response.json().catch(() => ({}))) as { count?: number; error?: string };
-    if (!response.ok) return { count: 0, error: payload.error || "Não foi possível enviar." };
-    return { count: Number(payload.count ?? 0) };
-  } catch {
-    return { count: 0, error: "Não foi possível conectar ao servidor." };
+    const payload = (await response.json().catch(() => ({}))) as {
+      count?: number;
+      total?: number;
+      failed?: number;
+      detail?: string;
+      error?: string;
+    };
+    if (!response.ok) return { count: 0, error: payload.error || `Falha no servidor (${response.status}).` };
+    return {
+      count: Number(payload.count ?? 0),
+      total: Number(payload.total ?? 0),
+      failed: Number(payload.failed ?? 0),
+      detail: payload.detail,
+    };
+  } catch (error) {
+    return { count: 0, error: error instanceof Error ? error.message : "Não foi possível conectar ao servidor." };
   }
 }
 
