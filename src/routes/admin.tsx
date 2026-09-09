@@ -78,9 +78,15 @@ import {
   sectionLabel,
   type FeaturedSection,
 } from "@/lib/merchandising";
+import { AdminShell } from "@/components/admin/admin-shell";
+import { DashboardPanel } from "@/components/admin/dashboard-panel";
+import { isModuleId, moduleById, type ModuleId } from "@/components/admin/admin-modules";
+import { ModuleHeader, Toolbar, FilterPill, EmptyState } from "@/components/admin/admin-ui";
 
 export const Route = createFileRoute("/admin")({
   ssr: false,
+  validateSearch: (s: Record<string, unknown>): { m?: ModuleId } =>
+    isModuleId(s["m"]) ? { m: s["m"] } : {},
   head: () => ({
     meta: [
       { title: "Administração — SPERB" },
