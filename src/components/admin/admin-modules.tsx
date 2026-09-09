@@ -46,14 +46,6 @@ export const ADMIN_MODULES: AdminModule[] = [
     icon: <ClipboardList className={ICON} />,
   },
   {
-    id: "pagamentos",
-    label: "Pagamentos",
-    short: "Pagamentos",
-    hint: "InfinitePay: Pix e cartão",
-    color: "oklch(0.55 0.24 300)",
-    icon: <CreditCard className={ICON} />,
-  },
-  {
     id: "clientes",
     label: "Clientes",
     short: "Clientes",

@@ -277,7 +277,7 @@ export function ReceiptDownload({
     if (!previewUrl || !receipt) return;
     const a = document.createElement("a");
     a.href = previewUrl;
-    a.download = `recibo-${receipt.number}.png`;
+    a.download = `recibo-${receipt.number}.jpg`;
     a.click();
   }
 
