@@ -12,6 +12,13 @@ export type AppNotification = {
   createdAt: string;
 };
 
+export type PushNotificationDraft = {
+  kind: string;
+  title: string;
+  body: string;
+  targetUrl: string;
+};
+
 const SEEN_KEY = "sperb:notifications:pushed";
 
 export async function fetchNotifications(phone: string): Promise<AppNotification[]> {
@@ -45,11 +52,68 @@ export function notificationPermission(): NotificationPermission | "unsupported"
   return notificationsSupported() ? Notification.permission : "unsupported";
 }
 
-/** Pede permissão para mostrar avisos na barra de notificações do celular. */
-export async function askNotificationPermission(): Promise<NotificationPermission | "unsupported"> {
+async function registerPushServiceWorker(): Promise<ServiceWorkerRegistration | null> {
+  if (typeof window === "undefined" || !("serviceWorker" in navigator)) return null;
+  try {
+    const registration = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+    return await navigator.serviceWorker.ready;
+  } catch {
+    return null;
+  }
+}
+
+function urlBase64ToUint8Array(value: string): Uint8Array {
+  const padding = "=".repeat((4 - (value.length % 4)) % 4);
+  const base64 = (value + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = atob(base64);
+  return Uint8Array.from(raw, (c) => c.charCodeAt(0));
+}
+
+async function subscribeToPush(phone: string): Promise<boolean> {
+  const digits = (phone || "").replace(/\D/g, "");
+  if (digits.length < 8 || typeof window === "undefined" || !("PushManager" in window)) return false;
+
+  try {
+    const keyResponse = await fetch("/api/public/push");
+    const keyData = (await keyResponse.json()) as { publicKey?: string };
+    if (!keyResponse.ok || !keyData.publicKey) return false;
+
+    const registration = await registerPushServiceWorker();
+    if (!registration) return false;
+
+    let subscription = await registration.pushManager.getSubscription();
+    if (!subscription) {
+      subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(keyData.publicKey),
+      });
+    }
+
+    const response = await fetch("/api/public/push", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        action: "subscribe",
+        phone,
+        deviceId: deviceId(),
+        subscription: subscription.toJSON(),
+      }),
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+/** Pede permissão e registra este aparelho para Push real. */
+export async function askNotificationPermission(phone = ""): Promise<NotificationPermission | "unsupported"> {
   if (!notificationsSupported()) return "unsupported";
   try {
-    return await Notification.requestPermission();
+    const permission = await Notification.requestPermission();
+    if (permission === "granted") {
+      await subscribeToPush(phone);
+    }
+    return permission;
   } catch {
     return Notification.permission;
   }
@@ -75,13 +139,12 @@ function storeSeen(ids: Set<string>) {
 function emoji(kind: string): string {
   if (kind === "coins") return "🪙 ";
   if (kind === "coupon") return "🎟️ ";
+  if (kind === "offer") return "🔥 ";
+  if (kind === "product") return "🛍️ ";
   return "🔔 ";
 }
 
-/**
- * Mostra na barra de notificações do celular os avisos novos (moedas e cupons).
- * Usa a Notification API do navegador — sem servidor de push, sem duplicar avisos.
- */
+/** Fallback para avisos antigos/automáticos enquanto o Push estiver indisponível. */
 export function useNotificationWatcher(phone: string) {
   const digits = (phone || "").replace(/\D/g, "");
   const query = useQuery({
@@ -118,18 +181,43 @@ export function useNotificationWatcher(phone: string) {
   return query;
 }
 
+export async function sendAdminPushNotification(draft: PushNotificationDraft): Promise<{ count: number; error?: string }> {
+  try {
+    const { data } = await supabase.auth.getSession();
+    const token = data.session?.access_token;
+    if (!token) return { count: 0, error: "Sessão de administrador não encontrada." };
+
+    const response = await fetch("/api/public/push", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ action: "send", ...draft }),
+    });
+    const payload = (await response.json().catch(() => ({}))) as { count?: number; error?: string };
+    if (!response.ok) return { count: 0, error: payload.error || "Não foi possível enviar." };
+    return { count: Number(payload.count ?? 0) };
+  } catch {
+    return { count: 0, error: "Não foi possível conectar ao servidor." };
+  }
+}
+
 /** Estado da permissão para uso na interface. */
-export function useNotificationPermission() {
+
+export function useNotificationPermission(phone = "") {
   const [state, setState] = useState<NotificationPermission | "unsupported">("default");
   const [justEnabled, setJustEnabled] = useState(false);
   useEffect(() => {
-    setState(notificationPermission());
-  }, []);
+    const current = notificationPermission();
+    setState(current);
+    if (current === "granted") void subscribeToPush(phone);
+  }, [phone]);
   return {
     state,
     justEnabled,
     async request() {
-      const next = await askNotificationPermission();
+      const next = await askNotificationPermission(phone);
       setState(next);
       if (next === "granted") {
         setJustEnabled(true);
