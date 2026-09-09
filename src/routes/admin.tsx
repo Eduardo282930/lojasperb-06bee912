@@ -366,6 +366,7 @@ function CouponForm({
         : "percent",
   );
   const [notifyClients, setNotifyClients] = useState(false);
+  const [advanced, setAdvanced] = useState(false);
   const [error, setError] = useState("");
   const [ok, setOk] = useState(false);
   const isCoins = benefit === "coins";
@@ -569,6 +570,17 @@ function CouponForm({
         />
       )}
 
+      <button
+        type="button"
+        onClick={() => setAdvanced((v) => !v)}
+        className="flex items-center justify-between rounded-2xl border-2 border-border bg-background px-4 py-3 text-base font-black text-foreground"
+      >
+        <span>Opções avançadas</span>
+        <ChevronDown className={`h-5 w-5 transition-transform ${advanced ? "rotate-180" : ""}`} />
+      </button>
+
+      {advanced && (
+        <>
       <label className="flex items-center gap-3 text-lg font-bold text-foreground">
         <input
           type="checkbox"
@@ -668,6 +680,9 @@ function CouponForm({
         </>
       )}
 
+
+        </>
+      )}
 
       <button
         onClick={() => void submit()}
@@ -769,6 +784,7 @@ function CouponRow({ coupon: c, onChanged }: { coupon: Coupon; onChanged: () => 
 function CouponsPanel() {
   const coupons = useCoupons();
   const refresh = useCouponsRefresh();
+  const [creating, setCreating] = useState(false);
 
   const color = moduleById("cupons")?.color ?? BLUE;
   return (
@@ -778,12 +794,62 @@ function CouponsPanel() {
         icon={<Ticket className="h-6 w-6" />}
         title="Cupons"
         hint={`${coupons.length} cupom(ns) cadastrado(s)`}
+        action={
+          <button
+            type="button"
+            onClick={() => setCreating(true)}
+            className="inline-flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-black text-white active:scale-95"
+            style={{ backgroundColor: color }}
+          >
+            <Plus className="h-5 w-5" strokeWidth={3} />
+            Novo cupom
+          </button>
+        }
       />
+
       <section className="rounded-3xl border bg-card p-4 shadow-sm">
-        <CouponForm onSaved={() => void refresh()} />
-        <h3 className="mt-6 text-lg font-black text-foreground">Cupons cadastrados</h3>
-        <CouponList coupons={coupons} onChanged={() => void refresh()} />
+        {coupons.length === 0 ? (
+          <EmptyState
+            icon={<Ticket className="h-9 w-9" />}
+            title="Nenhum cupom ainda"
+            hint="Toque em “Novo cupom” para criar o primeiro."
+          />
+        ) : (
+          <CouponList coupons={coupons} onChanged={() => void refresh()} />
+        )}
       </section>
+
+      {creating && (
+        <div className="fixed inset-0 z-50 flex justify-end bg-black/40" onClick={() => setCreating(false)}>
+          <div
+            className="h-full w-full max-w-md overflow-y-auto bg-card p-5 shadow-2xl sm:rounded-l-3xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-black uppercase tracking-[0.1em]" style={{ color }}>
+                  Novo cupom
+                </p>
+                <h3 className="text-xl font-black text-foreground">Criar cupom</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCreating(false)}
+                className="rounded-2xl border border-border px-3 py-2 text-sm font-black text-foreground"
+              >
+                Fechar
+              </button>
+            </div>
+            <CouponForm
+              compact
+              onSaved={() => {
+                void refresh();
+                setCreating(false);
+              }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
