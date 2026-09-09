@@ -1543,6 +1543,25 @@ function OrdersPanel({ focusOrderId }: { focusOrderId?: string | null }) {
     return () => { alive = false; };
   }, [quickSync, refetch]);
 
+  useEffect(() => {
+    if (!focusOrderId) return;
+    const found = (data ?? []).find((o) => o.id === focusOrderId);
+    if (!found) return;
+    setQ(focusOrderId.slice(0, 8));
+    setActiveStatus(bucket(found));
+  }, [focusOrderId, data]);
+
+  const [touchX, setTouchX] = useState<number | null>(null);
+
+  function slideTo(dir: 1 | -1) {
+    const order: Array<"topay" | "preparing" | "shipping" | "delivered" | "canceled"> = [
+      "topay", "preparing", "shipping", "delivered", "canceled",
+    ];
+    const i = order.indexOf(activeStatus);
+    const next = order[Math.min(order.length - 1, Math.max(0, i + dir))];
+    if (next) setActiveStatus(next);
+  }
+
   async function change(o: Order, status: string) {
     setBusy(o.id);
     const ok = await setOrderStatus(o.id, status, "");
@@ -1710,7 +1729,15 @@ function OrdersPanel({ focusOrderId }: { focusOrderId?: string | null }) {
         </div>
       </div>
 
-      <main>
+      <main
+        onTouchStart={(e) => setTouchX(e.touches[0]?.clientX ?? null)}
+        onTouchEnd={(e) => {
+          if (touchX === null) return;
+          const dx = (e.changedTouches[0]?.clientX ?? touchX) - touchX;
+          setTouchX(null);
+          if (Math.abs(dx) > 60) slideTo(dx < 0 ? 1 : -1);
+        }}
+      >
         {currentGroup.list.length === 0 ? (
           <EmptyState
             icon={<ClipboardList className="h-9 w-9" />}
@@ -1867,14 +1894,17 @@ function AdminOrderCard({
           {order.receiptUrl && <a href={order.receiptUrl} target="_blank" rel="noreferrer" className="underline" style={{ color: BLUE }}>Comprovante do pagamento</a>}
         </div>
 
-        {order.status === "canceled" && order.refundState !== "refunded" && (
+        {!refunded && (
           <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl bg-muted/50 p-3">
-            <span className="text-sm font-black" style={{ color: "oklch(0.72 0.17 62)" }}>Reembolso pendente de confirmação</span>
-            {isInfinitePayPaid ? (
-              <button type="button" disabled={busy} onClick={() => void onRefundInfinite(order)} className="rounded-xl px-3 py-2 text-sm font-black text-white" style={{ backgroundColor: BLUE }}>💳 Devolver dinheiro com InfinitePay</button>
-            ) : (
-              <button type="button" disabled={busy} onClick={() => void onMarkRefunded(order)} className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-black text-foreground">Confirmar reembolso</button>
+            {order.status === "canceled" && (
+              <span className="text-sm font-black" style={{ color: "oklch(0.72 0.17 62)" }}>
+                Reembolso pendente de confirmação
+              </span>
             )}
+            {isInfinitePayPaid && (
+              <button type="button" disabled={busy} onClick={() => void onRefundInfinite(order)} className="rounded-xl px-3 py-2 text-sm font-black text-white" style={{ backgroundColor: BLUE }}>💳 Devolver dinheiro com InfinitePay</button>
+            )}
+            <button type="button" disabled={busy} onClick={() => void onMarkRefunded(order)} className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-black text-foreground">Confirmar reembolso</button>
           </div>
         )}
 
