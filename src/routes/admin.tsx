@@ -65,6 +65,7 @@ import { runLoyverseQuickSync } from "@/lib/loyverse-reconcile.functions";
 import { useAdmin, adminSignIn, adminSignOut } from "@/lib/admin";
 import { formatPrice } from "@/lib/cart";
 import { broadcastNotification } from "@/lib/notifications";
+import { NotificationsPanel } from "@/components/admin/notifications-panel";
 import { fetchDevelopmentMode, setDevelopmentMode } from "@/lib/desenvolvimento";
 import { fetchCatalog, type CatalogProduct } from "@/lib/loyverse.functions";
 import { useLiveInvalidate } from "@/lib/live";
@@ -148,6 +149,7 @@ function AdminPage() {
       {active === "inicio" && <DashboardPanel onOpen={open} />}
       {active === "pedidos" && <OrdersPanel focusOrderId={focusOrderId} />}
       {active === "cupons" && <CouponsPanel />}
+      {active === "notificacoes" && <NotificationsPanel />}
       {active === "recibos" && <ReceiptsPanel />}
       {active === "estoque" && <StockPanel />}
       {active === "clientes" && <CustomersPanel />}
