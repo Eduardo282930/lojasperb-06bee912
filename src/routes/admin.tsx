@@ -769,13 +769,21 @@ function CouponsPanel() {
   const coupons = useCoupons();
   const refresh = useCouponsRefresh();
 
+  const color = moduleById("cupons")?.color ?? BLUE;
   return (
-    <section className="rounded-3xl border-2 border-border bg-card p-4">
-      <h2 className="text-xl font-black text-foreground">Cupons dos clientes SPERB</h2>
-      <CouponForm onSaved={() => void refresh()} />
-      <h3 className="mt-6 text-lg font-black text-foreground">Cupons cadastrados</h3>
-      <CouponList coupons={coupons} onChanged={() => void refresh()} />
-    </section>
+    <div>
+      <ModuleHeader
+        color={color}
+        icon={<Ticket className="h-6 w-6" />}
+        title="Cupons"
+        hint={`${coupons.length} cupom(ns) cadastrado(s)`}
+      />
+      <section className="rounded-3xl border bg-card p-4 shadow-sm">
+        <CouponForm onSaved={() => void refresh()} />
+        <h3 className="mt-6 text-lg font-black text-foreground">Cupons cadastrados</h3>
+        <CouponList coupons={coupons} onChanged={() => void refresh()} />
+      </section>
+    </div>
   );
 }
 
