@@ -183,7 +183,9 @@ export function useNotificationWatcher(phone: string) {
   return query;
 }
 
-export async function sendAdminPushNotification(draft: PushNotificationDraft): Promise<{ count: number; error?: string }> {
+export async function sendAdminPushNotification(
+  draft: PushNotificationDraft,
+): Promise<{ count: number; total?: number; failed?: number; detail?: string; error?: string }> {
   try {
     const { data } = await supabase.auth.getSession();
     const token = data.session?.access_token;
@@ -197,11 +199,22 @@ export async function sendAdminPushNotification(draft: PushNotificationDraft): P
       },
       body: JSON.stringify({ action: "send", ...draft }),
     });
-    const payload = (await response.json().catch(() => ({}))) as { count?: number; error?: string };
-    if (!response.ok) return { count: 0, error: payload.error || "Não foi possível enviar." };
-    return { count: Number(payload.count ?? 0) };
-  } catch {
-    return { count: 0, error: "Não foi possível conectar ao servidor." };
+    const payload = (await response.json().catch(() => ({}))) as {
+      count?: number;
+      total?: number;
+      failed?: number;
+      detail?: string;
+      error?: string;
+    };
+    if (!response.ok) return { count: 0, error: payload.error || `Falha no servidor (${response.status}).` };
+    return {
+      count: Number(payload.count ?? 0),
+      total: Number(payload.total ?? 0),
+      failed: Number(payload.failed ?? 0),
+      detail: payload.detail,
+    };
+  } catch (error) {
+    return { count: 0, error: error instanceof Error ? error.message : "Não foi possível conectar ao servidor." };
   }
 }
 
