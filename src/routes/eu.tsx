@@ -75,7 +75,7 @@ function EuPage() {
   const profile = useProfile();
   const { isAdmin } = useAdmin();
   const [editing, setEditing] = useState(false);
-  const notify = useNotificationPermission();
+  const notify = useNotificationPermission(profile.phone);
   useNotificationWatcher(profile.phone);
 
   const claimedList = useClaimedCoupons(profile.phone).data ?? [];
