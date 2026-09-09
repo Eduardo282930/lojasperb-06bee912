@@ -500,6 +500,7 @@ export type Database = {
           read_at: string | null
           store_key: string
           title: string
+          target_url: string
         }
         Insert: {
           body?: string
@@ -510,6 +511,7 @@ export type Database = {
           read_at?: string | null
           store_key?: string
           title?: string
+          target_url?: string
         }
         Update: {
           body?: string
@@ -520,6 +522,7 @@ export type Database = {
           read_at?: string | null
           store_key?: string
           title?: string
+          target_url?: string
         }
         Relationships: [
           {
@@ -530,6 +533,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      push_subscriptions: {
+        Row: {
+          id: string
+          store_key: string
+          customer_id: string
+          device_id: string | null
+          endpoint: string
+          p256dh: string
+          auth: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          store_key?: string
+          customer_id: string
+          device_id?: string | null
+          endpoint: string
+          p256dh: string
+          auth: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          store_key?: string
+          customer_id?: string
+          device_id?: string | null
+          endpoint?: string
+          p256dh?: string
+          auth?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       customers: {
         Row: {
