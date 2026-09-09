@@ -47,9 +47,14 @@ export function NotificationsPanel() {
       setMessage(result.error);
       return;
     }
-    setMessage(result.count > 0
-      ? `Notificação enviada para ${result.count} aparelho(s).`
-      : "Nenhum cliente com notificações Push ativadas foi encontrado.");
+    if (result.count > 0) {
+      setMessage(`Notificação enviada para ${result.count} aparelho(s).`);
+    } else if ((result.total ?? 0) === 0) {
+      setMessage("Nenhum cliente com notificações ativadas foi encontrado ainda.");
+    } else {
+      setMessage(`Nenhum envio concluído (${result.failed ?? 0} falha(s)). ${result.detail ?? ""}`.trim());
+      return;
+    }
     setTitle("");
     setBody("");
   }
