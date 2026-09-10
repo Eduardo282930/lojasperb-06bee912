@@ -282,7 +282,7 @@ function SacolaPage() {
 
 /** Ativação dos avisos: aparece só no Carrinho e na tela Eu. */
 function NotificationsBanner() {
-  const { profile } = useProfile();
+  const profile = useProfile();
   const { state, request } = useNotificationPermission(profile.phone);
 
   if (state === "unsupported") return null;
