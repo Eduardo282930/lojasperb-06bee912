@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { savePushSubscription, sendNotificationToAll, sendNotificationToCustomer } from "@/lib/web-push.server";
+import { notifyOrderEvent, savePushSubscription, sendNotificationToAll, sendNotificationToCustomer } from "@/lib/web-push.server";
+import type { OrderPushEvent } from "@/lib/web-push.server";
 
 async function body(request: Request) {
   try { return await request.json() as Record<string, unknown>; } catch { return {}; }
@@ -63,6 +64,25 @@ export const Route = createFileRoute("/api/public/push")({
           const { error } = await supabaseAdmin.from("push_history" as never).delete().eq("id", id as never);
           if (error) return Response.json({ error: `Não foi possível excluir: ${error.message}` }, { status: 500 });
           return Response.json({ ok: true });
+        }
+
+        // Aviso automático de pedido: um caminho único, sem duplicar envios.
+        if (action === "order-event") {
+          const denied = await requireAdmin(request);
+          if (denied) return denied;
+          const orderId = String(data.orderId ?? "").trim();
+          const event = String(data.event ?? "") as OrderPushEvent;
+          const allowed: OrderPushEvent[] = ["paid", "shipping", "delivered", "canceled_unpaid", "canceled_seller"];
+          if (!orderId || !allowed.includes(event)) {
+            return Response.json({ error: "Evento de pedido inválido." }, { status: 400 });
+          }
+          try {
+            const result = await notifyOrderEvent(orderId, event, { reason: String(data.reason ?? "") });
+            return Response.json(result);
+          } catch (error) {
+            console.error("[push] order-event", error);
+            return Response.json({ error: error instanceof Error ? error.message : "Falha ao avisar o cliente." }, { status: 500 });
+          }
         }
 
         if (action === "send-order") {
