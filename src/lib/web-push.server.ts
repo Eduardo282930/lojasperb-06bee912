@@ -157,14 +157,45 @@ export async function savePushSubscription(
   const auth = subscription?.keys?.auth ?? "";
   if (!subscription?.endpoint || !p256dh || !auth) throw new Error("Assinatura Push inválida.");
 
+  // O aparelho só pode ficar vinculado ao cliente que está logado.
+  // Primeiro usamos o resolvedor já existente. Se ele não retornar o ID,
+  // fazemos uma segunda tentativa pelo telefone do perfil autenticado.
   let customerId: string | null = null;
   try {
-    const { data } = await supabaseAdmin.rpc("resolve_customer", { p_device_id: deviceId || "", p_phone: phone || "" });
+    const { data } = await supabaseAdmin.rpc("resolve_customer", {
+      p_device_id: deviceId || "",
+      p_phone: phone || "",
+    });
     customerId = (data as string | null) ?? null;
   } catch {
     customerId = null;
   }
 
+  if (!customerId && phone) {
+    const normalizedPhone = phone.replace(/\D/g, "");
+    const { data: customer } = await supabaseAdmin
+      .from("customers")
+      .select("id,phone")
+      .eq("phone", phone)
+      .maybeSingle();
+
+    if (customer?.id) {
+      customerId = customer.id;
+    } else if (normalizedPhone) {
+      const { data: customers } = await supabaseAdmin
+        .from("customers")
+        .select("id,phone")
+        .limit(5000);
+      const match = (customers ?? []).find((item) =>
+        String(item.phone ?? "").replace(/\D/g, "") === normalizedPhone,
+      );
+      customerId = match?.id ?? null;
+    }
+  }
+
+  // Sem cliente identificado, não associamos a inscrição a outro cliente.
+  // Ela pode continuar existindo para o envio administrativo geral, mas
+  // notificações automáticas de pedidos só usam inscrições com customer_id.
   const { error } = await supabaseAdmin.from("push_subscriptions" as never).upsert(
     {
       endpoint: subscription.endpoint,
@@ -185,7 +216,18 @@ export async function sendNotificationToCustomer(customerId: string, draft: { ki
   const title = draft.title.trim();
   const body = draft.body.trim();
   const targetUrl = draft.targetUrl?.startsWith("/") ? draft.targetUrl : "/";
-  const { data: subscriptions } = (await supabaseAdmin.from("push_subscriptions" as never).select("id,endpoint,p256dh,auth").eq("customer_id", customerId) as never) as { data: Array<{ id:string; endpoint:string; p256dh:string; auth:string }> | null };
+  const { data: subscriptions, error: subscriptionError } = (await supabaseAdmin
+    .from("push_subscriptions" as never)
+    .select("id,endpoint,p256dh,auth")
+    .eq("customer_id", customerId) as never) as {
+    data: Array<{ id: string; endpoint: string; p256dh: string; auth: string }> | null;
+    error: { message: string } | null;
+  };
+
+  if (subscriptionError) {
+    throw new Error(`Não foi possível localizar o aparelho do cliente: ${subscriptionError.message}`);
+  }
+
   let sent = 0;
   const stale: string[] = [];
   for (const sub of subscriptions ?? []) {
