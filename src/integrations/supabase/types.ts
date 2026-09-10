@@ -243,8 +243,6 @@ export type Database = {
           active?: boolean
           starts_at?: string | null
           expires_at?: string | null
-          starts_at?: string | null
-          expires_at?: string | null
           code: string
           created_at?: string
           customer_id?: string | null
@@ -268,6 +266,8 @@ export type Database = {
         }
         Update: {
           active?: boolean
+          starts_at?: string | null
+          expires_at?: string | null
           code?: string
           created_at?: string
           customer_id?: string | null
