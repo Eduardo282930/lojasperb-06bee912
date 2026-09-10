@@ -222,6 +222,8 @@ export function NotificationsPanel() {
       <p className="px-1 text-xs font-semibold leading-5 text-muted-foreground">
         O cliente precisa ter permitido as notificações no celular. O envio usa Push real e não depende do aplicativo estar aberto.
       </p>
+
+      <PushHistory />
     </div>
   );
 }
