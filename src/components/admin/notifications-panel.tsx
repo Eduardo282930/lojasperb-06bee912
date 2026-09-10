@@ -122,6 +122,7 @@ const DESTINATIONS = [
 ] as const;
 
 export function NotificationsPanel() {
+  const queryClient = useQueryClient();
   const [kind, setKind] = useState("offer");
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
