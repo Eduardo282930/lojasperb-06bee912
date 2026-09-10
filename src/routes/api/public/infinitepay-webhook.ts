@@ -36,11 +36,15 @@ export const Route = createFileRoute("/api/public/infinitepay-webhook")({
         // (fluxo antigo) ou o `payment_nsu` gravado depois da criação.
         const { data: found } = await supabaseAdmin
           .from("orders")
-          .select("id")
+          .select("id,payment_status")
           .or(`id.eq.${orderNsu},payment_nsu.eq.${orderNsu}`)
           .limit(1)
           .maybeSingle();
         if (!found) return new Response("order not found", { status: 400 });
+
+        // O webhook pode chegar várias vezes: só é transição real quando o
+        // pedido ainda não estava pago.
+        const wasPaid = String((found as { payment_status?: string }).payment_status ?? "") === "paid";
 
         const { error } = await supabaseAdmin.rpc("confirm_order_payment", {
           p_order_id: found.id,
@@ -68,6 +72,16 @@ export const Route = createFileRoute("/api/public/infinitepay-webhook")({
           p_slug: slug,
           p_receipt_url: String(payload["receipt_url"] ?? ""),
         });
+
+        // Aviso somente ao cliente dono do pedido, e apenas na transição real.
+        if (!wasPaid) {
+          try {
+            const { notifyOrderEvent } = await import("@/lib/web-push.server");
+            await notifyOrderEvent(found.id, "paid");
+          } catch (err) {
+            console.error("[infinitepay] aviso de pagamento", err);
+          }
+        }
 
         // Pagamento confirmado: a reserva vira venda real no Loyverse.
         // Idempotente: se o recibo já existe, nada é criado de novo.

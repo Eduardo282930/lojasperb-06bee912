@@ -54,10 +54,13 @@ export const Route = createFileRoute("/pedidos")({
       : "topay";
 
     const checkout = String(search["checkout"] ?? "") === "1";
+    const order = String(search["order"] ?? "");
 
-    return checkout
-      ? { status, checkout: true as const }
-      : { status };
+    return {
+      status,
+      ...(checkout ? { checkout: true as const } : {}),
+      ...(order ? { order } : {}),
+    };
   },
 
   head: () => ({
@@ -150,11 +153,24 @@ function refundMessage(order: Order): string | null {
 function OrderCard({
   order,
   phone,
+  autoOpen,
 }: {
   order: Order;
   phone: string;
+  autoOpen?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(Boolean(autoOpen));
+  const cardRef = useRef<HTMLLIElement | null>(null);
+
+  // Vindo de uma notificação: abre e mostra exatamente este pedido.
+  useEffect(() => {
+    if (!autoOpen) return;
+    setOpen(true);
+    const timer = window.setTimeout(() => {
+      cardRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [autoOpen]);
   const [paying, setPaying] = useState(false);
 
   const startCheckout = useServerFn(createOrderCheckout);
@@ -214,7 +230,7 @@ function OrderCard({
   }
 
   return (
-    <li className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+    <li ref={cardRef} className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
       <div className="p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
@@ -458,7 +474,7 @@ function PedidosPage() {
     { table: "order_status_history", keys: [["order-timeline"]] },
   ]);
   const profile = useProfile();
-  const { status, checkout } = Route.useSearch();
+  const { status, checkout, order: focusOrderId } = Route.useSearch();
   const navigate = Route.useNavigate();
 
   const [lastOrderId, setLastOrderId] = useState("");
@@ -1368,6 +1384,10 @@ function PedidosPage() {
                               }
                               phone={
                                 profile.phone
+                              }
+                              autoOpen={
+                                order.id ===
+                                focusOrderId
                               }
                             />
                           ),

@@ -16,6 +16,8 @@ export type Order = {
   updatedAt: string;
   customerName: string;
   customerPhone: string;
+  /** Cliente cadastrado dono do pedido (usado para avisar só ele). */
+  customerId?: string | null;
   couponCode: string;
   items: OrderItem[];
   subtotal: number;
@@ -185,6 +187,7 @@ export async function fetchOrders(): Promise<Order[]> {
     updatedAt: (r as { updated_at?: string }).updated_at ?? r.created_at,
     customerName: r.customer_name ?? "",
     customerPhone: r.customer_phone ?? "",
+    customerId: (r as { customer_id?: string | null }).customer_id ?? null,
     couponCode: r.coupon_code ?? "",
     items: toItems(r.items),
     subtotal: num(r.subtotal),

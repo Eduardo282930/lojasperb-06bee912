@@ -36,6 +36,10 @@ export type Coupon = {
 
   /** When set, the coupon is exclusive to this customer's phone. */
   customerPhone: string | null;
+  /** Agendamento automático: quando o cupom começa a valer (null = já vale). */
+  startsAt: string | null;
+  /** Agendamento automático: quando o cupom deixa de valer (null = sem prazo). */
+  expiresAt: string | null;
 };
 
 export type Profile = {
@@ -91,6 +95,8 @@ function toCoupon(r: CouponRow): Coupon {
     uses: r.uses ?? 0,
     active: r.active,
     customerPhone: r.customer_phone ?? null,
+    startsAt: (r as { starts_at?: string | null }).starts_at ?? null,
+    expiresAt: (r as { expires_at?: string | null }).expires_at ?? null,
   };
 }
 
@@ -196,6 +202,8 @@ export async function saveCoupon(coupon: Coupon): Promise<void> {
     customer_phone: coupon.customerPhone
       ? coupon.customerPhone.replace(/\D/g, "")
       : null,
+    starts_at: coupon.startsAt ?? null,
+    expires_at: coupon.expiresAt ?? null,
   };
 
   if (coupon.id) {
@@ -253,7 +261,11 @@ export function isExhausted(c: Coupon): boolean {
 }
 
 export function isAvailable(c: Coupon): boolean {
-  return c.active && !isExhausted(c);
+  if (!c.active || isExhausted(c)) return false;
+  const now = Date.now();
+  if (c.startsAt && new Date(c.startsAt).getTime() > now) return false;
+  if (c.expiresAt && new Date(c.expiresAt).getTime() < now) return false;
+  return true;
 }
 
 /** Marks one use of the coupon (called when the order is sent). Global. */
