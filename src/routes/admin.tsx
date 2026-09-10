@@ -1704,32 +1704,22 @@ function OrdersPanel({ focusOrderId }: { focusOrderId?: string | null }) {
     }
     setBusy(o.id);
     const ok = await setOrderStatus(o.id, status, "", note);
-    if (ok && o.customerId) {
-      const session = await (await import("@/integrations/supabase/client")).supabase.auth.getSession();
-      const token = session.data.session?.access_token;
-      if (token) {
-        let title = "";
-        let body = "";
-        let targetUrl = "/pedidos";
-        if (o.paymentStatus !== "paid" && status === "preparing") {
-          title = "Pagamento confirmado!";
-          body = o.origin === "store" ? "Seu pedido realizado na loja foi confirmado e o pagamento já está certinho. 💙" : "Seu pagamento foi confirmado e seu pedido já está sendo preparado. 💙";
-          targetUrl = `/pedidos?status=preparing&order=${o.id}`;
-        } else if (status === "shipping") {
-          title = "🚚 Eba! Seu pedido está a caminho!";
-          body = "Já estamos levando seu pedido até você! 💙";
-          targetUrl = `/pedidos?status=shipping&order=${o.id}`;
-        } else if (status === "delivered") {
-          title = o.origin === "store" ? "🎉 Pedido finalizado!" : "📦 Pedido entregue!";
-          body = o.origin === "store" ? "Seu pedido foi concluído com sucesso. Obrigado por comprar com a SPERB! 💙" : "Verifique todos os itens e confira se está tudo certinho. Se tiver qualquer problema, fale conosco pelo WhatsApp.";
-          targetUrl = `/pedidos?status=delivered&order=${o.id}`;
-        } else if (status === "canceled") {
-          title = "❌ Pedido cancelado";
-          body = o.paymentStatus !== "paid" ? "O prazo para pagamento terminou e o pedido foi cancelado automaticamente." : `Seu pedido foi cancelado pelo vendedor. Motivo: ${note}.`;
-          targetUrl = `/pedidos?status=canceled&order=${o.id}`;
-        }
-        if (title) {
-          await fetch("/api/public/push", { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${token}` }, body: JSON.stringify({ action: "send-order", customerId: o.customerId, kind: "order", title, body, targetUrl }) }).catch(() => null);
+    // O aviso sai por um caminho único no servidor, que nunca repete o mesmo evento.
+    if (ok) {
+      let event = "";
+      if (o.paymentStatus !== "paid" && status === "preparing") event = "paid";
+      else if (status === "shipping") event = "shipping";
+      else if (status === "delivered") event = "delivered";
+      else if (status === "canceled") event = o.paymentStatus !== "paid" ? "canceled_unpaid" : "canceled_seller";
+      if (event) {
+        const session = await (await import("@/integrations/supabase/client")).supabase.auth.getSession();
+        const token = session.data.session?.access_token;
+        if (token) {
+          await fetch("/api/public/push", {
+            method: "POST",
+            headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+            body: JSON.stringify({ action: "order-event", orderId: o.id, event, reason: note }),
+          }).catch(() => null);
         }
       }
     }
