@@ -268,19 +268,12 @@ export async function sendAdminPushNotification(
 ): Promise<{ count: number; total?: number; failed?: number; detail?: string; error?: string }> {
   try {
     const { ok, data: payload } = await adminFetch({ action: "send", ...draft });
-    const payload = (await response.json().catch(() => ({}))) as {
-      count?: number;
-      total?: number;
-      failed?: number;
-      detail?: string;
-      error?: string;
-    };
-    if (!response.ok) return { count: 0, error: payload.error || `Falha no servidor (${response.status}).` };
+    if (!ok) return { count: 0, error: String(payload.error ?? "Falha no servidor.") };
     return {
       count: Number(payload.count ?? 0),
       total: Number(payload.total ?? 0),
       failed: Number(payload.failed ?? 0),
-      detail: payload.detail,
+      detail: payload.detail ? String(payload.detail) : undefined,
     };
   } catch (error) {
     return { count: 0, error: error instanceof Error ? error.message : "Não foi possível conectar ao servidor." };
