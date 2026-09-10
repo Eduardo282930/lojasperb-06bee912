@@ -218,8 +218,6 @@ export async function sendNotificationToAll(draft: { kind: string; title: string
         body,
         url: targetUrl,
         tag: `${kind}-${Date.now()}`,
-        icon: "/favicon.svg",
-        badge: "/favicon.svg",
       });
       if (response.ok) sent++;
       else {
