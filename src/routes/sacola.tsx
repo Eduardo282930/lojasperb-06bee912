@@ -3,6 +3,8 @@ import { useState } from "react";
 import { Minus, Plus, Trash2, Check, ShoppingCart } from "lucide-react";
 import { StoreLogoWithFallback } from "@/components/store-logo";
 import { BackButton } from "@/components/back-button";
+import { useProfile } from "@/lib/coupons";
+import { useNotificationPermission } from "@/lib/notifications";
 import { useCart, updateQty, formatPrice, priceValue, clearCart, applyFreshCart } from "@/lib/cart";
 import { SELECTION_KEY } from "@/lib/checkout-selection";
 import { createStockHold, releaseStockHold } from "@/lib/stock";
@@ -103,6 +105,8 @@ function SacolaPage() {
       </header>
 
       <main className="mx-auto max-w-3xl px-4 pt-4">
+        <NotificationsBanner />
+
         {cart.length === 0 ? (
           <div className="mt-8 rounded-3xl border-2 border-dashed border-border bg-card p-8 text-center">
             <span className="mx-auto grid h-20 w-20 place-items-center rounded-full bg-muted">
@@ -271,6 +275,39 @@ function SacolaPage() {
             </div>
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+/** Ativação dos avisos: aparece só no Carrinho e na tela Eu. */
+function NotificationsBanner() {
+  const { profile } = useProfile();
+  const { state, request } = useNotificationPermission(profile.phone);
+
+  if (state === "unsupported") return null;
+
+  if (state === "granted") {
+    return (
+      <p className="mb-3 rounded-2xl bg-[oklch(0.95_0.05_145)] px-4 py-3 text-base font-bold text-[oklch(0.42_0.14_145)]">
+        Notificações ativadas
+      </p>
+    );
+  }
+
+  return (
+    <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-muted px-4 py-3">
+      <p className="text-base font-bold text-foreground">Notificações desativadas</p>
+      <button
+        onClick={() => void request()}
+        className="rounded-xl bg-[oklch(0.55_0.22_255)] px-4 py-2 text-base font-black text-white active:scale-95"
+      >
+        Ativar
+      </button>
+      {state === "denied" && (
+        <p className="w-full text-sm font-semibold text-muted-foreground">
+          O navegador bloqueou os avisos. Abra as configurações do site e permita as notificações.
+        </p>
       )}
     </div>
   );
