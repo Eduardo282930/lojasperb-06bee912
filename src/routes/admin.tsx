@@ -1699,8 +1699,10 @@ function OrdersPanel({ focusOrderId }: { focusOrderId?: string | null }) {
 
   async function change(o: Order, status: string) {
     let note = "";
+    let reason = "";
     if (status === "canceled") {
-      note = window.prompt("Informe o motivo do cancelamento:", "Cancelado pelo vendedor.")?.trim() || "Cancelado pelo vendedor.";
+      reason = window.prompt("Informe o motivo do cancelamento:", "")?.trim() || "Sem motivo informado";
+      note = `Cancelado pelo vendedor — Motivo: ${reason}`;
     }
     setBusy(o.id);
     const ok = await setOrderStatus(o.id, status, "", note);
@@ -1718,7 +1720,7 @@ function OrdersPanel({ focusOrderId }: { focusOrderId?: string | null }) {
           await fetch("/api/public/push", {
             method: "POST",
             headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
-            body: JSON.stringify({ action: "order-event", orderId: o.id, event, reason: note }),
+            body: JSON.stringify({ action: "order-event", orderId: o.id, event, reason }),
           }).catch(() => null);
         }
       }
