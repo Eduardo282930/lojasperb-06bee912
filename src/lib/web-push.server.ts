@@ -248,8 +248,13 @@ export async function notifyOrderEvent(
     .from("order_push_events" as never)
     .insert({ order_id: orderId, event } as never);
   if (claimError) {
-    console.log(`[push] Aviso ${event} do pedido ${orderId} já havia sido enviado.`);
-    return { sent: 0, skipped: "already-sent" };
+    const duplicate = String(claimError.code ?? "") === "23505" || /duplicate key/i.test(claimError.message ?? "");
+    if (duplicate) {
+      console.log(`[push] Aviso ${event} do pedido ${orderId} já havia sido enviado.`);
+      return { sent: 0, skipped: "already-sent" };
+    }
+    console.error(`[push] Falha ao registrar o aviso ${event} do pedido ${orderId}: ${claimError.message}`);
+    throw new Error(`Não foi possível registrar o aviso: ${claimError.message}`);
   }
 
   const fromStore = String((order as { origin?: string | null }).origin ?? "") === "store";
@@ -300,6 +305,9 @@ export async function notifyOrderEvent(
     );
 
   const sent = await sendNotificationToCustomer(customerId, { kind: "order", title, body, targetUrl });
+  if (sent === 0) {
+    console.warn(`[push] Push não enviado: nenhum dispositivo vinculado ao customer_id ${customerId}.`);
+  }
   await supabaseAdmin
     .from("order_push_events" as never)
     .update({ sent } as never)
@@ -332,8 +340,16 @@ export async function sendNotificationToCustomer(customerId: string, draft: { ki
     try {
       const response = await sendWebPush(sub, { title, body, url: targetUrl, tag: `${kind}-${Date.now()}` });
       if (response.ok) sent++;
-      else if (response.status === 404 || response.status === 410) stale.push(sub.id);
-    } catch {}
+      else if (response.status === 404 || response.status === 410) {
+        stale.push(sub.id);
+        console.warn(`[push] Aparelho removido (${response.status}) do cliente ${customerId}.`);
+      } else {
+        const detail = await response.text().catch(() => "");
+        console.error(`[push] Falha ${response.status} ao avisar o cliente ${customerId}: ${detail}`);
+      }
+    } catch (error) {
+      console.error(`[push] Erro ao avisar o cliente ${customerId}:`, error);
+    }
   }
   if (stale.length) await supabaseAdmin.from("push_subscriptions" as never).delete().in("id", stale as never);
   return sent;
