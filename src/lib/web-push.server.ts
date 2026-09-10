@@ -179,6 +179,26 @@ export async function savePushSubscription(
   if (error) throw new Error(error.message);
 }
 
+export async function sendNotificationToCustomer(customerId: string, draft: { kind: string; title: string; body: string; targetUrl: string }) {
+  if (!vapidConfigured()) throw new Error("As chaves de notificação (VAPID) não estão configuradas no servidor.");
+  const kind = draft.kind || "order";
+  const title = draft.title.trim();
+  const body = draft.body.trim();
+  const targetUrl = draft.targetUrl?.startsWith("/") ? draft.targetUrl : "/";
+  const { data: subscriptions } = (await supabaseAdmin.from("push_subscriptions" as never).select("id,endpoint,p256dh,auth").eq("customer_id", customerId) as never) as { data: Array<{ id:string; endpoint:string; p256dh:string; auth:string }> | null };
+  let sent = 0;
+  const stale: string[] = [];
+  for (const sub of subscriptions ?? []) {
+    try {
+      const response = await sendWebPush(sub, { title, body, url: targetUrl, tag: `${kind}-${Date.now()}` });
+      if (response.ok) sent++;
+      else if (response.status === 404 || response.status === 410) stale.push(sub.id);
+    } catch {}
+  }
+  if (stale.length) await supabaseAdmin.from("push_subscriptions" as never).delete().in("id", stale as never);
+  return sent;
+}
+
 export async function sendNotificationToAll(draft: { kind: string; title: string; body: string; targetUrl: string }) {
   if (!vapidConfigured()) throw new Error("As chaves de notificação (VAPID) não estão configuradas no servidor.");
 

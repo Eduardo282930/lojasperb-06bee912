@@ -10,6 +10,7 @@ export type AppNotification = {
   body: string;
   readAt: string | null;
   createdAt: string;
+  targetUrl?: string;
 };
 
 export type PushNotificationDraft = {
@@ -34,6 +35,7 @@ export async function fetchNotifications(phone: string): Promise<AppNotification
     body: r.body ?? "",
     readAt: r.read_at ?? null,
     createdAt: r.created_at,
+    targetUrl: r.target_url ?? "/",
   }));
 }
 
@@ -188,11 +190,14 @@ export function useNotificationWatcher(phone: string) {
     const fresh = list.filter((n) => !n.readAt && !seen.has(n.id)).slice(0, 3);
     for (const n of fresh) {
       try {
-        new Notification(`${emoji(n.kind)}${n.title}`, {
+        const notification = new Notification(`${emoji(n.kind)}${n.title}`, {
           body: n.body,
-          icon: "/favicon.svg",
           tag: n.id,
         });
+        notification.onclick = () => {
+          window.focus();
+          window.location.href = n.targetUrl || "/";
+        };
       } catch {
         /* navegador bloqueou — ignora */
       }
@@ -286,9 +291,18 @@ export function useNotificationPermission(phone = "") {
   const [state, setState] = useState<NotificationPermission | "unsupported">("default");
   const [justEnabled, setJustEnabled] = useState(false);
   useEffect(() => {
-    const current = notificationPermission();
-    setState(current);
-    if (current === "granted") void subscribeToPush(phone);
+    const refresh = () => {
+      const current = notificationPermission();
+      setState(current);
+      if (current === "granted") void subscribeToPush(phone);
+    };
+    refresh();
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
   }, [phone]);
   return {
     state,
@@ -301,7 +315,6 @@ export function useNotificationPermission(phone = "") {
         try {
           new Notification("🔔 Notificações ativadas!", {
             body: "Muito obrigado por ativar os avisos da SPERB. Você receberá novidades, cupons, ofertas e benefícios por aqui.",
-            icon: "/favicon.svg",
             tag: "sperb-welcome",
           });
         } catch {
