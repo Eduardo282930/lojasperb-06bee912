@@ -210,6 +210,104 @@ export async function savePushSubscription(
   if (error) throw new Error(error.message);
 }
 
+export type OrderPushEvent =
+  | "paid"
+  | "shipping"
+  | "delivered"
+  | "canceled_unpaid"
+  | "canceled_seller";
+
+/**
+ * Aviso automático de pedido: sempre para o cliente dono do pedido e uma
+ * única vez por evento real (a tabela order_push_events é a trava).
+ */
+export async function notifyOrderEvent(
+  orderId: string,
+  event: OrderPushEvent,
+  options: { reason?: string } = {},
+): Promise<{ sent: number; skipped?: string }> {
+  const { data: order, error: orderError } = await supabaseAdmin
+    .from("orders")
+    .select("id, customer_id, origin, status, payment_status")
+    .eq("id", orderId)
+    .maybeSingle();
+
+  if (orderError || !order) {
+    console.error(`[push] pedido ${orderId} não encontrado para o aviso ${event}.`);
+    return { sent: 0, skipped: "order-not-found" };
+  }
+
+  const customerId = (order as { customer_id?: string | null }).customer_id ?? "";
+  if (!customerId) {
+    console.warn(`[push] Push não enviado: pedido ${orderId} não tem cliente vinculado.`);
+    return { sent: 0, skipped: "no-customer" };
+  }
+
+  // Trava de duplicidade: se o evento já foi registrado, ninguém recebe de novo.
+  const { error: claimError } = await supabaseAdmin
+    .from("order_push_events" as never)
+    .insert({ order_id: orderId, event } as never);
+  if (claimError) {
+    console.log(`[push] Aviso ${event} do pedido ${orderId} já havia sido enviado.`);
+    return { sent: 0, skipped: "already-sent" };
+  }
+
+  const fromStore = String((order as { origin?: string | null }).origin ?? "") === "store";
+  let title = "";
+  let body = "";
+  let status = "preparing";
+
+  if (event === "paid") {
+    title = "Pagamento confirmado!";
+    body = fromStore
+      ? "Seu pedido realizado na loja foi confirmado e o pagamento já está certinho. 💙"
+      : "Seu pagamento foi confirmado e seu pedido já está sendo preparado. 💙";
+    status = "preparing";
+  } else if (event === "shipping") {
+    title = "🚚 Eba! Seu pedido está a caminho!";
+    body = "Já estamos levando seu pedido até você!";
+    status = "shipping";
+  } else if (event === "delivered") {
+    title = fromStore ? "🎉 Pedido finalizado!" : "📦 Pedido entregue!";
+    body = fromStore
+      ? "Seu pedido foi concluído com sucesso. Obrigado por comprar com a SPERB! 💙"
+      : "Verifique todos os itens e confira se está tudo certinho. 😊 Se tiver qualquer problema, fale conosco pelo WhatsApp.";
+    status = "delivered";
+  } else if (event === "canceled_unpaid") {
+    title = "❌ Pedido cancelado";
+    body = "O prazo para pagamento terminou e o pedido foi cancelado automaticamente.";
+    status = "canceled";
+  } else {
+    title = "❌ Pedido cancelado";
+    const reason = (options.reason ?? "").trim();
+    body = reason
+      ? `Seu pedido foi cancelado pelo vendedor. Motivo: ${reason}`
+      : "Seu pedido foi cancelado pelo vendedor.";
+    status = "canceled";
+  }
+
+  const targetUrl = `/pedidos?status=${status}&order=${orderId}`;
+
+  // Histórico dentro do app, sempre para o dono do pedido.
+  await supabaseAdmin
+    .from("customer_notifications")
+    .insert({ customer_id: customerId, kind: "order", title, body, target_url: targetUrl })
+    .then(
+      () => undefined,
+      (error: unknown) => {
+        console.error("[push] histórico do cliente", error);
+      },
+    );
+
+  const sent = await sendNotificationToCustomer(customerId, { kind: "order", title, body, targetUrl });
+  await supabaseAdmin
+    .from("order_push_events" as never)
+    .update({ sent } as never)
+    .eq("order_id", orderId as never)
+    .eq("event", event as never);
+  return { sent };
+}
+
 export async function sendNotificationToCustomer(customerId: string, draft: { kind: string; title: string; body: string; targetUrl: string }) {
   if (!vapidConfigured()) throw new Error("As chaves de notificação (VAPID) não estão configuradas no servidor.");
   const kind = draft.kind || "order";
