@@ -6,6 +6,19 @@ async function body(request: Request) {
   try { return await request.json() as Record<string, unknown>; } catch { return {}; }
 }
 
+/** Confere o token e garante que é um administrador. Retorna o motivo da recusa ou null. */
+async function requireAdmin(request: Request): Promise<Response | null> {
+  const authorization = request.headers.get("authorization") ?? "";
+  const token = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
+  if (!token) return Response.json({ error: "Não autorizado." }, { status: 401 });
+  const { data: userData } = await supabaseAdmin.auth.getUser(token);
+  const userId = userData.user?.id;
+  if (!userId) return Response.json({ error: "Sessão inválida." }, { status: 401 });
+  const { data: role } = await supabaseAdmin.from("user_roles").select("role").eq("user_id", userId).eq("role", "admin").maybeSingle();
+  if (!role) return Response.json({ error: "Sem permissão de administrador." }, { status: 403 });
+  return null;
+}
+
 export const Route = createFileRoute("/api/public/push")({
   server: {
     handlers: {
