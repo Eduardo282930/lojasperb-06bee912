@@ -43,15 +43,31 @@ export const Route = createFileRoute("/api/public/push")({
           }
         }
 
+        if (action === "history") {
+          const denied = await requireAdmin(request);
+          if (denied) return denied;
+          const { data: rows, error } = (await supabaseAdmin
+            .from("push_history" as never)
+            .select("id,kind,title,body,target_url,sent,failed,created_at")
+            .order("created_at", { ascending: false })
+            .limit(100)) as never as { data: unknown[] | null; error: { message: string } | null };
+          if (error) return Response.json({ error: `Não foi possível ler o histórico: ${error.message}` }, { status: 500 });
+          return Response.json({ history: rows ?? [] });
+        }
+
+        if (action === "delete") {
+          const denied = await requireAdmin(request);
+          if (denied) return denied;
+          const id = String(data.id ?? "");
+          if (!id) return Response.json({ error: "Registro não informado." }, { status: 400 });
+          const { error } = await supabaseAdmin.from("push_history" as never).delete().eq("id", id as never);
+          if (error) return Response.json({ error: `Não foi possível excluir: ${error.message}` }, { status: 500 });
+          return Response.json({ ok: true });
+        }
+
         if (action === "send") {
-          const authorization = request.headers.get("authorization") ?? "";
-          const token = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
-          if (!token) return Response.json({ error: "Não autorizado." }, { status: 401 });
-          const { data: userData } = await supabaseAdmin.auth.getUser(token);
-          const userId = userData.user?.id;
-          if (!userId) return Response.json({ error: "Sessão inválida." }, { status: 401 });
-          const { data: role } = await supabaseAdmin.from("user_roles").select("role").eq("user_id", userId).eq("role", "admin").maybeSingle();
-          if (!role) return Response.json({ error: "Sem permissão de administrador." }, { status: 403 });
+          const denied = await requireAdmin(request);
+          if (denied) return denied;
 
           const title = String(data.title ?? "").trim();
           const message = String(data.body ?? "").trim();
