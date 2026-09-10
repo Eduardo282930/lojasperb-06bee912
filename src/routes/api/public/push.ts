@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { savePushSubscription, sendNotificationToAll } from "@/lib/web-push.server";
+import { savePushSubscription, sendNotificationToAll, sendNotificationToCustomer } from "@/lib/web-push.server";
 
 async function body(request: Request) {
   try { return await request.json() as Record<string, unknown>; } catch { return {}; }
@@ -63,6 +63,21 @@ export const Route = createFileRoute("/api/public/push")({
           const { error } = await supabaseAdmin.from("push_history" as never).delete().eq("id", id as never);
           if (error) return Response.json({ error: `Não foi possível excluir: ${error.message}` }, { status: 500 });
           return Response.json({ ok: true });
+        }
+
+        if (action === "send-order") {
+          const denied = await requireAdmin(request);
+          if (denied) return denied;
+          const customerId = String(data.customerId ?? "").trim();
+          const title = String(data.title ?? "").trim();
+          const message = String(data.body ?? "").trim();
+          if (!customerId || !title || !message) return Response.json({ error: "Dados da notificação incompletos." }, { status: 400 });
+          try {
+            const count = await sendNotificationToCustomer(customerId, { kind: String(data.kind ?? "order"), title, body: message, targetUrl: String(data.targetUrl ?? "/") });
+            return Response.json({ count });
+          } catch (error) {
+            return Response.json({ error: error instanceof Error ? error.message : "Falha ao enviar a notificação." }, { status: 500 });
+          }
         }
 
         if (action === "send") {
