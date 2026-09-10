@@ -146,6 +146,7 @@ export function NotificationsPanel() {
       targetUrl: targetUrl.trim() || "/",
     });
     setBusy(false);
+    await queryClient.invalidateQueries({ queryKey: ["admin-push-history"] });
     if (result.error) {
       setMessage(result.error);
       return;
