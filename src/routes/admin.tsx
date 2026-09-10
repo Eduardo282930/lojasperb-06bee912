@@ -111,6 +111,14 @@ const BLUE = "oklch(0.55 0.22 255)";
 const GREEN = "oklch(0.62 0.19 145)";
 const RED = "oklch(0.58 0.22 25)";
 
+function toDateTimeLocal(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (!Number.isFinite(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 function couponLabel(c: Coupon): string {
   if (!(c.value > 0)) return "Moedas de volta";
   return c.type === "percent" ? `${c.value}% OFF` : `${formatPrice(c.value)} OFF`;
@@ -340,6 +348,8 @@ const emptyCoupon: Coupon = {
   uses: 0,
   active: true,
   customerPhone: null,
+  startsAt: null,
+  expiresAt: null,
 };
 
 function CouponForm({
@@ -368,6 +378,7 @@ function CouponForm({
         : "percent",
   );
   const [notifyClients, setNotifyClients] = useState(false);
+  const [scheduled, setScheduled] = useState(Boolean(initial?.startsAt || initial?.expiresAt));
   const [advanced, setAdvanced] = useState(false);
   const [error, setError] = useState("");
   const [ok, setOk] = useState(false);
@@ -394,7 +405,8 @@ function CouponForm({
           draft.rewardType === "percent" && rewardCapped
             ? (draft.rewardMaxCoins ?? 0)
             : null,
-
+        startsAt: scheduled ? draft.startsAt : null,
+        expiresAt: scheduled ? draft.expiresAt : null,
       };
       await saveCoupon(saved);
       if (notifyClients) {
@@ -572,6 +584,44 @@ function CouponForm({
         />
       )}
 
+      <label className="flex items-center gap-3 text-lg font-bold text-foreground">
+        <input
+          type="checkbox"
+          checked={scheduled}
+          onChange={(e) => {
+            setScheduled(e.target.checked);
+            if (!e.target.checked) setDraft({ ...draft, startsAt: null, expiresAt: null });
+          }}
+          className="h-6 w-6"
+        />
+        Agendar validade automática do cupom
+      </label>
+      {scheduled && (
+        <div className="rounded-2xl border-2 border-border bg-muted/30 p-3">
+          <p className="text-sm font-black text-foreground">O cupom entra e sai sozinho nos horários escolhidos.</p>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <label className="text-sm font-bold text-muted-foreground">
+              Começa em
+              <input
+                type="datetime-local"
+                value={toDateTimeLocal(draft.startsAt)}
+                onChange={(e) => setDraft({ ...draft, startsAt: e.target.value ? new Date(e.target.value).toISOString() : null })}
+                className={input + " mt-1"}
+              />
+            </label>
+            <label className="text-sm font-bold text-muted-foreground">
+              Expira em
+              <input
+                type="datetime-local"
+                value={toDateTimeLocal(draft.expiresAt)}
+                onChange={(e) => setDraft({ ...draft, expiresAt: e.target.value ? new Date(e.target.value).toISOString() : null })}
+                className={input + " mt-1"}
+              />
+            </label>
+          </div>
+        </div>
+      )}
+
       <button
         type="button"
         onClick={() => setAdvanced((v) => !v)}
@@ -735,6 +785,8 @@ function CouponRow({ coupon: c, onChanged }: { coupon: Coupon; onChanged: () => 
               {c.maxUsesPerCustomer !== null &&
                 ` · ${c.maxUsesPerCustomer} por cliente`}
               {c.rewardCoins > 0 && ` · devolve ${c.rewardCoins} moedas`}
+              {c.startsAt && ` · inicia ${new Date(c.startsAt).toLocaleString("pt-BR")}`}
+              {c.expiresAt && ` · expira ${new Date(c.expiresAt).toLocaleString("pt-BR")}`}
               {isExhausted(c) && " · esgotado"}
             </p>
           </div>
@@ -1646,13 +1698,45 @@ function OrdersPanel({ focusOrderId }: { focusOrderId?: string | null }) {
   }
 
   async function change(o: Order, status: string) {
+    let note = "";
+    if (status === "canceled") {
+      note = window.prompt("Informe o motivo do cancelamento:", "Cancelado pelo vendedor.")?.trim() || "Cancelado pelo vendedor.";
+    }
     setBusy(o.id);
-    const ok = await setOrderStatus(o.id, status, "");
+    const ok = await setOrderStatus(o.id, status, "", note);
+    if (ok && o.customerId) {
+      const session = await (await import("@/integrations/supabase/client")).supabase.auth.getSession();
+      const token = session.data.session?.access_token;
+      if (token) {
+        let title = "";
+        let body = "";
+        let targetUrl = "/pedidos";
+        if (o.paymentStatus !== "paid" && status === "preparing") {
+          title = "Pagamento confirmado!";
+          body = o.origin === "store" ? "Seu pedido realizado na loja foi confirmado e o pagamento já está certinho. 💙" : "Seu pagamento foi confirmado e seu pedido já está sendo preparado. 💙";
+          targetUrl = `/pedidos?status=preparing&order=${o.id}`;
+        } else if (status === "shipping") {
+          title = "🚚 Eba! Seu pedido está a caminho!";
+          body = "Já estamos levando seu pedido até você! 💙";
+          targetUrl = `/pedidos?status=shipping&order=${o.id}`;
+        } else if (status === "delivered") {
+          title = o.origin === "store" ? "🎉 Pedido finalizado!" : "📦 Pedido entregue!";
+          body = o.origin === "store" ? "Seu pedido foi concluído com sucesso. Obrigado por comprar com a SPERB! 💙" : "Verifique todos os itens e confira se está tudo certinho. Se tiver qualquer problema, fale conosco pelo WhatsApp.";
+          targetUrl = `/pedidos?status=delivered&order=${o.id}`;
+        } else if (status === "canceled") {
+          title = "❌ Pedido cancelado";
+          body = o.paymentStatus !== "paid" ? "O prazo para pagamento terminou e o pedido foi cancelado automaticamente." : `Seu pedido foi cancelado pelo vendedor. Motivo: ${note}.`;
+          targetUrl = `/pedidos?status=canceled&order=${o.id}`;
+        }
+        if (title) {
+          await fetch("/api/public/push", { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${token}` }, body: JSON.stringify({ action: "send-order", customerId: o.customerId, kind: "order", title, body, targetUrl }) }).catch(() => null);
+        }
+      }
+    }
     setBusy(null);
     if (!ok) window.alert("Esta mudança de status não é permitida.");
     void refetch();
   }
-
   async function payOnDelivery(o: Order) {
     setBusy(o.id);
     const ok = await setPayOnDelivery(o.id);
