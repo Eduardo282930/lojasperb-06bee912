@@ -196,10 +196,14 @@ export async function savePushSubscription(
   // Sem cliente identificado, não associamos a inscrição a outro cliente.
   // Ela pode continuar existindo para o envio administrativo geral, mas
   // notificações automáticas de pedidos só usam inscrições com customer_id.
+  if (!customerId) {
+    console.warn("[push] Aparelho registrado sem cliente identificado — avisos de pedido não serão enviados para ele.");
+  }
   const { error } = await supabaseAdmin.from("push_subscriptions" as never).upsert(
     {
       endpoint: subscription.endpoint,
-      customer_id: customerId,
+      // Nunca apaga um vínculo já existente quando o cliente não é identificado.
+      ...(customerId ? { customer_id: customerId } : {}),
       device_id: deviceId || null,
       p256dh,
       auth,
