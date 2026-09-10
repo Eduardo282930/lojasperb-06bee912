@@ -1,6 +1,108 @@
 import { useState } from "react";
-import { Bell, ExternalLink, Send } from "lucide-react";
-import { sendAdminPushNotification } from "@/lib/notifications";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Bell, ExternalLink, History, Send, Trash2 } from "lucide-react";
+import {
+  deletePushHistoryEntry,
+  fetchPushHistory,
+  sendAdminPushNotification,
+  type PushHistoryEntry,
+} from "@/lib/notifications";
+
+const KIND_LABELS: Record<string, string> = {
+  coupon: "🎟️ Cupons",
+  main: "⭐ Principal",
+  offer: "🔥 Ofertas",
+  product: "🛍️ Produtos",
+  order: "📦 Pedidos",
+  coins: "🪙 Moedas",
+  info: "🔔 Outro",
+};
+
+function formatDateTime(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
+}
+
+function PushHistory() {
+  const queryClient = useQueryClient();
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [message, setMessage] = useState("");
+  const { data, isLoading } = useQuery({
+    queryKey: ["admin-push-history"],
+    queryFn: fetchPushHistory,
+    staleTime: 15 * 1000,
+  });
+  const entries = data?.history ?? [];
+
+  async function remove(entry: PushHistoryEntry) {
+    const first = window.confirm(`Excluir a notificação "${entry.title}" do histórico?`);
+    if (!first) return;
+    const second = window.confirm("Tem certeza? Essa exclusão não pode ser desfeita.");
+    if (!second) return;
+    setDeletingId(entry.id);
+    setMessage("");
+    const result = await deletePushHistoryEntry(entry.id);
+    setDeletingId(null);
+    if (result.error) {
+      setMessage(result.error);
+      return;
+    }
+    setMessage("Notificação excluída do histórico.");
+    await queryClient.invalidateQueries({ queryKey: ["admin-push-history"] });
+  }
+
+  return (
+    <section className="rounded-3xl border-2 border-border bg-card p-5 shadow-sm">
+      <div className="flex items-start gap-4">
+        <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-primary/10 text-primary">
+          <History className="h-7 w-7" />
+        </div>
+        <div>
+          <h2 className="text-xl font-black text-foreground">Histórico de envios</h2>
+          <p className="mt-1 text-sm font-semibold text-muted-foreground">
+            Notificações enviadas, com data, tipo e destino.
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-4 space-y-2">
+        {isLoading && <p className="text-sm font-semibold text-muted-foreground">Carregando…</p>}
+        {!isLoading && entries.length === 0 && (
+          <p className="text-sm font-semibold text-muted-foreground">
+            Nenhuma notificação enviada até agora.
+          </p>
+        )}
+        {entries.map((entry) => (
+          <div key={entry.id} className="rounded-2xl border border-border bg-background p-3">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-muted-foreground">
+                  {formatDateTime(entry.createdAt)} · {KIND_LABELS[entry.kind] ?? entry.kind}
+                </p>
+                <p className="mt-0.5 truncate text-sm font-black text-foreground">{entry.title}</p>
+                <p className="mt-0.5 text-sm font-semibold text-muted-foreground">{entry.body}</p>
+                <p className="mt-1 text-xs font-semibold text-muted-foreground">
+                  Abre em {entry.targetUrl} · enviada para {entry.sent} aparelho(s)
+                  {entry.failed > 0 ? ` · ${entry.failed} falha(s)` : ""}
+                </p>
+              </div>
+              <button
+                type="button"
+                disabled={deletingId === entry.id}
+                onClick={() => void remove(entry)}
+                aria-label={`Excluir notificação ${entry.title}`}
+                className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border-2 border-border text-destructive disabled:opacity-50">
+                <Trash2 className="h-5 w-5" />
+              </button>
+            </div>
+          </div>
+        ))}
+        {message && <p className="text-sm font-bold text-muted-foreground">{message}</p>}
+      </div>
+    </section>
+  );
+}
 
 const TYPES = [
   ["coupon", "🎟️ Cupons"],
@@ -20,6 +122,7 @@ const DESTINATIONS = [
 ] as const;
 
 export function NotificationsPanel() {
+  const queryClient = useQueryClient();
   const [kind, setKind] = useState("offer");
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
@@ -43,6 +146,7 @@ export function NotificationsPanel() {
       targetUrl: targetUrl.trim() || "/",
     });
     setBusy(false);
+    await queryClient.invalidateQueries({ queryKey: ["admin-push-history"] });
     if (result.error) {
       setMessage(result.error);
       return;
@@ -120,6 +224,8 @@ export function NotificationsPanel() {
       <p className="px-1 text-xs font-semibold leading-5 text-muted-foreground">
         O cliente precisa ter permitido as notificações no celular. O envio usa Push real e não depende do aplicativo estar aberto.
       </p>
+
+      <PushHistory />
     </div>
   );
 }

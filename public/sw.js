@@ -9,8 +9,6 @@ self.addEventListener("push", (event) => {
   const url = data.url || "/";
   event.waitUntil(self.registration.showNotification(title, {
     body,
-    icon: data.icon || "/favicon.svg",
-    badge: data.badge || "/favicon.svg",
     tag: data.tag || "sperb-notification",
     data: { url },
   }));

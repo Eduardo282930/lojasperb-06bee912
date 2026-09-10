@@ -218,8 +218,6 @@ export async function sendNotificationToAll(draft: { kind: string; title: string
         body,
         url: targetUrl,
         tag: `${kind}-${Date.now()}`,
-        icon: "/favicon.svg",
-        badge: "/favicon.svg",
       });
       if (response.ok) sent++;
       else {
@@ -234,6 +232,20 @@ export async function sendNotificationToAll(draft: { kind: string; title: string
   }
 
   if (stale.length) await supabaseAdmin.from("push_subscriptions" as never).delete().in("id", stale as never);
+
+  // Histórico de envios para o painel Admin.
+  try {
+    await supabaseAdmin.from("push_history" as never).insert({
+      kind,
+      title,
+      body,
+      target_url: targetUrl,
+      sent,
+      failed,
+    } as never);
+  } catch {
+    /* histórico indisponível não deve impedir o envio */
+  }
 
   return { sent, created, failed, total: (subscriptions ?? []).length, lastError };
 }

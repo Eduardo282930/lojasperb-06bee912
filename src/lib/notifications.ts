@@ -204,35 +204,76 @@ export function useNotificationWatcher(phone: string) {
   return query;
 }
 
+async function adminFetch(payload: Record<string, unknown>): Promise<{ ok: boolean; data: Record<string, unknown> }> {
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  if (!token) return { ok: false, data: { error: "Sessão de administrador não encontrada." } };
+  const response = await fetch("/api/public/push", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+  const body = (await response.json().catch(() => ({}))) as Record<string, unknown>;
+  return { ok: response.ok, data: body };
+}
+
+export type PushHistoryEntry = {
+  id: string;
+  kind: string;
+  title: string;
+  body: string;
+  targetUrl: string;
+  sent: number;
+  failed: number;
+  createdAt: string;
+};
+
+export async function fetchPushHistory(): Promise<{ history: PushHistoryEntry[]; error?: string }> {
+  try {
+    const { ok, data } = await adminFetch({ action: "history" });
+    if (!ok) return { history: [], error: String(data.error ?? "Não foi possível carregar o histórico.") };
+    const rows = (data.history ?? []) as Array<Record<string, unknown>>;
+    return {
+      history: rows.map((r) => ({
+        id: String(r.id ?? ""),
+        kind: String(r.kind ?? "info"),
+        title: String(r.title ?? ""),
+        body: String(r.body ?? ""),
+        targetUrl: String(r.target_url ?? "/"),
+        sent: Number(r.sent ?? 0),
+        failed: Number(r.failed ?? 0),
+        createdAt: String(r.created_at ?? ""),
+      })),
+    };
+  } catch (error) {
+    return { history: [], error: error instanceof Error ? error.message : "Não foi possível conectar ao servidor." };
+  }
+}
+
+export async function deletePushHistoryEntry(id: string): Promise<{ error?: string }> {
+  try {
+    const { ok, data } = await adminFetch({ action: "delete", id });
+    if (!ok) return { error: String(data.error ?? "Não foi possível excluir.") };
+    return {};
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Não foi possível conectar ao servidor." };
+  }
+}
+
 export async function sendAdminPushNotification(
   draft: PushNotificationDraft,
 ): Promise<{ count: number; total?: number; failed?: number; detail?: string; error?: string }> {
   try {
-    const { data } = await supabase.auth.getSession();
-    const token = data.session?.access_token;
-    if (!token) return { count: 0, error: "Sessão de administrador não encontrada." };
-
-    const response = await fetch("/api/public/push", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ action: "send", ...draft }),
-    });
-    const payload = (await response.json().catch(() => ({}))) as {
-      count?: number;
-      total?: number;
-      failed?: number;
-      detail?: string;
-      error?: string;
-    };
-    if (!response.ok) return { count: 0, error: payload.error || `Falha no servidor (${response.status}).` };
+    const { ok, data: payload } = await adminFetch({ action: "send", ...draft });
+    if (!ok) return { count: 0, error: String(payload.error ?? "Falha no servidor.") };
     return {
       count: Number(payload.count ?? 0),
       total: Number(payload.total ?? 0),
       failed: Number(payload.failed ?? 0),
-      detail: payload.detail,
+      detail: payload.detail ? String(payload.detail) : undefined,
     };
   } catch (error) {
     return { count: 0, error: error instanceof Error ? error.message : "Não foi possível conectar ao servidor." };
