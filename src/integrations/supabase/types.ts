@@ -216,6 +216,8 @@ export type Database = {
       coupons: {
         Row: {
           active: boolean
+          starts_at: string | null
+          expires_at: string | null
           code: string
           created_at: string
           customer_id: string | null
@@ -239,6 +241,10 @@ export type Database = {
         }
         Insert: {
           active?: boolean
+          starts_at?: string | null
+          expires_at?: string | null
+          starts_at?: string | null
+          expires_at?: string | null
           code: string
           created_at?: string
           customer_id?: string | null
@@ -1259,6 +1265,7 @@ export type Database = {
           kind: string
           read_at: string
           title: string
+          target_url: string
         }[]
       }
       only_digits: { Args: { p: string }; Returns: string }
