@@ -118,6 +118,36 @@ export async function importStoreReceipts(days = 90): Promise<ImportResult> {
   let customers: LoyverseCustomer[] = [];
   let stores: LoyverseStore[] = [];
   let employees: LoyverseEmployee[] = [];
+  /** Variantes que pertencem à categoria "Conserto" (serviço, não venda). */
+  const repairVariants = new Set<string>();
+  try {
+    const [cats, its] = await Promise.all([
+      loyverse<{ categories?: Array<{ id: string; name?: string | null }> }>(
+        "categories?limit=250",
+        token,
+      ).catch(() => ({ categories: [] })),
+      loyverse<{
+        items?: Array<{
+          category_id?: string | null;
+          variants?: Array<{ variant_id?: string | null }> | null;
+        }>;
+      }>("items?limit=250", token).catch(() => ({ items: [] })),
+    ]);
+    const { isRepairCategoryName } = await import("./loyverse.functions");
+    const repairCats = new Set(
+      (cats.categories ?? [])
+        .filter((c) => isRepairCategoryName(c.name))
+        .map((c) => c.id),
+    );
+    for (const it of its.items ?? []) {
+      if (!it.category_id || !repairCats.has(it.category_id)) continue;
+      for (const v of it.variants ?? []) {
+        if (v.variant_id) repairVariants.add(String(v.variant_id));
+      }
+    }
+  } catch {
+    /* sem categorias: o recibo entra como venda normal */
+  }
   try {
     const [r, c, s, e] = await Promise.all([
       receiptsSince(days)
