@@ -35,7 +35,8 @@ type InputImage = { name: string; mime: string; data: string };
  */
 export const runAssistant = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { images: InputImage[] }) => {
+  .inputValidator((data: { images: InputImage[]; mode?: "store" | "order" }) => {
+    const mode = data?.mode === "order" ? "order" : "store";
     const images = Array.isArray(data?.images) ? data.images : [];
     if (images.length === 0) throw new Error("Envie ao menos uma imagem.");
     if (images.length > MAX_IMAGES) {
@@ -49,7 +50,7 @@ export const runAssistant = createServerFn({ method: "POST" })
         throw new Error(`A imagem "${img.name}" é muito grande (máximo 8 MB).`);
       }
     }
-    return { images };
+    return { images, mode };
   })
   .handler(async ({ data, context }): Promise<AssistantRun> => {
     const { data: isAdmin } = await context.supabase.rpc("has_role", {
@@ -58,12 +59,39 @@ export const runAssistant = createServerFn({ method: "POST" })
     });
     if (!isAdmin) return { ok: false, reason: "forbidden", items: [], review: [] };
 
-    const { readPurchaseImage, upsertPurchase, loadItems } = await import(
-      "@/lib/assistant.server"
-    );
+    const {
+      readPurchaseImage,
+      upsertPurchase,
+      loadItems,
+      loadCategories,
+      ensureOrderCategory,
+      pickCategory,
+    } = await import("@/lib/assistant.server");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     let items = await loadItems();
+
+    // Categorias do Loyverse: lidas uma única vez por lote.
+    const isOrder = data.mode === "order";
+    let categories = await loadCategories().catch(() => []);
+    let orderCategoryId: string | null = null;
+    if (isOrder) {
+      try {
+        const ensured = await ensureOrderCategory(categories);
+        orderCategoryId = ensured.id;
+        categories = ensured.categories;
+      } catch (err) {
+        return {
+          ok: false,
+          reason:
+            err instanceof Error
+              ? err.message
+              : "Não consegui preparar a categoria Encomenda.",
+          items: [],
+          review: [],
+        };
+      }
+    }
     const results: AssistantItem[] = [];
     const review: Array<{ image: string; reason: string }> = [];
 
@@ -93,7 +121,10 @@ export const runAssistant = createServerFn({ method: "POST" })
           continue;
         }
         try {
-          const out = await upsertPurchase(draft, items);
+          const categoryId = isOrder
+            ? orderCategoryId
+            : await pickCategory(draft.name, categories);
+          const out = await upsertPurchase(draft, items, categoryId, isOrder);
           items = out.items;
           results.push({ ...out.result, image: image.name });
 

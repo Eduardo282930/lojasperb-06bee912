@@ -6,8 +6,14 @@
  * ou link guardado no banco.
  */
 
-const GEMINI_TIMEOUT_MS = 60_000;
-const LOYVERSE_TIMEOUT_MS = 15_000;
+/** A leitura pode demorar: nada de corte curto que cancela a análise no meio. */
+const GEMINI_TIMEOUT_MS = 180_000;
+const GEMINI_TRIES = 3;
+const LOYVERSE_TIMEOUT_MS = 20_000;
+
+export type AssistantMode = "store" | "order";
+/** Nome exato da categoria dos produtos por encomenda no Loyverse. */
+export const ORDER_CATEGORY_NAME = "Encomenda";
 
 export type AssistantImage = { name: string; mime: string; data: string };
 
@@ -106,55 +112,103 @@ const SCHEMA = {
   required: ["products"],
 };
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+type GeminiPart =
+  | { text: string }
+  | { inline_data: { mime_type: string; data: string } };
+
+/**
+ * Uma chamada ao Gemini com JSON estruturado, tempo limite generoso e
+ * repetição automática quando a falha é passageira (ocupado, instabilidade,
+ * demora). Erros definitivos não são repetidos.
+ */
+async function geminiJson(
+  parts: GeminiPart[],
+  schema: unknown,
+): Promise<string> {
+  const key = process.env["GEMINI_API_KEY"];
+  if (!key) throw new Error("A chave da inteligência artificial não está configurada.");
+
+  let lastError = new Error("Não consegui falar com a inteligência artificial.");
+
+  for (let attempt = 1; attempt <= GEMINI_TRIES; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), GEMINI_TIMEOUT_MS);
+    let res: Response;
+    try {
+      res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel()}:generateContent?key=${encodeURIComponent(key)}`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          signal: controller.signal,
+          body: JSON.stringify({
+            contents: [{ role: "user", parts }],
+            generationConfig: {
+              temperature: 0,
+              responseMimeType: "application/json",
+              responseSchema: schema,
+              // Raciocínio curto: a leitura sai em segundos em vez de minutos.
+              thinkingConfig: { thinkingLevel: "low" },
+            },
+          }),
+        },
+      );
+    } catch (err) {
+      lastError = controller.signal.aborted
+        ? new Error("A leitura demorou demais e foi interrompida.")
+        : new Error("A conexão com a inteligência artificial falhou.");
+      void err;
+      clearTimeout(timer);
+      if (attempt < GEMINI_TRIES) {
+        await sleep(attempt * 2_000);
+        continue;
+      }
+      throw lastError;
+    } finally {
+      clearTimeout(timer);
+    }
+
+    if (res.ok) {
+      const json = (await res.json()) as {
+        candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+      };
+      return (
+        json.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("") ?? ""
+      );
+    }
+
+    const body = await res.text();
+    const busy = res.status === 429 || res.status === 503 || res.status >= 500;
+    if (res.status === 400 || res.status === 401 || res.status === 403) {
+      throw new Error(
+        "A inteligência artificial recusou a leitura (chave ou imagem inválida).",
+      );
+    }
+    lastError = new Error(
+      busy
+        ? "A inteligência artificial está ocupada. Tente de novo em instantes."
+        : `Leitura falhou (${res.status}): ${body.slice(0, 160)}`,
+    );
+    if (!busy || attempt === GEMINI_TRIES) throw lastError;
+    await sleep(attempt * 3_000);
+  }
+
+  throw lastError;
+}
+
 /** Lê UMA imagem. A imagem só existe na memória desta chamada. */
 export async function readPurchaseImage(
   image: AssistantImage,
 ): Promise<PurchaseDraft[]> {
-  const key = process.env["GEMINI_API_KEY"];
-  if (!key) throw new Error("GEMINI_API_KEY ausente");
-
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), GEMINI_TIMEOUT_MS);
-  let res: Response;
-  try {
-    res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel()}:generateContent?key=${encodeURIComponent(key)}`,
-      {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        signal: controller.signal,
-        body: JSON.stringify({
-          contents: [
-            {
-              role: "user",
-              parts: [
-                { text: PROMPT },
-                { inline_data: { mime_type: image.mime, data: image.data } },
-              ],
-            },
-          ],
-          generationConfig: {
-            temperature: 0,
-            responseMimeType: "application/json",
-            responseSchema: SCHEMA,
-          },
-        }),
-      },
-    );
-  } finally {
-    clearTimeout(timer);
-  }
-
-  if (!res.ok) {
-    const body = await res.text();
-    if (res.status === 429) throw new Error("A inteligência artificial está ocupada. Tente de novo em instantes.");
-    throw new Error(`Leitura falhou (${res.status}): ${body.slice(0, 200)}`);
-  }
-
-  const json = (await res.json()) as {
-    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
-  };
-  const text = json.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("") ?? "";
+  const text = await geminiJson(
+    [
+      { text: PROMPT },
+      { inline_data: { mime_type: image.mime, data: image.data } },
+    ],
+    SCHEMA,
+  );
   if (!text.trim()) return [];
 
   let parsed: { products?: unknown };
@@ -284,6 +338,72 @@ async function storeId(): Promise<string> {
   return id;
 }
 
+/* ------------------------------ Categorias ------------------------------- */
+
+export type LoyCategory = { id: string; name: string; deleted_at?: string | null };
+
+export async function loadCategories(): Promise<LoyCategory[]> {
+  const all = await loyverseList<LoyCategory>("categories");
+  return all.filter((c) => !c.deleted_at && c.id && c.name);
+}
+
+/** Devolve o id da categoria "Encomenda", criando-a só se ainda não existir. */
+export async function ensureOrderCategory(
+  categories: LoyCategory[],
+): Promise<{ id: string; categories: LoyCategory[] }> {
+  const wanted = normalizeName(ORDER_CATEGORY_NAME);
+  const found = categories.find((c) => normalizeName(c.name) === wanted);
+  if (found) return { id: found.id, categories };
+
+  const created = await loyverse<LoyCategory>("categories", {
+    method: "POST",
+    body: { name: ORDER_CATEGORY_NAME },
+  });
+  if (!created?.id) throw new Error("Não consegui criar a categoria Encomenda no Loyverse.");
+  return { id: created.id, categories: [...categories, created] };
+}
+
+const CATEGORY_SCHEMA = {
+  type: "object",
+  properties: { categoryId: { type: "string" } },
+  required: ["categoryId"],
+};
+
+/**
+ * A IA escolhe a categoria EXISTENTE mais adequada para o produto.
+ * Nunca cria categoria nova: quando nada combina, devolve vazio.
+ */
+export async function pickCategory(
+  productName: string,
+  categories: LoyCategory[],
+): Promise<string | null> {
+  if (categories.length === 0 || !productName.trim()) return null;
+  const list = categories.map((c) => `${c.id} = ${c.name}`).join("\n");
+  try {
+    const text = await geminiJson(
+      [
+        {
+          text: `Escolha a categoria mais adequada para o produto abaixo.
+
+Produto: ${productName}
+
+Categorias existentes (id = nome):
+${list}
+
+Responda com o id exato da melhor categoria. Se nenhuma servir, responda com categoryId vazio. Nunca invente um id.`,
+        },
+      ],
+      CATEGORY_SCHEMA,
+    );
+    const id = String(
+      (JSON.parse(text || "{}") as { categoryId?: unknown }).categoryId ?? "",
+    ).trim();
+    return categories.some((c) => c.id === id) ? id : null;
+  } catch {
+    return null; // sem categoria é melhor do que travar o cadastro
+  }
+}
+
 async function inventoryFor(variantId: string, store: string): Promise<number> {
   const data = await loyverse<{ inventory_levels?: Array<{ in_stock?: number }> }>(
     `inventory?variant_ids=${variantId}&store_ids=${store}`,
@@ -316,6 +436,8 @@ function variantLabel(v: LoyVariant): string {
 export async function upsertPurchase(
   draft: PurchaseDraft,
   items: LoyItem[],
+  categoryId?: string | null,
+  forceCategory = false,
 ): Promise<{ result: AssistantResult; items: LoyItem[] }> {
   const store = await storeId();
   const wantedName = normalizeName(draft.name);
@@ -338,6 +460,19 @@ export async function upsertPurchase(
   }
 
   if (matchItem?.id && matchVariant?.variant_id) {
+    // Encomenda: o produto existente também precisa ficar na categoria certa.
+    if (forceCategory && categoryId && matchItem.category_id !== categoryId) {
+      try {
+        const full = await loyverse<LoyItem>(`items/${matchItem.id}`);
+        await loyverse("items", {
+          method: "POST",
+          body: { ...full, category_id: categoryId },
+        });
+        matchItem.category_id = categoryId;
+      } catch {
+        /* o estoque é somado mesmo assim */
+      }
+    }
     const current = await inventoryFor(matchVariant.variant_id, store);
     await setInventory(matchVariant.variant_id, store, current + draft.qty);
     return {
@@ -364,6 +499,7 @@ export async function upsertPurchase(
     sold_by_weight: false,
     is_composite: false,
     use_production: false,
+    ...(categoryId ? { category_id: categoryId } : {}),
     ...(draft.variant ? { option1_name: "Variação" } : {}),
     variants: [
       {

@@ -3,7 +3,11 @@
  * Ensures system/internal products don't appear in commercial product listings
  */
 
-import { isStoreLogoName, type CatalogProduct } from "./loyverse.functions";
+import {
+  isOrderCategoryName,
+  isStoreLogoName,
+  type CatalogProduct,
+} from "./loyverse.functions";
 
 /**
  * Check if a product is a commercial product (for sale)
@@ -18,6 +22,12 @@ export function isCommercialProduct(product: CatalogProduct): boolean {
   if (isStoreLogoName(product.name)) {
     return false;
   }
+
+  // Encomenda: controle interno no Loyverse, nunca na vitrine pública.
+  if (isOrderCategoryName(product.categoryName)) {
+    return false;
+  }
+  
   
   return true;
 }

@@ -10,6 +10,8 @@ import {
 const MAX_IMAGES = 10;
 const ALLOWED = ["image/jpeg", "image/png", "image/webp"];
 
+const MAX_SIDE = 1600;
+
 function toBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -20,6 +22,32 @@ function toBase64(file: File): Promise<string> {
     };
     reader.readAsDataURL(file);
   });
+}
+
+/**
+ * Reduz a foto no próprio aparelho antes de enviar: sobe mais rápido e a
+ * leitura não estoura o tempo limite. A foto original não é guardada.
+ */
+async function shrink(file: File): Promise<{ mime: string; data: string }> {
+  try {
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, MAX_SIDE / Math.max(bitmap.width, bitmap.height));
+    if (scale >= 1 && file.size <= 1_200_000) {
+      bitmap.close();
+      return { mime: file.type, data: await toBase64(file) };
+    }
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(bitmap.width * scale);
+    canvas.height = Math.round(bitmap.height * scale);
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("sem canvas");
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close();
+    const url = canvas.toDataURL("image/jpeg", 0.85);
+    return { mime: "image/jpeg", data: url.slice(url.indexOf(",") + 1) };
+  } catch {
+    return { mime: file.type, data: await toBase64(file) };
+  }
 }
 
 function money(v: number): string {
@@ -42,6 +70,8 @@ export function AssistantPanel({
   const savePrice = useServerFn(setAssistantPrice);
 
   const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const [mode, setMode] = useState<"store" | "order">("store");
   const [error, setError] = useState<string | null>(null);
   const [items, setItems] = useState<AssistantItem[]>([]);
   const [review, setReview] = useState<Array<{ image: string; reason: string }>>([]);
@@ -64,38 +94,55 @@ export function AssistantPanel({
 
     setError(null);
     setBusy(true);
+    setProgress({ done: 0, total: files.length });
+    const batchReview: Array<{ image: string; reason: string }> = [];
+
     try {
-      const images = await Promise.all(
-        files.map(async (f) => ({
-          name: f.name,
-          mime: f.type,
-          data: await toBase64(f),
-        })),
-      );
-      const out = await run({ data: { images } });
-      if (!out.ok) {
-        setError(
-          out.reason === "forbidden"
-            ? "Você precisa estar logado como administrador."
-            : (out.reason ?? "Não consegui processar as imagens."),
-        );
-        return;
-      }
-      setItems((prev) => [...out.items, ...prev]);
-      setReview(out.review);
-      setPrices((prev) => {
-        const next = { ...prev };
-        for (const it of out.items) {
-          if (next[it.variantId] === undefined) {
-            next[it.variantId] = it.salePrice > 0 ? String(it.salePrice) : "";
+      // Uma foto por vez: a falha de uma não derruba o lote inteiro.
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i]!;
+        try {
+          const shrunk = await shrink(file);
+          const out = await run({
+            data: {
+              mode,
+              images: [{ name: file.name, mime: shrunk.mime, data: shrunk.data }],
+            },
+          });
+          if (!out.ok) {
+            const reason =
+              out.reason === "forbidden"
+                ? "Você precisa estar logado como administrador."
+                : (out.reason ?? "Não consegui processar esta imagem.");
+            batchReview.push({ image: file.name, reason });
+          } else {
+            batchReview.push(...out.review);
+            setItems((prev) => [...out.items, ...prev]);
+            setPrices((prev) => {
+              const next = { ...prev };
+              for (const it of out.items) {
+                if (next[it.variantId] === undefined) {
+                  next[it.variantId] = it.salePrice > 0 ? String(it.salePrice) : "";
+                }
+              }
+              return next;
+            });
           }
+        } catch (err) {
+          batchReview.push({
+            image: file.name,
+            reason:
+              err instanceof Error && err.message
+                ? err.message
+                : "Não consegui processar esta imagem.",
+          });
         }
-        return next;
-      });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Não consegui processar as imagens.");
+        setProgress({ done: i + 1, total: files.length });
+      }
+      setReview(batchReview);
     } finally {
       setBusy(false);
+      setProgress(null);
       if (inputRef.current) inputRef.current.value = "";
     }
   }
@@ -156,6 +203,44 @@ export function AssistantPanel({
         onChange={(e) => void handleFiles(e.target.files)}
       />
 
+      <div className="mt-4">
+        <p className="mb-2 text-sm font-black text-foreground">Tipo do produto</p>
+        <div className="grid grid-cols-2 gap-2">
+          {(
+            [
+              { key: "store", label: "🏪 Produto da loja" },
+              { key: "order", label: "📦 Produto por encomenda" },
+            ] as const
+          ).map((opt) => {
+            const on = mode === opt.key;
+            return (
+              <button
+                key={opt.key}
+                type="button"
+                disabled={busy}
+                onClick={() => setMode(opt.key)}
+                aria-pressed={on}
+                className="tap-target rounded-2xl border-2 px-3 py-3 text-sm font-black leading-tight disabled:opacity-60"
+                style={{
+                  borderColor: on ? color : "hsl(var(--border))",
+                  backgroundColor: on
+                    ? `color-mix(in oklab, ${color} 14%, transparent)`
+                    : "transparent",
+                  color: on ? color : undefined,
+                }}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
+        <p className="mt-2 text-xs font-semibold text-muted-foreground">
+          {mode === "order"
+            ? "Vai para a categoria Encomenda no Loyverse e não aparece para os clientes."
+            : "A inteligência artificial escolhe a categoria que já existe no Loyverse."}
+        </p>
+      </div>
+
       <button
         type="button"
         disabled={busy}
@@ -165,7 +250,10 @@ export function AssistantPanel({
       >
         {busy ? (
           <>
-            <Loader2 className="h-5 w-5 animate-spin" /> Lendo as fotos…
+            <Loader2 className="h-5 w-5 animate-spin" />
+            {progress
+              ? `Lendo ${Math.min(progress.done + 1, progress.total)} de ${progress.total}…`
+              : "Lendo as fotos…"}
           </>
         ) : (
           <>
