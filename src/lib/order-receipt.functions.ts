@@ -146,5 +146,7 @@ export const getOrderReceipt = createServerFn({ method: "POST" })
       total: num(row["total"]),
       logoDataUrl: await logoAsDataUrl(),
       refunded,
+      isRepair,
+      orderCode,
     };
   });
