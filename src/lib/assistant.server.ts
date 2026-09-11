@@ -94,6 +94,53 @@ function toIsoDate(value: unknown): string {
   return br ? `${br[3]}-${br[2]}-${br[1]}` : "";
 }
 
+/**
+ * Rede de segurança do nome: mesmo que a leitura devolva o título gigante da
+ * Shopee, o produto entra na loja com nome curto, limpo e legível.
+ */
+const NOISE =
+  /\b(oferta|ofertas|promo(?:ç|c)(?:ã|a)o|promocional|imperd(?:í|i)vel|frete\s+gr(?:á|a)tis|envio\s+r(?:á|a)pido|pronta\s+entrega|super|mega|top|novo|original|barato|qualidade|loja\s+oficial|atacado|kit)\b/gi;
+
+export function cleanProductName(raw: string): string {
+  let s = String(raw ?? "")
+    .replace(/[\p{Extended_Pictographic}\u2600-\u27bf]/gu, " ")
+    .replace(/#[\wÀ-ÿ]+/g, " ")
+    .replace(/\.{2,}/g, " ")
+    .replace(NOISE, " ")
+    .replace(/(\d+)\s*[/x×]\s*(\d+)\s*[/x×]\s*(\d+)/gi, "$1x$2x$3")
+    .replace(/(\d+)\s*[/×]\s*(\d+)/g, "$1x$2")
+    .replace(/[|•*_"']+/g, " ")
+    .replace(/\s*[,;\-–]\s*/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  // Caixa alta vira Capitalização Normal, preservando siglas curtas e medidas.
+  s = s
+    .split(" ")
+    .map((w) =>
+      w.length > 3 && w === w.toUpperCase() && /[a-zà-ÿ]/i.test(w)
+        ? w.charAt(0) + w.slice(1).toLowerCase()
+        : w,
+    )
+    .join(" ");
+
+  // Palavras repetidas ("azul azul") saem, mantendo a ordem original.
+  const seen = new Set<string>();
+  s = s
+    .split(" ")
+    .filter((w) => {
+      const k = normalizeName(w);
+      if (!k) return false;
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    })
+    .join(" ");
+
+  if (s.length > 60) s = s.slice(0, 60).replace(/\s+\S*$/, "").trim();
+  return s;
+}
+
 const SCHEMA = {
   type: "object",
   properties: {
