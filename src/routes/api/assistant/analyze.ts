@@ -16,4 +16,4 @@ export const Route=createFileRoute('/api/assistant/analyze')({server:{handlers:{
  const stream=new ReadableStream({start(controller){let closed=false;const send=(v:unknown)=>{if(!closed)try{controller.enqueue(enc.encode(JSON.stringify(v)+'\n'));}catch{closed=true;}};send({stage:'Lendo imagem com Gemini…'});const heartbeat=setInterval(()=>send({stage:'Analisando imagem…'}),10000);
  void(async()=>{try{const chat=await import('@/lib/assistant-chat.server');send({result:await chat.extract(owner,parsed.data.id,parsed.data.image,parsed.data.mode)});}catch(e){send({error:e instanceof Error?e.message:'Falha na leitura'});}finally{parsed.data.image.data='';clearInterval(heartbeat);if(!closed){closed=true;controller.close();}}})();},cancel(){/* operação em andamento conclui sem repetir escritas */}});
  return new Response(stream,{headers:{'Content-Type':'application/x-ndjson','Cache-Control':'no-store','X-Accel-Buffering':'no'}});
-}}});
+}}}});
