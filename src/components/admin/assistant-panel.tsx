@@ -54,7 +54,7 @@ export function AssistantPanel({onClose}: {color:string;onClose:()=>void}) {
  const request=useServerFn(assistantChat);
  async function call(args:Parameters<typeof request>[0]):Promise<ChatState>{
   const result=await request(args);
-  if('busy' in result)throw new Error('Uma gravação ainda está terminando. Esta alteração não foi executada; você pode continuar conversando.');
+   if('busy' in result)throw new Error(result.message);
   return result;
  }
  const activeRequests=useRef(0);

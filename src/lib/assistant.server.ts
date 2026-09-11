@@ -8,7 +8,7 @@
 
 /** A leitura pode demorar: nada de corte curto que cancela a análise no meio. */
 const GEMINI_TIMEOUT_MS = 180_000;
-const GEMINI_TRIES = 3;
+const GEMINI_TRIES = 4;
 const LOYVERSE_TIMEOUT_MS = 20_000;
 
 export type AssistantMode = "store" | "order";
@@ -49,6 +49,10 @@ function geminiModel(): string {
   const model = process.env["GEMINI_MODEL"] || "gemini-3.5-flash";
   if (model.includes("1.5")) throw new Error("Configure um modelo Gemini Flash atual.");
   return model;
+}
+
+function geminiModels(): string[] {
+  return [...new Set([geminiModel(), "gemini-3.8-flash"])];
 }
 
 const PROMPT = `Você analisa capturas de tela de compras da Shopee para cadastrar produtos numa loja.
@@ -116,6 +120,18 @@ const SCHEMA = {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+function retryDelay(response: Response, attempt: number): number {
+  const retryAfter = response.headers.get("Retry-After");
+  if (retryAfter) {
+    const seconds = Number(retryAfter);
+    if (Number.isFinite(seconds)) return Math.max(1_000, seconds * 1_000);
+    const date = Date.parse(retryAfter);
+    if (Number.isFinite(date)) return Math.max(1_000, date - Date.now());
+  }
+  const exponential = Math.min(30_000, 2_000 * 2 ** (attempt - 1));
+  return exponential + Math.floor(Math.random() * 750);
+}
+
 type GeminiPart =
   | { text: string }
   | { inline_data: { mime_type: string; data: string } };
@@ -134,13 +150,16 @@ export async function geminiJson(
 
   let lastError = new Error("Não consegui falar com a inteligência artificial.");
 
+  const models = geminiModels();
+  let modelIndex = 0;
   for (let attempt = 1; attempt <= GEMINI_TRIES; attempt++) {
+    const model = models[modelIndex] ?? models[0];
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), GEMINI_TIMEOUT_MS);
     let res: Response;
     try {
       res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel()}:generateContent`,
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
         {
           method: "POST",
           headers: { "content-type": "application/json", "x-goog-api-key": key },
@@ -164,7 +183,7 @@ export async function geminiJson(
       void err;
       clearTimeout(timer);
       if (attempt < GEMINI_TRIES) {
-        await sleep(attempt * 2_000);
+        await sleep(Math.min(30_000, 2_000 * 2 ** (attempt - 1)) + Math.floor(Math.random() * 750));
         continue;
       }
       throw lastError;
@@ -194,8 +213,8 @@ export async function geminiJson(
         : `Leitura falhou (${res.status}): ${body.slice(0, 160)}`,
     );
     if (!busy || attempt === GEMINI_TRIES) throw lastError;
-    const retryAfter = Number(res.headers.get("Retry-After"));
-    await sleep(Math.max(attempt * 3_000, Number.isFinite(retryAfter) ? retryAfter * 1000 : 0));
+    if (models.length > 1) modelIndex = (modelIndex + 1) % models.length;
+    await sleep(retryDelay(res, attempt));
   }
 
   throw lastError;
