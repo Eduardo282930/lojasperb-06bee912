@@ -40,7 +40,7 @@ export type AssistantResult = {
 export type AssistantReview = { image: string; reason: string };
 
 function geminiModel(): string {
-  return process.env["GEMINI_MODEL"] || "gemini-flash-latest";
+  return process.env["GEMINI_MODEL"] || "gemini-3.5-flash";
 }
 
 const PROMPT = `Você analisa capturas de tela de compras da Shopee para cadastrar produtos numa loja.
@@ -50,14 +50,35 @@ Extraia TODOS os produtos visíveis na imagem. Para cada produto:
 - variant: a variação escolhida (cor, tamanho, modelo). Vazio se não houver.
 - qty: quantidade comprada (número inteiro, mínimo 1).
 - seller: nome da loja/vendedor, se aparecer.
-- listedPrice: preço anunciado ATUAL por unidade. IGNORE completamente qualquer preço riscado/antigo.
-- cost: valor realmente pago por unidade. Se só houver total, divida pela quantidade.
+- listedPrice: preço anunciado ATUAL de UMA unidade, só o número (ex.: 39.90). IGNORE completamente qualquer preço riscado/antigo.
+- cost: valor pago por UMA unidade, só o número. Nunca repita aqui o total do pedido.
+- totalPaid: total realmente pago pelo item (todas as unidades), só o número.
 - trackingCode: código de rastreio/pedido, se aparecer.
 - purchasedAt: data da compra no formato AAAA-MM-DD, se aparecer.
 - notes: informação adicional útil (frete, cupom aplicado, observações).
 
 Nunca invente preço de venda. Se a imagem não for uma compra ou não der para ler, devolva a lista vazia.
 Responda apenas com JSON.`;
+
+/** Aceita 39.90, "39,90", "R$ 1.299,00" e devolve número. */
+function toNumber(value: unknown): number {
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+  const raw = String(value ?? "").replace(/[^\d.,-]/g, "");
+  if (!raw) return 0;
+  const normalized = raw.includes(",")
+    ? raw.replace(/\./g, "").replace(",", ".")
+    : raw;
+  const n = Number(normalized);
+  return Number.isFinite(n) ? n : 0;
+}
+
+/** Aceita 2026-08-12 e 12/08/2026. */
+function toIsoDate(value: unknown): string {
+  const s = String(value ?? "").trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const br = s.match(/^(\d{2})[/-](\d{2})[/-](\d{4})$/);
+  return br ? `${br[3]}-${br[2]}-${br[1]}` : "";
+}
 
 const SCHEMA = {
   type: "object",
