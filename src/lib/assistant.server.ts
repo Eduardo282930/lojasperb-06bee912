@@ -53,8 +53,15 @@ function geminiModel(): string {
 const PROMPT = `Você analisa capturas de tela de compras da Shopee para cadastrar produtos numa loja.
 
 Extraia TODOS os produtos visíveis na imagem. Para cada produto:
-- name: nome completo do produto, reconstruído por extenso. Nunca use "..." nem corte o nome.
-- variant: a variação escolhida (cor, tamanho, modelo). Vazio se não houver.
+- name: nome CURTO, limpo e profissional, pronto para aparecer na loja. NUNCA copie o título da Shopee literalmente.
+  Regras do nome:
+  * Remova marketing ("oferta", "promoção", "frete grátis", "envio rápido", "kit imperdível"), emojis, símbolos, hashtags, nome do vendedor, códigos e siglas sem sentido, palavras repetidas e reticências.
+  * Reconstrua palavras cortadas por "..." usando o contexto.
+  * Mantenha o que identifica o produto e a variação importante (modelo, cor, tamanho, medida), pois a loja usa apenas produtos simples.
+  * Use Capitalização Normal (não caixa alta) e medidas no formato 138x188x15.
+  * Máximo de 60 caracteres.
+  * Exemplo: "Protetor De Colchão Impermeável Cap... AZUL,CASAL - ZIPER 138/188/15" vira "Protetor de Colchão Impermeável Azul Casal 138x188x15".
+- variant: deixe vazio quando a variação já estiver dentro do name. Se houver duas variações diferentes na mesma compra, devolva DOIS produtos separados, cada um com o próprio name completo.
 - qty: quantidade comprada (número inteiro, mínimo 1).
 - seller: nome da loja/vendedor, se aparecer.
 - listedPrice: preço anunciado ATUAL de UMA unidade, só o número (ex.: 39.90). IGNORE completamente qualquer preço riscado/antigo.
