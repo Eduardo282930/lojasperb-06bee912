@@ -34,6 +34,8 @@ async function drawReceipt(r: ReceiptData): Promise<Blob | null> {
   const logo = r.logoDataUrl ? await loadImage(r.logoDataUrl) : null;
 
   const lines: Array<[string, string]> = [];
+  if (r.isRepair) lines.push(["Tipo", "Conserto (serviço)"]);
+  if (r.orderCode) lines.push(["Código do pedido", r.orderCode]);
   if (r.employeeName) lines.push(["Funcionário", r.employeeName]);
   if (r.customerName) lines.push(["Cliente", r.customerName]);
   if (r.customerPhone) lines.push(["Telefone", r.customerPhone]);
@@ -126,6 +128,17 @@ async function drawReceipt(r: ReceiptData): Promise<Blob | null> {
   ctx.font = "400 22px system-ui, sans-serif";
   ctx.fillText("Obrigado pela preferência!", center, y + 26);
   y += 60;
+
+  if (r.isRepair) {
+    ctx.strokeStyle = "#111111";
+    ctx.lineWidth = 3;
+    ctx.strokeRect(center - 220, y, 440, 54);
+    ctx.fillStyle = "#111111";
+    ctx.font = "800 27px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("SERVIÇO DE CONSERTO", center, y + 37);
+    y += 78;
+  }
 
   ctx.fillStyle = "#111111";
   ctx.font = "700 60px system-ui, sans-serif";
