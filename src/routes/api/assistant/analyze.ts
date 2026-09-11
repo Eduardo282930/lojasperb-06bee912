@@ -3,7 +3,7 @@ import { z } from 'zod';
 const schema=z.object({id:z.string().uuid(),mode:z.enum(['store','order']),image:z.object({name:z.string().max(255),mime:z.enum(['image/jpeg','image/png','image/webp']),data:z.string().min(1).max(11200000).regex(/^[A-Za-z0-9+/]*={0,2}$/)})});
 export const Route=createFileRoute('/api/assistant/analyze')({server:{handlers:{POST:async({request})=>{
  const {createClient}=await import('@supabase/supabase-js');
- const url=process.env['EXT_SUPABASE_URL'],key=process.env['EXT_SUPABASE_PUBLISHABLE_KEY'];
+ const url=process.env['EXT_SUPABASE_URL']??process.env['SUPABASE_URL'],key=process.env['EXT_SUPABASE_PUBLISHABLE_KEY']??process.env['SUPABASE_PUBLISHABLE_KEY'];
  if(!url||!key)return new Response('Conexão externa indisponível',{status:503});
  const auth=request.headers.get('Authorization');if(!auth?.startsWith('Bearer '))return new Response('Unauthorized',{status:401});
  const d=createClient(url,key,{global:{headers:{Authorization:auth}},auth:{persistSession:false}});
