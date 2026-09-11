@@ -3,7 +3,8 @@ import { z } from 'zod';
 import * as ai from './assistant.server';
 import type { ChatState, ChatProduct } from './assistant-chat.types';
 function db() {
- const url=process.env['EXT_SUPABASE_URL'], key=process.env['EXT_SUPABASE_SERVICE_ROLE_KEY'];
+ const url=process.env['EXT_SUPABASE_URL']??process.env['SUPABASE_URL'];
+ const key=process.env['EXT_SUPABASE_SERVICE_ROLE_KEY']??process.env['SUPABASE_SERVICE_ROLE_KEY'];
  if(!url||!key) throw new Error('Conexão externa não configurada.');
  return createClient(url,key,{auth:{persistSession:false}});
 }
