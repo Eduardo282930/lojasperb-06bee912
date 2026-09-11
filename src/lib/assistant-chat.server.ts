@@ -49,6 +49,7 @@ export async function extract(owner:string,id:string,image:ai.AssistantImage,mod
  return state(owner,id);
  });
 }
+export async function syncBatch(owner:string,id:string){await state(owner,id);await sync();return state(owner,id);}
 export async function register(owner:string,id:string,productId:string){
  const current=await state(owner,id),p=current.products.find(p=>p.id===productId);if(!p)throw new Error('Produto não pertence à conversa.');
  return lock('loyverse:assistant-writes',async()=>{
@@ -60,16 +61,15 @@ export async function register(owner:string,id:string,productId:string){
  if(old.data){if(old.data.status==='done'){const r=await d.from('assistant_products').update({status:'done',result:old.data.result,error:null}).eq('id',productId);check(r.error);return state(owner,id);}throw new Error('Compra com resultado incerto: confira no Loyverse antes de repetir para não duplicar estoque.');}
  let started=false;
  try{
- const categories=await ai.loadCategories();
+ const [categories,items]=await Promise.all([ai.loadCategories(),ai.loadItems()]);
  const category=product.mode==='order'?(await ai.ensureOrderCategory(categories)).id:(typeof draft.categoryId==='string'?categories.find(c=>c.id===draft.categoryId&&ai.normalizeName(c.name)!=='encomenda')?.id??null:await ai.pickCategory(draft.name,categories));
- const items=await ai.loadItems();
  const claim=await d.from('assistant_operations').insert({operation_key:key});check(claim.error);started=true;
  const out=await ai.upsertPurchase(draft,items,category,product.mode==='order');
  if(typeof product.draft['manualPrice']==='number' && product.draft['manualPrice']>0){await ai.saveSalePrice(out.result.itemId,out.result.variantId,product.draft['manualPrice']);out.result.salePrice=product.draft['manualPrice'];}
  const done=await d.from('assistant_operations').update({status:'done',result:out.result}).eq('operation_key',key);check(done.error);
  const r=await d.from('assistant_products').update({status:'done',result:out.result,error:null}).eq('id',productId);check(r.error);
  await message(id,'assistant',`${out.result.name}: ${out.result.created?'cadastrado':'estoque atualizado'} no Loyverse.${out.result.salePrice>0?'':' Aguardando preço de venda; fora da vitrine.'}`);
- try{await sync();}catch{await message(id,'assistant','Cadastro salvo; atualização da vitrine pendente da próxima sincronização.');}
+ // A vitrine é sincronizada uma vez ao concluir o lote, não a cada produto.
  }catch(e){const error=(e instanceof Error?e.message:'Falha ao cadastrar')+(started?' Confira o Loyverse antes de repetir.':'');await d.from('assistant_products').update({status:'review',error}).eq('id',productId);await message(id,'assistant',`Precisa de conferência — ${draft.name}: ${error}`);}
  return state(owner,id);
  });
