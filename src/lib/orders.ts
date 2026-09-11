@@ -113,10 +113,12 @@ export function displayStatusLabel(order: {
   status: string;
   paymentStatus: string;
   origin?: string;
+  items?: OrderItem[];
 }): string {
   // Reembolso feito no Loyverse: o cliente vê cancelado e reembolsado.
   if (order.paymentStatus === "refunded") return "Reembolsado e cancelado";
   if (order.status === "canceled") return "Cancelado";
+  if (isRepairOrder(order)) return "Conserto finalizado na loja";
   if (order.status === "delivered" && isStoreOrder(order)) {
     return "Entregue e finalizado na loja";
   }
