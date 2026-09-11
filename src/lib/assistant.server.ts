@@ -47,7 +47,12 @@ export type AssistantResult = {
 export type AssistantReview = { image: string; reason: string };
 
 function geminiModel(): string {
-  return "gemini-2.5-flash-lite";
+  const configured = process.env["GEMINI_MODEL"]?.trim();
+  const model = configured || "gemini-3.5-flash-lite";
+  if (/1\.5|pro/i.test(model) || !/flash-lite/i.test(model)) {
+    throw new Error("GEMINI_MODEL deve usar um modelo Gemini Flash Lite atual.");
+  }
+  return model.replace(/^models\//, "");
 }
 
 const PROMPT = `Você analisa capturas de tela de compras da Shopee para cadastrar produtos numa loja.
@@ -248,7 +253,9 @@ export async function geminiJson(
     }
 
     const body = await res.text();
-    if(res.status===404)throw new Error("O Google não disponibiliza gemini-2.5-flash-lite para esta chave. Nenhum outro modelo foi utilizado.");
+    if (res.status === 404) {
+      throw new Error(`O Google não disponibiliza ${model} para esta chave. Nenhum outro modelo foi utilizado.`);
+    }
     const busy = res.status === 429 || res.status === 503 || res.status >= 500;
     if (res.status === 400 || res.status === 401 || res.status === 403) {
       throw new Error(
