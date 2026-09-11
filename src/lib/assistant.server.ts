@@ -93,6 +93,7 @@ const SCHEMA = {
           qty: { type: "integer" },
           seller: { type: "string" },
           listedPrice: { type: "number" },
+          totalPaid: { type: "number" },
           cost: { type: "number" },
           trackingCode: { type: "string" },
           purchasedAt: { type: "string" },
