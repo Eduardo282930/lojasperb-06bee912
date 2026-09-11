@@ -166,18 +166,21 @@ export async function readPurchaseImage(
   const list = Array.isArray(parsed.products) ? parsed.products : [];
   return list.map((raw) => {
     const p = raw as Record<string, unknown>;
-    const qty = Math.max(1, Math.floor(Number(p["qty"]) || 1));
-    const cost = Math.max(0, Number(p["cost"]) || 0);
-    const listed = Math.max(0, Number(p["listedPrice"]) || 0);
+    const qty = Math.max(1, Math.floor(toNumber(p["qty"]) || 1));
+    const total = Math.max(0, toNumber(p["totalPaid"]));
+    let cost = Math.max(0, toNumber(p["cost"]));
+    // Quando a IA repete o total no custo, o custo por unidade é o total ÷ quantidade.
+    if (qty > 1 && total > 0 && Math.abs(cost - total) < 0.01) cost = total / qty;
+    if (cost === 0 && total > 0) cost = total / qty;
     return {
       name: String(p["name"] ?? "").trim(),
       variant: String(p["variant"] ?? "").trim(),
       qty,
       seller: String(p["seller"] ?? "").trim(),
-      listedPrice: listed,
-      cost,
+      listedPrice: Math.max(0, toNumber(p["listedPrice"])),
+      cost: Math.round(cost * 100) / 100,
       trackingCode: String(p["trackingCode"] ?? "").trim(),
-      purchasedAt: String(p["purchasedAt"] ?? "").trim(),
+      purchasedAt: toIsoDate(p["purchasedAt"]),
       notes: String(p["notes"] ?? "").trim(),
     } satisfies PurchaseDraft;
   });
