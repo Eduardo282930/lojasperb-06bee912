@@ -9,7 +9,7 @@ import { createServerFn } from "@tanstack/react-start";
  * aparelho no momento do download e desaparece junto com a tela.
  */
 
-export type ReceiptItem = { name: string; qty: number; price: number };
+export type ReceiptItem = { name: string; qty: number; price: number; repair?: boolean };
 
 export type ReceiptData = {
   ok: boolean;
@@ -33,6 +33,10 @@ export type ReceiptData = {
   total: number;
   logoDataUrl: string | null;
   refunded: boolean;
+  /** Serviço de conserto: recibo com garantia de 3 meses, não é venda. */
+  isRepair: boolean;
+  /** Mesmo código do pedido no Loyverse, para consulta. */
+  orderCode: string;
 };
 
 function digits(v: string): string {
@@ -102,12 +106,18 @@ export const getOrderReceipt = createServerFn({ method: "POST" })
           name: String(i["name"] ?? "Item"),
           qty: num(i["qty"]) || 1,
           price: num(i["price"]),
+          repair: i["repair"] === true,
         }))
       : [];
 
     const created = String(row["paid_at"] ?? row["created_at"] ?? "");
     const date = created ? new Date(created) : new Date();
     const isStore = String(row["origin"] ?? "app") === "store";
+    const isRepair = items.some((i) => i.repair);
+    const orderCode =
+      String(row["loyverse_receipt_id"] ?? "") ||
+      String(row["receipt_number"] ?? "") ||
+      String(row["id"] ?? "").slice(0, 8).toUpperCase();
 
     return {
       ok: true,
@@ -136,5 +146,7 @@ export const getOrderReceipt = createServerFn({ method: "POST" })
       total: num(row["total"]),
       logoDataUrl: await logoAsDataUrl(),
       refunded,
+      isRepair,
+      orderCode,
     };
   });

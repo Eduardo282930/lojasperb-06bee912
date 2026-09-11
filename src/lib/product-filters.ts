@@ -5,6 +5,7 @@
 
 import {
   isOrderCategoryName,
+  isRepairCategoryName,
   isStoreLogoName,
   type CatalogProduct,
 } from "./loyverse.functions";
@@ -23,8 +24,8 @@ export function isCommercialProduct(product: CatalogProduct): boolean {
     return false;
   }
 
-  // Encomenda: controle interno no Loyverse, nunca na vitrine pública.
-  if (isOrderCategoryName(product.categoryName)) {
+  // Encomenda e conserto: controle interno no Loyverse, nunca na vitrine.
+  if (isOrderCategoryName(product.categoryName) || isRepairCategoryName(product.categoryName)) {
     return false;
   }
   

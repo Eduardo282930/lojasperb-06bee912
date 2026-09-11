@@ -8,6 +8,8 @@ export type OrderItem = {
   price: number;
   image?: string | null;
   sku?: string;
+  /** true quando o item é um serviço de conserto feito na loja. */
+  repair?: boolean;
 };
 
 export type Order = {
@@ -50,6 +52,11 @@ export type Order = {
 /** true quando o pedido foi lançado pelo vendedor na loja física. */
 export function isStoreOrder(order: { origin?: string }): boolean {
   return order.origin === "store";
+}
+
+/** true quando o pedido é um serviço de conserto (categoria Conserto). */
+export function isRepairOrder(order: { items?: OrderItem[] }): boolean {
+  return (order.items ?? []).some((i) => i.repair === true);
 }
 
 /** Pagamento na entrega tem rótulo próprio, nunca aparece só como "Pago". */
@@ -106,10 +113,12 @@ export function displayStatusLabel(order: {
   status: string;
   paymentStatus: string;
   origin?: string;
+  items?: OrderItem[];
 }): string {
   // Reembolso feito no Loyverse: o cliente vê cancelado e reembolsado.
   if (order.paymentStatus === "refunded") return "Reembolsado e cancelado";
   if (order.status === "canceled") return "Cancelado";
+  if (isRepairOrder(order)) return "Conserto finalizado na loja";
   if (order.status === "delivered" && isStoreOrder(order)) {
     return "Entregue e finalizado na loja";
   }

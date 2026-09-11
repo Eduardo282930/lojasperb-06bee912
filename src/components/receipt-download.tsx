@@ -34,6 +34,8 @@ async function drawReceipt(r: ReceiptData): Promise<Blob | null> {
   const logo = r.logoDataUrl ? await loadImage(r.logoDataUrl) : null;
 
   const lines: Array<[string, string]> = [];
+  if (r.isRepair) lines.push(["Tipo", "Conserto (serviço)"]);
+  if (r.orderCode) lines.push(["Código do pedido", r.orderCode]);
   if (r.employeeName) lines.push(["Funcionário", r.employeeName]);
   if (r.customerName) lines.push(["Cliente", r.customerName]);
   if (r.customerPhone) lines.push(["Telefone", r.customerPhone]);
@@ -70,6 +72,7 @@ async function drawReceipt(r: ReceiptData): Promise<Blob | null> {
     56 + // nome da loja
     (r.storeAddress ? 34 : 0) +
     56 + // agradecimento
+    (r.isRepair ? 78 : 0) +
     100 + // total em destaque
     (r.refunded ? 78 : 0) +
     lines.length * 44 +
@@ -78,7 +81,7 @@ async function drawReceipt(r: ReceiptData): Promise<Blob | null> {
     36 +
     totals.length * 42 +
     64 + // total final
-    140 + // rodapé
+    (r.isRepair ? 180 : 140) + // rodapé
     PAD;
 
   const canvas = document.createElement("canvas");
@@ -125,6 +128,17 @@ async function drawReceipt(r: ReceiptData): Promise<Blob | null> {
   ctx.font = "400 22px system-ui, sans-serif";
   ctx.fillText("Obrigado pela preferência!", center, y + 26);
   y += 60;
+
+  if (r.isRepair) {
+    ctx.strokeStyle = "#111111";
+    ctx.lineWidth = 3;
+    ctx.strokeRect(center - 220, y, 440, 54);
+    ctx.fillStyle = "#111111";
+    ctx.font = "800 27px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("SERVIÇO DE CONSERTO", center, y + 37);
+    y += 78;
+  }
 
   ctx.fillStyle = "#111111";
   ctx.font = "700 60px system-ui, sans-serif";
@@ -215,6 +229,14 @@ async function drawReceipt(r: ReceiptData): Promise<Blob | null> {
   ctx.fillStyle = "#777777";
   ctx.font = "400 19px system-ui, sans-serif";
   ctx.textAlign = "center";
+  if (r.isRepair) {
+    ctx.fillStyle = "#111111";
+    ctx.font = "700 21px system-ui, sans-serif";
+    ctx.fillText("Conserto com 3 meses de garantia.", center, y);
+    y += 30;
+    ctx.fillStyle = "#777777";
+    ctx.font = "400 19px system-ui, sans-serif";
+  }
   ctx.fillText("Garantia conforme o Código de Defesa do Consumidor.", center, y);
   y += 30;
   ctx.fillText("WhatsApp (51) 99610-9657", center, y);

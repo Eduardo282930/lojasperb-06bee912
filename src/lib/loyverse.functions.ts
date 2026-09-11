@@ -72,6 +72,20 @@ export function isOrderCategoryName(name: string | null | undefined): boolean {
   );
 }
 
+/**
+ * Categoria "Conserto": serviço feito na loja. Nunca aparece na vitrine;
+ * o cliente só vê no recibo e nos pedidos finalizados.
+ */
+export function isRepairCategoryName(name: string | null | undefined): boolean {
+  const clean = String(name ?? "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return clean === "conserto" || clean === "concerto" || clean === "consertos" || clean === "concertos";
+}
+
 
 type LoyverseVariant = {
   variant_id: string;
@@ -368,8 +382,8 @@ async function buildCatalog(token: string): Promise<Catalog> {
 
     const categoryName =
       (it.category_id && categoryNames.get(it.category_id)) || "Outros";
-    // Produtos por encomenda ficam só no Loyverse: fora da vitrine pública.
-    if (isOrderCategoryName(categoryName)) continue;
+    // Encomenda e conserto ficam só no Loyverse: fora da vitrine pública.
+    if (isOrderCategoryName(categoryName) || isRepairCategoryName(categoryName)) continue;
     const tracked = it.track_stock !== false;
     const hasOptions = itemVariants.some((v) =>
       Boolean(v.option1_value || v.option2_value || v.option3_value),
