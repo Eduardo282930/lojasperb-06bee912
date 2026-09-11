@@ -1,48 +1,53 @@
-# Assistente SPERB — cadastro de produtos por foto
+# Entrada Inteligente com IA — corrigir o erro e escolher o tipo do produto
 
-Uma nova ação dentro de **Meu estoque**, no painel admin. Você envia as fotos das compras da Shopee, a inteligência artificial lê cada foto e os produtos são criados na hora no Loyverse — sem perguntas no meio do caminho.
+## 1. Fim do "This operation was aborted"
 
-## Como vai funcionar
+Hoje cada leitura tem um limite fixo de tempo. Fotos grandes (e o envio de várias de uma vez) estouram esse limite e a chamada é cancelada no meio, derrubando o lote.
 
-1. No topo de "Meu estoque" aparece o botão **Assistente SPERB**.
-2. Abre um painel simples: "Envie as fotos das suas compras e eu cadastro os produtos para você" + botão **Adicionar imagens** (uma ou várias de uma vez, até 10 por envio).
-3. As fotos são enviadas juntas para leitura. Aparece só uma barra de progresso.
-4. Terminou: **✓ 5 produtos cadastrados** e, logo abaixo, **Defina os preços de venda** — todas as caixinhas juntas na tela.
-5. Cada caixinha mostra nome, variação, quantidade, custo real e preço anunciado, com um campo de preço de venda. Enter ou "Salvar" grava na hora e mostra **✓ Preço salvo**, sem sair da tela e sem confirmação extra. A caixinha continua editável.
-6. Fotos ilegíveis ou com dados faltando não param o lote: o resto é cadastrado normalmente e essas aparecem numa lista **Precisa de conferência**, dizendo qual imagem e o que faltou.
+O que muda:
 
-## O que a IA extrai de cada foto
+- A foto é reduzida no próprio aparelho antes de subir (lado maior ~1600 px, JPEG), então chega muito mais leve e rápida.
+- O tempo de espera da leitura passa a ser generoso (alguns minutos), não mais um corte curto.
+- Se a leitura falhar por sobrecarga ou instabilidade momentânea, o sistema tenta de novo sozinho até 3 vezes, com pausa crescente. Erros definitivos (chave inválida, foto ilegível) não são repetidos.
+- As fotos são lidas uma a uma, isoladas: se uma falhar, ela vai para **Precisa de conferência** com o motivo em português claro ("a leitura demorou demais", "a IA está ocupada") e as demais continuam.
+- O painel mostra o andamento por foto ("Lendo 2 de 5") em vez de uma barra parada.
+- As fotos continuam existindo só durante a leitura; nada é guardado no banco.
 
-Nome completo do produto (reconstruído, nunca cortado com "..."), variação, quantidade, vendedor, preço anunciado, valor realmente pago, código de rastreio, data da compra e observações úteis.
+## 2. Escolher o tipo antes de enviar
 
-Regras de preço:
-- **Preço anunciado** = o preço atual mostrado. Preço riscado é ignorado por completo.
-- **Custo** = o valor realmente pago.
-- **Economia** = anunciado − pago, guardada só como informação.
-- A IA **nunca** sugere, arredonda ou altera preço de venda. O preço de venda é sempre o que você digitar (39, 39,90, 45…), salvo exatamente assim.
+No painel do Assistente, acima do botão de adicionar imagens, duas opções grandes:
 
-## Onde os dados ficam
+- 🏪 **Produto da loja** (já vem marcada)
+- 📦 **Produto por encomenda**
 
-- O produto é criado **no Loyverse** (nome, variação, custo, estoque da compra), então já aparece na vitrine como hoje. O preço de venda que você digitar é gravado no Loyverse.
-- Preço anunciado na Shopee, economia, vendedor, código de rastreio, data da compra e o link da foto ficam numa tabela nova no seu Supabase externo, ligada à variação do Loyverse. Nada substitui custo por preço de venda nem o contrário.
+A escolha vale para todas as fotos daquele envio e pode ser trocada antes de processar.
 
-## Duplicados
+### Produto por encomenda
 
-Antes de criar, o Assistente procura pelo SKU/código de barras, pelo nome normalizado + variação e pelo código de rastreio já registrado. Se já existir, **não** cria produto novo: soma a quantidade comprada ao estoque daquele item no Loyverse e registra a nova compra no histórico.
+- O produto é criado no Loyverse sempre na categoria **Encomenda**.
+- Se essa categoria ainda não existir no Loyverse, ela é criada uma única vez e reaproveitada.
+- Esses produtos **não aparecem** no aplicativo dos clientes: nem na vitrine, nem na busca, nem nas recomendações, nem no carrinho.
+
+### Produto da loja
+
+- Fluxo atual, mais uma novidade: a IA identifica o que é o produto e escolhe sozinha a **categoria existente mais parecida** no Loyverse (chinelo → a categoria de calçados que você já tem, fita → a de utilidades, etc.).
+- Nunca cria categoria nova. Se nenhuma combinar, o produto fica sem categoria, como hoje.
+
+## 3. Encomenda fora do aplicativo público
+
+O bloqueio é feito em dois pontos, para não escapar por cache nem por busca:
+
+- Na montagem do catálogo no servidor: itens da categoria Encomenda são descartados e a categoria não entra na lista de categorias.
+- Na tela: uma trava extra ignora qualquer item de encomenda que venha de um cache antigo.
 
 ## Detalhes técnicos
 
-- **Chave**: `GEMINI_API_KEY` guardada só no cofre de segredos, lida apenas no servidor. Modelo Flash multimodal atual configurável por `GEMINI_MODEL` (padrão: `gemini-flash-latest`), sem `gemini-1.5-flash`; se o Google mudar o modelo, basta trocar a variável.
-- **Backend**: `src/lib/assistant.functions.ts` com `createServerFn` protegido por `requireSupabaseAuth` + checagem de `has_role(admin)`. Valida tipo de arquivo (jpeg/png/webp), tamanho (até 8 MB por imagem) e quantidade (até 10 por lote). Chama a API do Gemini (`generateContent`) com JSON estruturado, imagem a imagem em paralelo limitado, cada falha isolada.
-- **Loyverse**: nova escrita `POST /v1.0/items` e `POST /v1.0/inventory` em um `loyversePost` ao lado do `loyverseGet` atual; atualização de preço em `PUT`/`POST /v1.0/items`. Depois do lote, o catálogo é ressincronizado para a vitrine refletir na hora (mesmo mecanismo em tempo real já existente).
-- **Migration externa** `supabase/external-migrations/20260911_product_purchases.sql`: tabela `product_purchases` (external_variant_id, product_name, variant_label, qty, cost, listed_price, savings, seller, tracking_code, purchased_at, source_image_url, needs_review, raw jsonb), índice único por `tracking_code + external_variant_id`, RLS só para `service_role`. Aplicada apenas no Supabase externo — Lovable Cloud continua desativado.
-- **Frontend**: `src/components/admin/assistant-panel.tsx` (upload, progresso, resultado, grade de caixinhas de preço) e um botão no cabeçalho do painel de estoque em `src/routes/admin.tsx`. Visual e tokens iguais ao restante do admin.
-- Nada muda em Home, pedidos, pagamentos, cupons, notificações, carrinho, checkout ou nos outros módulos.
-
-## Antes de começar
-
-Vou precisar que você salve a `GEMINI_API_KEY` no cofre de segredos (peço no formulário seguro assim que o plano for aprovado) e que o seu token do Loyverse tenha permissão de escrita em itens e estoque — sem isso o cadastro automático não consegue criar o produto.
+- `src/lib/assistant.server.ts`: `GEMINI_TIMEOUT_MS` sobe para 180 s; `readPurchaseImage` ganha retry com backoff (429/503/5xx/AbortError, 3 tentativas) e mensagens de erro traduzidas; novas funções `ensureOrderCategory()` (busca `categories`, cria "Encomenda" via `POST /v1.0/categories` só se faltar, com cache em memória) e `pickCategory()` (a IA recebe a lista de categorias existentes e devolve o `category_id`, ou vazio). `upsertPurchase` recebe `mode: "store" | "order"` e grava `category_id` no item criado.
+- `src/lib/assistant.functions.ts`: `runAssistant` aceita `mode` no input validado; carrega as categorias uma vez por lote; cada imagem em `try/catch` próprio (já existente) com o motivo normalizado.
+- `src/components/admin/assistant-panel.tsx`: seletor de tipo (padrão `store`), redimensionamento via `canvas` antes do envio, progresso por imagem.
+- `src/lib/loyverse.functions.ts`: em `buildCatalog`, `isOrderCategoryName()` (normaliza para "encomenda") descarta itens dessa categoria e a remove de `categories`; `src/lib/product-filters.ts` ganha a mesma checagem como proteção de frontend.
+- Nada muda em pedidos, pagamentos, cupons, notificações, checkout ou reembolso. Nenhuma foto é persistida.
 
 ## Verificação
 
-Typecheck e build, um lote de teste com várias fotos (incluindo uma ilegível), conferência de duplicado reenviando a mesma foto e teste visual do admin em 390 px e 1440 px.
+Typecheck, build e um teste real: uma foto como Produto da loja (confere categoria escolhida), uma como Produto por encomenda (confere categoria Encomenda no Loyverse e ausência na vitrine e na busca), e uma foto pesada/ilegível para confirmar que o lote não para.
