@@ -194,6 +194,7 @@ export async function geminiJson(
     }
 
     const body = await res.text();
+    if(res.status===404)throw new Error("O Google não disponibiliza gemini-2.5-flash-lite para esta chave. Nenhum outro modelo foi utilizado.");
     const busy = res.status === 429 || res.status === 503 || res.status >= 500;
     if (res.status === 400 || res.status === 401 || res.status === 403) {
       throw new Error(
