@@ -8,7 +8,7 @@
 
 /** A leitura pode demorar: nada de corte curto que cancela a análise no meio. */
 const GEMINI_TIMEOUT_MS = 180_000;
-const GEMINI_TRIES = 3;
+const GEMINI_TRIES = 4;
 const LOYVERSE_TIMEOUT_MS = 20_000;
 
 export type AssistantMode = "store" | "order";
@@ -116,6 +116,18 @@ const SCHEMA = {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+function retryDelay(response: Response, attempt: number): number {
+  const retryAfter = response.headers.get("Retry-After");
+  if (retryAfter) {
+    const seconds = Number(retryAfter);
+    if (Number.isFinite(seconds)) return Math.max(1_000, seconds * 1_000);
+    const date = Date.parse(retryAfter);
+    if (Number.isFinite(date)) return Math.max(1_000, date - Date.now());
+  }
+  const exponential = Math.min(30_000, 2_000 * 2 ** (attempt - 1));
+  return exponential + Math.floor(Math.random() * 750);
+}
+
 type GeminiPart =
   | { text: string }
   | { inline_data: { mime_type: string; data: string } };
@@ -164,7 +176,7 @@ export async function geminiJson(
       void err;
       clearTimeout(timer);
       if (attempt < GEMINI_TRIES) {
-        await sleep(attempt * 2_000);
+        await sleep(Math.min(30_000, 2_000 * 2 ** (attempt - 1)) + Math.floor(Math.random() * 750));
         continue;
       }
       throw lastError;
@@ -194,8 +206,7 @@ export async function geminiJson(
         : `Leitura falhou (${res.status}): ${body.slice(0, 160)}`,
     );
     if (!busy || attempt === GEMINI_TRIES) throw lastError;
-    const retryAfter = Number(res.headers.get("Retry-After"));
-    await sleep(Math.max(attempt * 3_000, Number.isFinite(retryAfter) ? retryAfter * 1000 : 0));
+    await sleep(retryDelay(res, attempt));
   }
 
   throw lastError;
