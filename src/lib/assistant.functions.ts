@@ -97,9 +97,12 @@ export const runAssistant = createServerFn({ method: "POST" })
           items = out.items;
           results.push({ ...out.result, image: image.name });
 
-          const insert = supabaseAdmin.from("product_purchases") as unknown as {
+          const fromTable = supabaseAdmin.from.bind(supabaseAdmin) as unknown as (
+            table: string,
+          ) => {
             insert: (row: Record<string, unknown>) => Promise<{ error: unknown }>;
           };
+          const insert = fromTable("product_purchases");
           await insert.insert({
             external_variant_id: out.result.variantId,
             loyverse_item_id: out.result.itemId,
