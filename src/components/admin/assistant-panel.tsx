@@ -95,8 +95,8 @@ export function AssistantPanel({onClose}: {color:string;onClose:()=>void}) {
  finally{latestChat.current=current;activeRequests.current--;setBusy(activeRequests.current>0);setStage('');composer.current?.focus();}
  }
  async function price(product:ChatProduct,value:number){
-  if(!chat||operationActive.current)throw new Error('Aguarde a operação atual antes de salvar outro preço.');
-  operationActive.current=true;setBusy(true);
+  if(!chat)return;
+  activeRequests.current++;setBusy(true);
   try{const result=await call({data:{id:chat.id,action:'price',productId:product.id,price:value}});latestChat.current=result;setChat(result);}
   finally{activeRequests.current--;setBusy(activeRequests.current>0);}
  }
