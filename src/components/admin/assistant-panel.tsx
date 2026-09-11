@@ -54,12 +54,11 @@ export function AssistantPanel({onClose}: {color:string;onClose:()=>void}) {
  const request=useServerFn(assistantChat);
  async function call(args:Parameters<typeof request>[0]):Promise<ChatState>{
   const result=await request(args);
-  if('busy' in result){setStage('Aguardando a operação anterior; seu envio está na fila…');await new Promise(resolve=>setTimeout(resolve,1500));return call(args);}
+  if('busy' in result)throw new Error('Uma gravação ainda está terminando. Esta alteração não foi executada; você pode continuar conversando.');
   return result;
  }
- const operationActive=useRef(false);
- const queue=useRef<Array<{instruction:string;batch:File[];mode:Mode}>>([]);
- const [queued,setQueued]=useState<string[]>([]);
+ const activeRequests=useRef(0);
+ const [responses,setResponses]=useState<Array<{id:string;text:string}>>([]);
  const latestChat=useRef<ChatState|null>(null);
  const composer=useRef<HTMLTextAreaElement>(null);
  const [chat,setChat]=useState<ChatState|null>(null),[text,setText]=useState(''),[files,setFiles]=useState<File[]>([]),[mode,setMode]=useState<Mode>('store');
@@ -69,19 +68,11 @@ export function AssistantPanel({onClose}: {color:string;onClose:()=>void}) {
  useEffect(()=>{bottom.current?.scrollIntoView({behavior:'smooth'});},[chat?.messages.length,stage]);
  async function send(){
  if(!chat||(!text.trim()&&!files.length))return;
- queue.current.push({instruction:text,batch:files,mode});
- setQueued(queue.current.map(job=>job.instruction||`${job.batch.length} imagem(ns)`));
+ const instruction=text,batch=files,requestId=crypto.randomUUID();
+ let current=latestChat.current??chat;
+ setResponses(old=>[...old,{id:requestId,text:`${instruction||`${batch.length} imagem(ns)`} — Respondendo…`}]);
  setText('');setFiles([]);composer.current?.focus();
- await drain();
- }
- async function drain(){
- if(operationActive.current)return;
- operationActive.current=true;setBusy(true);
- try{while(queue.current.length){
- const job=queue.current.shift();if(!job)break;
- setQueued(queue.current.map(item=>item.instruction||`${item.batch.length} imagem(ns)`));
- let current=latestChat.current??chat;if(!current)break;
- const {batch,instruction,mode}=job;
+ activeRequests.current++;setBusy(true);
  setError('');
  try {
  // Images are extracted individually; instructions can classify a mixed batch before registration.
@@ -94,21 +85,20 @@ export function AssistantPanel({onClose}: {color:string;onClose:()=>void}) {
  if(!response.ok||!response.body)throw new Error(`Falha na leitura (${response.status}).`);
  const reader=response.body.getReader(),decoder=new TextDecoder();let buffer='',waiting=false;
  while(true){const chunk=await reader.read();if(chunk.done)break;buffer+=decoder.decode(chunk.value,{stream:true});let end;while((end=buffer.indexOf('\n'))>=0){const event=JSON.parse(buffer.slice(0,end));buffer=buffer.slice(end+1);if(event.result){current=event.result;setChat(current);}if(event.busy)waiting=true;else if(event.error)throw new Error(event.error);}}
- if(waiting){setStage('Seu envio está na fila; aguardando a operação anterior…');await new Promise(resolve=>setTimeout(resolve,1500));index--;continue;}
+ if(waiting)throw new Error('Outra imagem está sendo processada. Esta imagem não foi analisada; envie-a novamente.');
  }catch(e){setError(`${file.name}: precisa de conferência — ${e instanceof Error?e.message:'Falha na imagem'}`);}
  }
  if(instruction.trim()){setStage('Entendendo sua mensagem…');current=await call({data:{action:'text',id:current.id,text:instruction}});setChat(current);}
  for(const p of current.products.filter(p=>p.status==='pending')){setStage(`Cadastrando ${p.draft.name}…`);try{current=await call({data:{action:'register',id:current.id,productId:p.id}});setChat(current);}catch(e){setError(e instanceof Error?e.message:'Falha no cadastro');}}
- }catch(e){setError(e instanceof Error?e.message:'Não foi possível enviar.');setText(instruction);}
- finally{latestChat.current=current;}
- }
- }finally{operationActive.current=false;setBusy(false);setStage('');composer.current?.focus();}
+ setResponses(old=>old.filter(r=>r.id!==requestId));
+ }catch(e){const detail=e instanceof Error?e.message:'Não foi possível responder. Envie novamente.';setResponses(old=>old.map(r=>r.id===requestId?{...r,text:`${instruction||'Imagens'} — ${detail}`} :r));}
+ finally{latestChat.current=current;activeRequests.current--;setBusy(activeRequests.current>0);setStage('');composer.current?.focus();}
  }
  async function price(product:ChatProduct,value:number){
-  if(!chat||operationActive.current)throw new Error('Aguarde a operação atual antes de salvar outro preço.');
-  operationActive.current=true;setBusy(true);
+  if(!chat)return;
+  activeRequests.current++;setBusy(true);
   try{const result=await call({data:{id:chat.id,action:'price',productId:product.id,price:value}});latestChat.current=result;setChat(result);}
-  finally{operationActive.current=false;setBusy(false);void drain();}
+  finally{activeRequests.current--;setBusy(activeRequests.current>0);}
  }
  if(!mounted)return null;
  return createPortal(<section role="dialog" aria-modal="true" aria-label="Assistente SPERB" className="fixed inset-0 z-[100] flex h-dvh flex-col bg-background text-foreground">
@@ -118,7 +108,7 @@ export function AssistantPanel({onClose}: {color:string;onClose:()=>void}) {
  {chat?.messages.length===0&&<p className="py-12 text-center text-muted-foreground">Olá! O que vamos cadastrar hoje?</p>}
  {chat?.messages.map(m=><article key={m.id} className={m.role==='user'?'ml-auto max-w-[90%] rounded-2xl bg-muted p-3':'max-w-full py-1'}><p className="mb-1 text-xs font-bold text-muted-foreground">{m.role==='user'?'Você':'Assistente SPERB'}</p><div className="break-words text-base leading-relaxed [&_p]:mb-2 [&_ul]:list-inside [&_ul]:list-disc"><ReactMarkdown>{m.content}</ReactMarkdown></div></article>)}
  {!!chat?.products.length&&<div className="grid gap-3 sm:grid-cols-2">{chat.products.map((p,i)=><PriceCard key={p.id} product={p} index={i} disabled={busy} save={v=>price(p,v)}/>)}</div>}
- {queued.map((label,index)=><p key={index} className="rounded-lg bg-muted p-3 text-sm">Na fila: {label}</p>)}
+ {responses.map(response=><p role="status" key={response.id} className="rounded-lg bg-muted p-3 text-sm">{response.text}</p>)}
   {stage&&<p role="status" className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="size-4 animate-spin"/>{stage}</p>}
  {error&&<p role="alert" className="break-words rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
  <div ref={bottom}/></div></div>
