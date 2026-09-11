@@ -14,6 +14,7 @@ import {
   fetchOrders,
   fetchDuplicates,
   confirmRefund,
+  isRepairOrder,
   minutesLeftToPay,
   type Order,
 } from "@/lib/orders";
@@ -106,7 +107,20 @@ export function DashboardPanel({
     const deliveredToday = list.filter(
       (o) => o.status === "delivered" && isToday(o.updatedAt || o.createdAt),
     );
-    return { salesToday, profitToday, paidToday, toPay, preparing, shipping, deliveredToday };
+    /* Consertos: serviço, sem custo de produto — o total é o lucro. */
+    const repairsToday = paidToday.filter((o) => isRepairOrder(o));
+    const repairProfitToday = repairsToday.reduce((sum, o) => sum + (o.total || 0), 0);
+    return {
+      salesToday,
+      profitToday,
+      paidToday,
+      toPay,
+      preparing,
+      shipping,
+      deliveredToday,
+      repairsToday,
+      repairProfitToday,
+    };
   }, [list, costByKey]);
 
   const stock = useMemo(() => {
