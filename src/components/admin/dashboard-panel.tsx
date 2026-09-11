@@ -8,6 +8,7 @@ import {
   PackageSearch,
   TrendingUp,
   Truck,
+  Wrench,
 } from "lucide-react";
 
 import {
@@ -219,7 +220,7 @@ export function DashboardPanel({
         <p className="mb-2 px-1 text-[11px] font-black uppercase tracking-[0.1em] text-muted-foreground">
           Hoje
         </p>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-7">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-8">
           <StatCard
             label="Vendas hoje"
             value={formatPrice(kpis.salesToday)}
@@ -233,6 +234,13 @@ export function DashboardPanel({
             hint="Vendas menos o custo dos produtos"
             color="oklch(0.52 0.20 275)"
             icon={<TrendingUp className="h-4 w-4" />}
+          />
+          <StatCard
+            label="Consertos hoje"
+            value={formatPrice(kpis.repairProfitToday)}
+            hint={`${kpis.repairsToday.length} conserto(s) · lucro do serviço`}
+            color="oklch(0.60 0.15 200)"
+            icon={<Wrench className="h-4 w-4" />}
           />
           <StatCard
             label="A pagar"
