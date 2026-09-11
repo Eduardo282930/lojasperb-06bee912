@@ -51,6 +51,10 @@ function geminiModel(): string {
   return model;
 }
 
+function geminiModels(): string[] {
+  return [...new Set([geminiModel(), "gemini-3.8-flash"])];
+}
+
 const PROMPT = `Você analisa capturas de tela de compras da Shopee para cadastrar produtos numa loja.
 
 Extraia TODOS os produtos visíveis na imagem. Para cada produto:
@@ -146,13 +150,16 @@ export async function geminiJson(
 
   let lastError = new Error("Não consegui falar com a inteligência artificial.");
 
+  const models = geminiModels();
+  let modelIndex = 0;
   for (let attempt = 1; attempt <= GEMINI_TRIES; attempt++) {
+    const model = models[modelIndex] ?? models[0];
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), GEMINI_TIMEOUT_MS);
     let res: Response;
     try {
       res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel()}:generateContent`,
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
         {
           method: "POST",
           headers: { "content-type": "application/json", "x-goog-api-key": key },
@@ -206,6 +213,7 @@ export async function geminiJson(
         : `Leitura falhou (${res.status}): ${body.slice(0, 160)}`,
     );
     if (!busy || attempt === GEMINI_TRIES) throw lastError;
+    if (models.length > 1) modelIndex = (modelIndex + 1) % models.length;
     await sleep(retryDelay(res, attempt));
   }
 

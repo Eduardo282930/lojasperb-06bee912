@@ -15,6 +15,7 @@ export const assistantChat=createServerFn({method:'POST'}).middleware([requireSu
  throw new Error('Mensagem inválida.');
   } catch(error) {
     if(error instanceof AssistantBusyError)return {busy:true as const,message:error.message};
-    throw error;
+     console.error('[assistant] Request failed',error instanceof Error?error.message:'unknown error');
+     return {busy:true as const,message:error instanceof Error?error.message:'Não foi possível concluir esta solicitação.'};
   }
 });
