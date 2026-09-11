@@ -23,7 +23,9 @@ import {
   CircleDollarSign,
   Boxes,
   LockKeyhole,
+  Sparkles,
 } from "lucide-react";
+import { AssistantPanel } from "@/components/admin/assistant-panel";
 import {
   findCustomerId,
   adminCoinBalance,
