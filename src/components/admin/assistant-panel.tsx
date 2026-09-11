@@ -94,6 +94,7 @@ export function AssistantPanel({onClose}: {color:string;onClose:()=>void}) {
  if(!response.ok||!response.body)throw new Error(`Falha na leitura (${response.status}).`);
  const reader=response.body.getReader(),decoder=new TextDecoder();let buffer='',waiting=false;
  while(true){const chunk=await reader.read();if(chunk.done)break;buffer+=decoder.decode(chunk.value,{stream:true});let end;while((end=buffer.indexOf('\n'))>=0){const event=JSON.parse(buffer.slice(0,end));buffer=buffer.slice(end+1);if(event.result){current=event.result;setChat(current);}if(event.busy)waiting=true;else if(event.error)throw new Error(event.error);}}
+ if(waiting){setStage('Seu envio está na fila; aguardando a operação anterior…');await new Promise(resolve=>setTimeout(resolve,1500));index--;continue;}
  }catch(e){setError(`${file.name}: precisa de conferência — ${e instanceof Error?e.message:'Falha na imagem'}`);}
  }
  if(instruction.trim()){setStage('Entendendo sua mensagem…');current=await call({data:{action:'text',id:current.id,text:instruction}});setChat(current);}
