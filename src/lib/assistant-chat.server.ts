@@ -34,17 +34,22 @@ async function hash(s:string){return Array.from(new Uint8Array(await crypto.subt
 async function sync(){const {syncCatalogFromLoyverse}=await import('./loyverse.functions');await syncCatalogFromLoyverse();}
 export async function extract(owner:string,id:string,image:ai.AssistantImage,mode:'store'|'order') {
  await state(owner,id);
- return lock(`conversation:${id}`,async()=>{
+ const fingerprint=await hash(image.data);
+ return lock(`image:${id}:${fingerprint}`,async()=>{
+ const existing=await state(owner,id);
+ if(existing.products.some(p=>p.draft['sourceHash']===fingerprint))return existing;
  await message(id,'user',`Imagem enviada: ${image.name} (${mode==='order'?'encomenda':'loja'})`);
  try {
- const drafts=await ai.readPurchaseImage(image);
+ const categories=mode==='store'?(await ai.loadCategories()).filter(c=>ai.normalizeName(c.name)!=='encomenda'):[];
+ const drafts=await ai.readPurchaseImage(image,categories);
  if(!drafts.length)throw new Error('Nenhum produto legível nesta imagem.');
- const r=await db().from('assistant_products').insert(drafts.map(d=>({conversation_id:id,draft:d,mode})));check(r.error);
+ const r=await db().from('assistant_products').insert(drafts.map(d=>({conversation_id:id,draft:{...d,sourceHash:fingerprint},mode})));check(r.error);
  await message(id,'assistant',`${drafts.length} produto(s) identificado(s). Preparando o cadastro.`);
  }catch(e){await message(id,'assistant',`Precisa de conferência — ${image.name}: ${e instanceof Error?e.message:'Falha na leitura'}`);}
  return state(owner,id);
  });
 }
+export async function syncBatch(owner:string,id:string){await state(owner,id);await sync();return state(owner,id);}
 export async function register(owner:string,id:string,productId:string){
  const current=await state(owner,id),p=current.products.find(p=>p.id===productId);if(!p)throw new Error('Produto não pertence à conversa.');
  return lock('loyverse:assistant-writes',async()=>{
@@ -56,16 +61,15 @@ export async function register(owner:string,id:string,productId:string){
  if(old.data){if(old.data.status==='done'){const r=await d.from('assistant_products').update({status:'done',result:old.data.result,error:null}).eq('id',productId);check(r.error);return state(owner,id);}throw new Error('Compra com resultado incerto: confira no Loyverse antes de repetir para não duplicar estoque.');}
  let started=false;
  try{
- const categories=await ai.loadCategories();
- const category=product.mode==='order'?(await ai.ensureOrderCategory(categories)).id:await ai.pickCategory(draft.name,categories);
- const items=await ai.loadItems();
+ const [categories,items]=await Promise.all([ai.loadCategories(),ai.loadItems()]);
+ const category=product.mode==='order'?(await ai.ensureOrderCategory(categories)).id:(typeof draft.categoryId==='string'?categories.find(c=>c.id===draft.categoryId&&ai.normalizeName(c.name)!=='encomenda')?.id??null:await ai.pickCategory(draft.name,categories));
  const claim=await d.from('assistant_operations').insert({operation_key:key});check(claim.error);started=true;
  const out=await ai.upsertPurchase(draft,items,category,product.mode==='order');
  if(typeof product.draft['manualPrice']==='number' && product.draft['manualPrice']>0){await ai.saveSalePrice(out.result.itemId,out.result.variantId,product.draft['manualPrice']);out.result.salePrice=product.draft['manualPrice'];}
  const done=await d.from('assistant_operations').update({status:'done',result:out.result}).eq('operation_key',key);check(done.error);
  const r=await d.from('assistant_products').update({status:'done',result:out.result,error:null}).eq('id',productId);check(r.error);
  await message(id,'assistant',`${out.result.name}: ${out.result.created?'cadastrado':'estoque atualizado'} no Loyverse.${out.result.salePrice>0?'':' Aguardando preço de venda; fora da vitrine.'}`);
- try{await sync();}catch{await message(id,'assistant','Cadastro salvo; atualização da vitrine pendente da próxima sincronização.');}
+ // A vitrine é sincronizada uma vez ao concluir o lote, não a cada produto.
  }catch(e){const error=(e instanceof Error?e.message:'Falha ao cadastrar')+(started?' Confira o Loyverse antes de repetir.':'');await d.from('assistant_products').update({status:'review',error}).eq('id',productId);await message(id,'assistant',`Precisa de conferência — ${draft.name}: ${error}`);}
  return state(owner,id);
  });

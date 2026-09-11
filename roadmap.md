@@ -7,3 +7,9 @@
 - [x] Identificação de compras por rastreio + produto e bloqueios de escrita.
 - [ ] Executar SQL no banco externo: ação do proprietário.
 - [ ] Validar chat autenticado ponta a ponta após execução da migração.
+
+## Otimização do Assistente
+- [x] Fixar Flash-Lite sem alternância e eliminar raciocínio extra.
+- [x] Paralelizar leitura com limite, deduplicar imagens e aproveitar resultados progressivamente.
+- [x] Integrar categoria na extração, sincronizar uma vez por lote e medir chamada Gemini.
+- [ ] Validação real bloqueada: Google respondeu 404, gemini-2.5-flash-lite indisponível para novos usuários desta chave. Sintaxe verificada; nenhum estoque alterado.

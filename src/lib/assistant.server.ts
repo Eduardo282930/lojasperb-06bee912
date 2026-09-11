@@ -8,7 +8,7 @@
 
 /** A leitura pode demorar: nada de corte curto que cancela a análise no meio. */
 const GEMINI_TIMEOUT_MS = 180_000;
-const GEMINI_TRIES = 4;
+const GEMINI_TRIES = 2;
 const LOYVERSE_TIMEOUT_MS = 20_000;
 
 export type AssistantMode = "store" | "order";
@@ -27,6 +27,7 @@ export type PurchaseDraft = {
   trackingCode: string;
   purchasedAt: string;
   notes: string;
+  categoryId?: string;
 };
 
 export type AssistantResult = {
@@ -46,13 +47,7 @@ export type AssistantResult = {
 export type AssistantReview = { image: string; reason: string };
 
 function geminiModel(): string {
-  const model = process.env["GEMINI_MODEL"] || "gemini-3.5-flash";
-  if (model.includes("1.5")) throw new Error("Configure um modelo Gemini Flash atual.");
-  return model;
-}
-
-function geminiModels(): string[] {
-  return [...new Set([geminiModel(), "gemini-3.8-flash"])];
+  return "gemini-2.5-flash-lite";
 }
 
 const PROMPT = `Você analisa capturas de tela de compras da Shopee para cadastrar produtos numa loja.
@@ -110,6 +105,7 @@ const SCHEMA = {
           trackingCode: { type: "string" },
           purchasedAt: { type: "string" },
           notes: { type: "string" },
+          categoryId: { type: "string" },
         },
         required: ["name", "qty", "cost"],
       },
@@ -150,10 +146,9 @@ export async function geminiJson(
 
   let lastError = new Error("Não consegui falar com a inteligência artificial.");
 
-  const models = geminiModels();
-  let modelIndex = 0;
+  const model = geminiModel();
   for (let attempt = 1; attempt <= GEMINI_TRIES; attempt++) {
-    const model = models[modelIndex] ?? models[0];
+    const started = Date.now();
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), GEMINI_TIMEOUT_MS);
     let res: Response;
@@ -171,7 +166,7 @@ export async function geminiJson(
               responseMimeType: "application/json",
               responseSchema: schema,
               // Raciocínio curto: a leitura sai em segundos em vez de minutos.
-              thinkingConfig: { thinkingLevel: "low" },
+              thinkingConfig: { thinkingBudget: 0 },
             },
           }),
         },
@@ -182,13 +177,11 @@ export async function geminiJson(
         : new Error("A conexão com a inteligência artificial falhou.");
       void err;
       clearTimeout(timer);
-      if (attempt < GEMINI_TRIES) {
-        await sleep(Math.min(30_000, 2_000 * 2 ** (attempt - 1)) + Math.floor(Math.random() * 750));
-        continue;
-      }
+
       throw lastError;
     } finally {
       clearTimeout(timer);
+      console.info("[assistant timing] gemini", { ms: Date.now() - started, attempt, model });
     }
 
     if (res.ok) {
@@ -201,6 +194,7 @@ export async function geminiJson(
     }
 
     const body = await res.text();
+    if(res.status===404)throw new Error("O Google não disponibiliza gemini-2.5-flash-lite para esta chave. Nenhum outro modelo foi utilizado.");
     const busy = res.status === 429 || res.status === 503 || res.status >= 500;
     if (res.status === 400 || res.status === 401 || res.status === 403) {
       throw new Error(
@@ -213,7 +207,7 @@ export async function geminiJson(
         : `Leitura falhou (${res.status}): ${body.slice(0, 160)}`,
     );
     if (!busy || attempt === GEMINI_TRIES) throw lastError;
-    if (models.length > 1) modelIndex = (modelIndex + 1) % models.length;
+
     await sleep(retryDelay(res, attempt));
   }
 
@@ -223,10 +217,11 @@ export async function geminiJson(
 /** Lê UMA imagem. A imagem só existe na memória desta chamada. */
 export async function readPurchaseImage(
   image: AssistantImage,
+  categories: LoyCategory[] = [],
 ): Promise<PurchaseDraft[]> {
   const text = await geminiJson(
     [
-      { text: PROMPT },
+      { text: PROMPT + "\nEscolha categoryId somente entre estas categorias existentes; vazio se nenhuma servir. " + JSON.stringify(categories.map(c => ({id:c.id,name:c.name}))) },
       { inline_data: { mime_type: image.mime, data: image.data } },
     ],
     SCHEMA,
@@ -258,6 +253,7 @@ export async function readPurchaseImage(
       trackingCode: String(p["trackingCode"] ?? "").trim(),
       purchasedAt: toIsoDate(p["purchasedAt"]),
       notes: String(p["notes"] ?? "").trim(),
+      categoryId: categories.some(c => c.id === p["categoryId"]) ? String(p["categoryId"]) : "",
     } satisfies PurchaseDraft;
   });
 }

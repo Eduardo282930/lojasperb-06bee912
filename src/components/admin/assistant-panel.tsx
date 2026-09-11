@@ -58,6 +58,7 @@ export function AssistantPanel({onClose}: {color:string;onClose:()=>void}) {
   return result;
  }
  const activeRequests=useRef(0);
+ const seenImages=useRef(new Set<string>());
  const [responses,setResponses]=useState<Array<{id:string;text:string}>>([]);
  const latestChat=useRef<ChatState|null>(null);
  const composer=useRef<HTMLTextAreaElement>(null);
@@ -75,22 +76,32 @@ export function AssistantPanel({onClose}: {color:string;onClose:()=>void}) {
  activeRequests.current++;setBusy(true);
  setError('');
  try {
- // Images are extracted individually; instructions can classify a mixed batch before registration.
- for(let index=0;index<batch.length;index++){
- const file=batch[index];if(!file)continue;setStage(`Imagem ${index+1} de ${batch.length}: lendo…`);
+ let next=0;
+ let registrations:Promise<void>=Promise.resolve();
+ const claimed=new Set<string>();
+ const registerReady=(snapshot:ChatState)=>{for(const p of snapshot.products.filter(p=>p.status==='pending'&&!claimed.has(p.id))){claimed.add(p.id);registrations=registrations.then(async()=>{try{current=await call({data:{action:'register',id:snapshot.id,productId:p.id}});setChat(current);}catch(e){setError(e instanceof Error?e.message:'Falha no cadastro');}});}};
+  const worker=async()=>{while(next<batch.length){const index=next++;
+  const file=batch[index];if(!file)return;setStage(`Imagem ${index+1} de ${batch.length}: lendo…`);
  try{
- const image=await shrink(file),session=await supabase.auth.getSession();
+ const digest=await crypto.subtle.digest('SHA-256',await file.arrayBuffer());
+  const fingerprint=Array.from(new Uint8Array(digest)).map(b=>b.toString(16).padStart(2,'0')).join('');
+  if(seenImages.current.has(fingerprint))continue;
+  seenImages.current.add(fingerprint);
+  const image=await shrink(file),session=await supabase.auth.getSession();
  const token=session.data.session?.access_token;if(!token)throw new Error('Entre novamente como administrador.');
  const response=await fetch('/api/assistant/analyze',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify({id:current.id,mode,image:{name:file.name,...image}})});
  if(!response.ok||!response.body)throw new Error(`Falha na leitura (${response.status}).`);
  const reader=response.body.getReader(),decoder=new TextDecoder();let buffer='',waiting=false;
- while(true){const chunk=await reader.read();if(chunk.done)break;buffer+=decoder.decode(chunk.value,{stream:true});let end;while((end=buffer.indexOf('\n'))>=0){const event=JSON.parse(buffer.slice(0,end));buffer=buffer.slice(end+1);if(event.result){current=event.result;setChat(current);}if(event.busy)waiting=true;else if(event.error)throw new Error(event.error);}}
+ while(true){const chunk=await reader.read();if(chunk.done)break;buffer+=decoder.decode(chunk.value,{stream:true});let end;while((end=buffer.indexOf('\n'))>=0){const event=JSON.parse(buffer.slice(0,end));buffer=buffer.slice(end+1);if(event.result){current=event.result;setChat(current);if(!instruction.trim())registerReady(current);}if(event.busy)waiting=true;else if(event.error)throw new Error(event.error);}}
  if(waiting)throw new Error('Outra imagem está sendo processada. Esta imagem não foi analisada; envie-a novamente.');
  }catch(e){setError(`${file.name}: precisa de conferência — ${e instanceof Error?e.message:'Falha na imagem'}`);}
- }
- if(instruction.trim()){setStage('Entendendo sua mensagem…');current=await call({data:{action:'text',id:current.id,text:instruction}});setChat(current);}
- for(const p of current.products.filter(p=>p.status==='pending')){setStage(`Cadastrando ${p.draft.name}…`);try{current=await call({data:{action:'register',id:current.id,productId:p.id}});setChat(current);}catch(e){setError(e instanceof Error?e.message:'Falha no cadastro');}}
- setResponses(old=>old.filter(r=>r.id!==requestId));
+ }};
+  await Promise.all(Array.from({length:Math.min(2,batch.length)},()=>worker()));
+  current=await call({data:{action:'state',id:current.id}});setChat(current);
+  if(instruction.trim()){setStage('Entendendo sua mensagem…');current=await call({data:{action:'text',id:current.id,text:instruction}});setChat(current);}
+ registerReady(current);await registrations;
+ if(claimed.size){try{current=await call({data:{action:'sync',id:current.id}});setChat(current);}catch{setError('Cadastros salvos; atualização da vitrine pendente.');}}
+ setResponses(old=>batch.length?[...old.filter(r=>r.id!==requestId),{id:requestId,text:'Imagens concluídas. Informe os preços de venda nos produtos abaixo.'}]:old.filter(r=>r.id!==requestId));
  }catch(e){const detail=e instanceof Error?e.message:'Não foi possível responder. Envie novamente.';setResponses(old=>old.map(r=>r.id===requestId?{...r,text:`${instruction||'Imagens'} — ${detail}`} :r));}
  finally{latestChat.current=current;activeRequests.current--;setBusy(activeRequests.current>0);setStage('');composer.current?.focus();}
  }
