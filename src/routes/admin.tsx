@@ -23,7 +23,9 @@ import {
   CircleDollarSign,
   Boxes,
   LockKeyhole,
+  Sparkles,
 } from "lucide-react";
+import { AssistantPanel } from "@/components/admin/assistant-panel";
 import {
   findCustomerId,
   adminCoinBalance,
@@ -918,6 +920,7 @@ function StockPanel() {
   });
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "in" | "low" | "out">("all");
+  const [assistant, setAssistant] = useState(false);
 
   const products = catalog.data?.products ?? [];
 
@@ -1042,6 +1045,14 @@ function StockPanel() {
             </span>
             <button
               type="button"
+              onClick={() => setAssistant((v) => !v)}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-white px-3 py-1.5 text-sm font-black backdrop-blur active:scale-95"
+              style={{ color: BLUE }}
+            >
+              <Sparkles className="h-4 w-4" /> Assistente SPERB
+            </button>
+            <button
+              type="button"
               onClick={() => void catalog.refetch()}
               className="rounded-xl bg-white/15 px-3 py-1.5 text-sm font-black backdrop-blur active:scale-95"
             >
@@ -1050,6 +1061,17 @@ function StockPanel() {
           </div>
         </div>
       </div>
+
+      {assistant && (
+        <AssistantPanel
+          color={BLUE}
+          onClose={() => {
+            setAssistant(false);
+            void catalog.refetch();
+          }}
+        />
+      )}
+
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <div className="rounded-2xl border bg-card p-4">
