@@ -683,8 +683,10 @@ function PedidosPage() {
       return "canceled";
     }
 
+    /* Conserto: o cliente vê direto em Finalizado, com o recibo. */
     if (
-      order.status === "delivered"
+      order.status === "delivered" ||
+      isRepairOrder(order)
     ) {
       return "delivered";
     }
