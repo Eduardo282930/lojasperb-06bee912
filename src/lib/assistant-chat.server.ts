@@ -39,7 +39,7 @@ export async function extract(owner:string,id:string,image:ai.AssistantImage,mod
  try {
  const drafts=await ai.readPurchaseImage(image);
  if(!drafts.length)throw new Error('Nenhum produto legível nesta imagem.');
- const r=await db().from('assistant_products').insert(drafts.map(d=>({conversation_id:id,draft:d,mode})));check(r.error);
+ const r=await db().from('assistant_products').insert(drafts.map(d=>({conversation_id:id,draft:{...d,sourceHash:fingerprint},mode})));check(r.error);
  await message(id,'assistant',`${drafts.length} produto(s) identificado(s). Preparando o cadastro.`);
  }catch(e){await message(id,'assistant',`Precisa de conferência — ${image.name}: ${e instanceof Error?e.message:'Falha na leitura'}`);}
  return state(owner,id);
@@ -57,7 +57,7 @@ export async function register(owner:string,id:string,productId:string){
  let started=false;
  try{
  const categories=await ai.loadCategories();
- const category=product.mode==='order'?(await ai.ensureOrderCategory(categories)).id:await ai.pickCategory(draft.name,categories);
+ const category=product.mode==='order'?(await ai.ensureOrderCategory(categories)).id:(typeof draft.categoryId==='string'?categories.find(c=>c.id===draft.categoryId&&ai.normalizeName(c.name)!=='encomenda')?.id??null:await ai.pickCategory(draft.name,categories));
  const items=await ai.loadItems();
  const claim=await d.from('assistant_operations').insert({operation_key:key});check(claim.error);started=true;
  const out=await ai.upsertPurchase(draft,items,category,product.mode==='order');
