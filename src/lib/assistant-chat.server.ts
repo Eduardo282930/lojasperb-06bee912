@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 import * as ai from './assistant.server';
 import type { ChatState, ChatProduct } from './assistant-chat.types';
+import { withAssistantLock } from './assistant-lock';
 function db() {
  const url=process.env['EXT_SUPABASE_URL']??process.env['SUPABASE_URL'];
  const key=process.env['EXT_SUPABASE_SERVICE_ROLE_KEY']??process.env['SUPABASE_SERVICE_ROLE_KEY'];
@@ -20,7 +21,15 @@ export async function state(owner:string,id?:string):Promise<ChatState> {
  return {id:thread.id,messages:m.data??[],products:p.data??[]} as ChatState;
 }
 async function message(id:string,role:string,content:string){const r=await db().from('assistant_messages').insert({conversation_id:id,role,content});check(r.error);}
-async function lock<T>(key:string,fn:()=>Promise<T>):Promise<T>{const d=db(),owner=crypto.randomUUID();const r=await d.rpc('assistant_lock',{k:key,who:owner});check(r.error);if(!r.data)throw new Error('Esta operação está em andamento. Aguarde.');try{return await fn();}finally{await d.from('assistant_locks').delete().eq('lock_key',key).eq('owner',owner);}}
+async function lock<T>(key:string,fn:()=>Promise<T>):Promise<T>{
+ const d=db(),owner=crypto.randomUUID();
+ return withAssistantLock(async()=>{
+  const r=await d.rpc('assistant_lock',{k:key,who:owner});check(r.error);return r.data===true;
+ },async()=>{
+  const r=await d.from('assistant_locks').delete().eq('lock_key',key).eq('owner',owner);
+  if(r.error)console.error('[assistant] Lock release failed',r.error.code);
+ },fn);
+}
 async function hash(s:string){return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s)))).map(b=>b.toString(16).padStart(2,'0')).join('');}
 async function sync(){const {syncCatalogFromLoyverse}=await import('./loyverse.functions');await syncCatalogFromLoyverse();}
 export async function extract(owner:string,id:string,image:ai.AssistantImage,mode:'store'|'order') {

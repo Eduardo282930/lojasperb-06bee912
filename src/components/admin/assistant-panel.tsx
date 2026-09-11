@@ -51,13 +51,19 @@ async function shrink(file: File): Promise<{ mime: string; data: string }> {
 }
 
 export function AssistantPanel({onClose}: {color:string;onClose:()=>void}) {
- const call=useServerFn(assistantChat);
+ const request=useServerFn(assistantChat);
+ async function call(args:Parameters<typeof request>[0]):Promise<ChatState>{
+  const result=await request(args);
+  if('busy' in result)throw new Error(result.message);
+  return result;
+ }
+ const operationActive=useRef(false);
  const [chat,setChat]=useState<ChatState|null>(null),[text,setText]=useState(''),[files,setFiles]=useState<File[]>([]),[mode,setMode]=useState<Mode>('store');
  const [busy,setBusy]=useState(false),[stage,setStage]=useState(''),[error,setError]=useState(''),[mounted,setMounted]=useState(false);
  const fileInput=useRef<HTMLInputElement>(null),bottom=useRef<HTMLDivElement>(null);
  useEffect(()=>{setMounted(true);void call({data:{action:'state'}}).then(setChat).catch(e=>setError(e.message));},[]);
  useEffect(()=>{bottom.current?.scrollIntoView({behavior:'smooth'});},[chat?.messages.length,stage]);
- async function send(){if(!chat||busy||(!text.trim()&&!files.length))return;setBusy(true);setError('');let current=chat;const batch=files;const instruction=text;setText('');setFiles([]);
+ async function send(){if(!chat||operationActive.current||(!text.trim()&&!files.length))return;operationActive.current=true;setBusy(true);setError('');let current=chat;const batch=files;const instruction=text;setText('');setFiles([]);
  try {
  // Images are extracted individually; instructions can classify a mixed batch before registration.
  for(let index=0;index<batch.length;index++){
@@ -74,9 +80,14 @@ export function AssistantPanel({onClose}: {color:string;onClose:()=>void}) {
  if(instruction.trim()){setStage('Entendendo sua mensagem…');current=await call({data:{action:'text',id:current.id,text:instruction}});setChat(current);}
  for(const p of current.products.filter(p=>p.status==='pending')){setStage(`Cadastrando ${p.draft.name}…`);try{current=await call({data:{action:'register',id:current.id,productId:p.id}});setChat(current);}catch(e){setError(e instanceof Error?e.message:'Falha no cadastro');}}
  }catch(e){setError(e instanceof Error?e.message:'Não foi possível enviar.');setText(instruction);}
- finally{setBusy(false);setStage('');}
+ finally{operationActive.current=false;setBusy(false);setStage('');}
  }
- async function price(product:ChatProduct,value:number){if(!chat)return;const result=await call({data:{id:chat.id,action:'price',productId:product.id,price:value}});setChat(result);}
+ async function price(product:ChatProduct,value:number){
+  if(!chat||operationActive.current)throw new Error('Aguarde a operação atual antes de salvar outro preço.');
+  operationActive.current=true;setBusy(true);
+  try{const result=await call({data:{id:chat.id,action:'price',productId:product.id,price:value}});setChat(result);}
+  finally{operationActive.current=false;setBusy(false);}
+ }
  if(!mounted)return null;
  return createPortal(<section role="dialog" aria-modal="true" aria-label="Assistente SPERB" className="fixed inset-0 z-[100] flex h-dvh flex-col bg-background text-foreground">
  <header className="flex shrink-0 items-center justify-between border-b px-4 py-3"><div className="flex items-center gap-3"><Sparkles className="size-6 text-primary"/><div><h1 className="text-lg font-bold">Assistente SPERB</h1><p className="text-xs text-muted-foreground">Conversa · memória de 30 dias</p></div></div><Button variant="ghost" size="icon" aria-label="Fechar assistente" disabled={busy} onClick={onClose}><X/></Button></header>
