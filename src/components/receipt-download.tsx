@@ -229,6 +229,14 @@ async function drawReceipt(r: ReceiptData): Promise<Blob | null> {
   ctx.fillStyle = "#777777";
   ctx.font = "400 19px system-ui, sans-serif";
   ctx.textAlign = "center";
+  if (r.isRepair) {
+    ctx.fillStyle = "#111111";
+    ctx.font = "700 21px system-ui, sans-serif";
+    ctx.fillText("Conserto com 3 meses de garantia.", center, y);
+    y += 30;
+    ctx.fillStyle = "#777777";
+    ctx.font = "400 19px system-ui, sans-serif";
+  }
   ctx.fillText("Garantia conforme o Código de Defesa do Consumidor.", center, y);
   y += 30;
   ctx.fillText("WhatsApp (51) 99610-9657", center, y);
