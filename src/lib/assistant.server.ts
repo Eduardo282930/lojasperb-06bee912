@@ -46,7 +46,9 @@ export type AssistantResult = {
 export type AssistantReview = { image: string; reason: string };
 
 function geminiModel(): string {
-  return process.env["GEMINI_MODEL"] || "gemini-3.5-flash";
+  const model = process.env["GEMINI_MODEL"] || "gemini-3.5-flash";
+  if (model.includes("1.5")) throw new Error("Configure um modelo Gemini Flash atual.");
+  return model;
 }
 
 const PROMPT = `Você analisa capturas de tela de compras da Shopee para cadastrar produtos numa loja.
@@ -123,7 +125,7 @@ type GeminiPart =
  * repetição automática quando a falha é passageira (ocupado, instabilidade,
  * demora). Erros definitivos não são repetidos.
  */
-async function geminiJson(
+export async function geminiJson(
   parts: GeminiPart[],
   schema: unknown,
 ): Promise<string> {
@@ -192,7 +194,8 @@ async function geminiJson(
         : `Leitura falhou (${res.status}): ${body.slice(0, 160)}`,
     );
     if (!busy || attempt === GEMINI_TRIES) throw lastError;
-    await sleep(attempt * 3_000);
+    const retryAfter = Number(res.headers.get("Retry-After"));
+    await sleep(Math.max(attempt * 3_000, Number.isFinite(retryAfter) ? retryAfter * 1000 : 0));
   }
 
   throw lastError;
@@ -274,7 +277,7 @@ function token(): string {
   return t;
 }
 
-async function loyverse<T>(
+export async function loyverse<T>(
   path: string,
   init?: { method?: string; body?: unknown },
 ): Promise<T> {
@@ -330,7 +333,7 @@ export function normalizeName(s: string): string {
 
 let storeIdCache: { at: number; id: string } | null = null;
 
-async function storeId(): Promise<string> {
+export async function storeId(): Promise<string> {
   if (storeIdCache && Date.now() - storeIdCache.at < 10 * 60_000) return storeIdCache.id;
   const stores = await loyverseList<{ id: string }>("stores");
   const id = stores[0]?.id;
@@ -378,6 +381,7 @@ export async function pickCategory(
   productName: string,
   categories: LoyCategory[],
 ): Promise<string | null> {
+  categories = categories.filter(c => normalizeName(c.name) !== "encomenda");
   if (categories.length === 0 || !productName.trim()) return null;
   const list = categories.map((c) => `${c.id} = ${c.name}`).join("\n");
   try {
@@ -405,14 +409,14 @@ Responda com o id exato da melhor categoria. Se nenhuma servir, responda com cat
   }
 }
 
-async function inventoryFor(variantId: string, store: string): Promise<number> {
+export async function inventoryFor(variantId: string, store: string): Promise<number> {
   const data = await loyverse<{ inventory_levels?: Array<{ in_stock?: number }> }>(
     `inventory?variant_ids=${variantId}&store_ids=${store}`,
   );
   return Math.max(0, Math.floor(Number(data.inventory_levels?.[0]?.in_stock ?? 0)));
 }
 
-async function setInventory(variantId: string, store: string, stockAfter: number) {
+export async function setInventory(variantId: string, store: string, stockAfter: number) {
   await loyverse("inventory", {
     method: "POST",
     body: {
@@ -458,6 +462,7 @@ export async function upsertPurchase(
         break;
       }
     }
+    if (sameName && !matchVariant) throw new Error("Produto antigo com variações: precisa de conferência antes de alterar.");
     if (matchVariant) break;
   }
 

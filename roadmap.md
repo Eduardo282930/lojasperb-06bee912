@@ -1,6 +1,9 @@
 # Assistente SPERB
-- [x] Validar criação sem variants e obter autorização para unidade técnica padrão.
-- [x] Corrigir autenticação Gemini por cabeçalho e cadastro simples/preço fixo.
-- [ ] Memória administrativa por 30 dias e operações idempotentes: bloqueada até existir ferramenta de migração direcionada ao banco externo (a disponível aponta para Cloud).
-- [ ] Conversa completa, comandos contextualizados e processamento progressivo dependem da memória segura acima.
-- [ ] Testes completos de chat e cadastro dependem das etapas acima.
+- [x] Conversa de tela inteira e preços editáveis integrados.
+- [x] Funções administrativas com contexto persistente e isolamento por proprietário.
+- [x] Migração SQL externa entregue (fotos não persistidas); expiração de 30 dias com cron.
+- [x] Extração independente e progressiva por imagem; cadastro por produto.
+- [x] Produtos simples FIXED com unidade técnica autorizada; encomendas excluídas.
+- [x] Identificação de compras por rastreio + produto e bloqueios de escrita.
+- [ ] Executar SQL no banco externo: ação do proprietário.
+- [ ] Validar chat autenticado ponta a ponta após execução da migração.

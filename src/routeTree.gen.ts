@@ -28,6 +28,7 @@ import { Route as ApiPublicInfinitepayWebhookRouteImport } from './routes/api/pu
 import { Route as ApiPublicExpireReservationsRouteImport } from './routes/api/public/expire-reservations'
 import { Route as ApiPublicEnsureWebhooksRouteImport } from './routes/api/public/ensure-webhooks'
 import { Route as ApiPublicCleanupRouteImport } from './routes/api/public/cleanup'
+import { Route as ApiAssistantAnalyzeRouteImport } from './routes/api/assistant/analyze'
 
 const SacolaRoute = SacolaRouteImport.update({
   id: '/sacola',
@@ -128,6 +129,11 @@ const ApiPublicCleanupRoute = ApiPublicCleanupRouteImport.update({
   path: '/api/public/cleanup',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAssistantAnalyzeRoute = ApiAssistantAnalyzeRouteImport.update({
+  id: '/api/assistant/analyze',
+  path: '/api/assistant/analyze',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -139,6 +145,7 @@ export interface FileRoutesByFullPath {
   '/pedidos': typeof PedidosRoute
   '/sacola': typeof SacolaRoute
   '/produto/$id': typeof ProdutoIdRoute
+  '/api/assistant/analyze': typeof ApiAssistantAnalyzeRoute
   '/api/public/cleanup': typeof ApiPublicCleanupRoute
   '/api/public/ensure-webhooks': typeof ApiPublicEnsureWebhooksRoute
   '/api/public/expire-reservations': typeof ApiPublicExpireReservationsRoute
@@ -160,6 +167,7 @@ export interface FileRoutesByTo {
   '/pedidos': typeof PedidosRoute
   '/sacola': typeof SacolaRoute
   '/produto/$id': typeof ProdutoIdRoute
+  '/api/assistant/analyze': typeof ApiAssistantAnalyzeRoute
   '/api/public/cleanup': typeof ApiPublicCleanupRoute
   '/api/public/ensure-webhooks': typeof ApiPublicEnsureWebhooksRoute
   '/api/public/expire-reservations': typeof ApiPublicExpireReservationsRoute
@@ -182,6 +190,7 @@ export interface FileRoutesById {
   '/pedidos': typeof PedidosRoute
   '/sacola': typeof SacolaRoute
   '/produto/$id': typeof ProdutoIdRoute
+  '/api/assistant/analyze': typeof ApiAssistantAnalyzeRoute
   '/api/public/cleanup': typeof ApiPublicCleanupRoute
   '/api/public/ensure-webhooks': typeof ApiPublicEnsureWebhooksRoute
   '/api/public/expire-reservations': typeof ApiPublicExpireReservationsRoute
@@ -205,6 +214,7 @@ export interface FileRouteTypes {
     | '/pedidos'
     | '/sacola'
     | '/produto/$id'
+    | '/api/assistant/analyze'
     | '/api/public/cleanup'
     | '/api/public/ensure-webhooks'
     | '/api/public/expire-reservations'
@@ -226,6 +236,7 @@ export interface FileRouteTypes {
     | '/pedidos'
     | '/sacola'
     | '/produto/$id'
+    | '/api/assistant/analyze'
     | '/api/public/cleanup'
     | '/api/public/ensure-webhooks'
     | '/api/public/expire-reservations'
@@ -247,6 +258,7 @@ export interface FileRouteTypes {
     | '/pedidos'
     | '/sacola'
     | '/produto/$id'
+    | '/api/assistant/analyze'
     | '/api/public/cleanup'
     | '/api/public/ensure-webhooks'
     | '/api/public/expire-reservations'
@@ -269,6 +281,7 @@ export interface RootRouteChildren {
   PedidosRoute: typeof PedidosRoute
   SacolaRoute: typeof SacolaRoute
   ProdutoIdRoute: typeof ProdutoIdRoute
+  ApiAssistantAnalyzeRoute: typeof ApiAssistantAnalyzeRoute
   ApiPublicCleanupRoute: typeof ApiPublicCleanupRoute
   ApiPublicEnsureWebhooksRoute: typeof ApiPublicEnsureWebhooksRoute
   ApiPublicExpireReservationsRoute: typeof ApiPublicExpireReservationsRoute
@@ -416,6 +429,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicCleanupRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/assistant/analyze': {
+      id: '/api/assistant/analyze'
+      path: '/api/assistant/analyze'
+      fullPath: '/api/assistant/analyze'
+      preLoaderRoute: typeof ApiAssistantAnalyzeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -429,6 +449,7 @@ const rootRouteChildren: RootRouteChildren = {
   PedidosRoute: PedidosRoute,
   SacolaRoute: SacolaRoute,
   ProdutoIdRoute: ProdutoIdRoute,
+  ApiAssistantAnalyzeRoute: ApiAssistantAnalyzeRoute,
   ApiPublicCleanupRoute: ApiPublicCleanupRoute,
   ApiPublicEnsureWebhooksRoute: ApiPublicEnsureWebhooksRoute,
   ApiPublicExpireReservationsRoute: ApiPublicExpireReservationsRoute,
