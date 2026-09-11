@@ -238,6 +238,8 @@ export async function importStoreReceipts(days = 90): Promise<ImportResult> {
         price: money(l.price ?? (qty > 0 ? gross / qty : gross)),
         sku: l.sku ?? "",
         image: imageByVariant.get(variant) ?? null,
+        /* Serviço de conserto: aparece no recibo com garantia de 3 meses. */
+        repair: repairVariants.has(variant) || undefined,
       };
     });
 

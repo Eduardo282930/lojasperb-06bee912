@@ -8,6 +8,8 @@ export type OrderItem = {
   price: number;
   image?: string | null;
   sku?: string;
+  /** true quando o item é um serviço de conserto feito na loja. */
+  repair?: boolean;
 };
 
 export type Order = {
