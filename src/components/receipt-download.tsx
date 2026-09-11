@@ -70,6 +70,7 @@ async function drawReceipt(r: ReceiptData): Promise<Blob | null> {
     56 + // nome da loja
     (r.storeAddress ? 34 : 0) +
     56 + // agradecimento
+    (r.isRepair ? 78 : 0) +
     100 + // total em destaque
     (r.refunded ? 78 : 0) +
     lines.length * 44 +
