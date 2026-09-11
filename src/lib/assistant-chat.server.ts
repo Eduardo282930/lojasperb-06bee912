@@ -34,10 +34,14 @@ async function hash(s:string){return Array.from(new Uint8Array(await crypto.subt
 async function sync(){const {syncCatalogFromLoyverse}=await import('./loyverse.functions');await syncCatalogFromLoyverse();}
 export async function extract(owner:string,id:string,image:ai.AssistantImage,mode:'store'|'order') {
  await state(owner,id);
- return lock(`conversation:${id}`,async()=>{
+ const fingerprint=await hash(image.data);
+ return lock(`image:${id}:${fingerprint}`,async()=>{
+ const existing=await state(owner,id);
+ if(existing.products.some(p=>p.draft['sourceHash']===fingerprint))return existing;
  await message(id,'user',`Imagem enviada: ${image.name} (${mode==='order'?'encomenda':'loja'})`);
  try {
- const drafts=await ai.readPurchaseImage(image);
+ const categories=mode==='store'?(await ai.loadCategories()).filter(c=>ai.normalizeName(c.name)!=='encomenda'):[];
+ const drafts=await ai.readPurchaseImage(image,categories);
  if(!drafts.length)throw new Error('Nenhum produto legível nesta imagem.');
  const r=await db().from('assistant_products').insert(drafts.map(d=>({conversation_id:id,draft:{...d,sourceHash:fingerprint},mode})));check(r.error);
  await message(id,'assistant',`${drafts.length} produto(s) identificado(s). Preparando o cadastro.`);
