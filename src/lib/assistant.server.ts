@@ -53,8 +53,15 @@ function geminiModel(): string {
 const PROMPT = `Você analisa capturas de tela de compras da Shopee para cadastrar produtos numa loja.
 
 Extraia TODOS os produtos visíveis na imagem. Para cada produto:
-- name: nome completo do produto, reconstruído por extenso. Nunca use "..." nem corte o nome.
-- variant: a variação escolhida (cor, tamanho, modelo). Vazio se não houver.
+- name: nome CURTO, limpo e profissional, pronto para aparecer na loja. NUNCA copie o título da Shopee literalmente.
+  Regras do nome:
+  * Remova marketing ("oferta", "promoção", "frete grátis", "envio rápido", "kit imperdível"), emojis, símbolos, hashtags, nome do vendedor, códigos e siglas sem sentido, palavras repetidas e reticências.
+  * Reconstrua palavras cortadas por "..." usando o contexto.
+  * Mantenha o que identifica o produto e a variação importante (modelo, cor, tamanho, medida), pois a loja usa apenas produtos simples.
+  * Use Capitalização Normal (não caixa alta) e medidas no formato 138x188x15.
+  * Máximo de 60 caracteres.
+  * Exemplo: "Protetor De Colchão Impermeável Cap... AZUL,CASAL - ZIPER 138/188/15" vira "Protetor de Colchão Impermeável Azul Casal 138x188x15".
+- variant: deixe vazio quando a variação já estiver dentro do name. Se houver duas variações diferentes na mesma compra, devolva DOIS produtos separados, cada um com o próprio name completo.
 - qty: quantidade comprada (número inteiro, mínimo 1).
 - seller: nome da loja/vendedor, se aparecer.
 - listedPrice: preço anunciado ATUAL de UMA unidade, só o número (ex.: 39.90). IGNORE completamente qualquer preço riscado/antigo.
@@ -85,6 +92,53 @@ function toIsoDate(value: unknown): string {
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
   const br = s.match(/^(\d{2})[/-](\d{2})[/-](\d{4})$/);
   return br ? `${br[3]}-${br[2]}-${br[1]}` : "";
+}
+
+/**
+ * Rede de segurança do nome: mesmo que a leitura devolva o título gigante da
+ * Shopee, o produto entra na loja com nome curto, limpo e legível.
+ */
+const NOISE =
+  /\b(oferta|ofertas|promo(?:ç|c)(?:ã|a)o|promocional|imperd(?:í|i)vel|frete\s+gr(?:á|a)tis|envio\s+r(?:á|a)pido|pronta\s+entrega|super|mega|top|novo|original|barato|qualidade|loja\s+oficial|atacado|kit)\b/gi;
+
+export function cleanProductName(raw: string): string {
+  let s = String(raw ?? "")
+    .replace(/[\p{Extended_Pictographic}\u2600-\u27bf]/gu, " ")
+    .replace(/#[\wÀ-ÿ]+/g, " ")
+    .replace(/\.{2,}/g, " ")
+    .replace(NOISE, " ")
+    .replace(/(\d+)\s*[/x×]\s*(\d+)\s*[/x×]\s*(\d+)/gi, "$1x$2x$3")
+    .replace(/(\d+)\s*[/×]\s*(\d+)/g, "$1x$2")
+    .replace(/[|•*_"']+/g, " ")
+    .replace(/\s*[,;\-–]\s*/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  // Caixa alta vira Capitalização Normal, preservando siglas curtas e medidas.
+  s = s
+    .split(" ")
+    .map((w) =>
+      w.length > 3 && w === w.toUpperCase() && /[a-zà-ÿ]/i.test(w)
+        ? w.charAt(0) + w.slice(1).toLowerCase()
+        : w,
+    )
+    .join(" ");
+
+  // Palavras repetidas ("azul azul") saem, mantendo a ordem original.
+  const seen = new Set<string>();
+  s = s
+    .split(" ")
+    .filter((w) => {
+      const k = normalizeName(w);
+      if (!k) return false;
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    })
+    .join(" ");
+
+  if (s.length > 60) s = s.slice(0, 60).replace(/\s+\S*$/, "").trim();
+  return s;
 }
 
 const SCHEMA = {
@@ -244,8 +298,8 @@ export async function readPurchaseImage(
     if (qty > 1 && total > 0 && Math.abs(cost - total) < 0.01) cost = total / qty;
     if (cost === 0 && total > 0) cost = total / qty;
     return {
-      name: String(p["name"] ?? "").trim(),
-      variant: String(p["variant"] ?? "").trim(),
+      name: cleanProductName(String(p["name"] ?? "")),
+      variant: cleanProductName(String(p["variant"] ?? "")),
       qty,
       seller: String(p["seller"] ?? "").trim(),
       listedPrice: Math.max(0, toNumber(p["listedPrice"])),
