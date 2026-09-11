@@ -138,10 +138,10 @@ async function geminiJson(
     let res: Response;
     try {
       res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel()}:generateContent?key=${encodeURIComponent(key)}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel()}:generateContent`,
         {
           method: "POST",
-          headers: { "content-type": "application/json" },
+          headers: { "content-type": "application/json", "x-goog-api-key": key },
           signal: controller.signal,
           body: JSON.stringify({
             contents: [{ role: "user", parts }],
@@ -249,6 +249,7 @@ type LoyVariant = {
   option1_value?: string | null;
   option2_value?: string | null;
   option3_value?: string | null;
+  default_pricing_type?: "FIXED";
   cost?: number | null;
   default_price?: number | null;
   purchase_cost?: number | null;
@@ -440,8 +441,9 @@ export async function upsertPurchase(
   forceCategory = false,
 ): Promise<{ result: AssistantResult; items: LoyItem[] }> {
   const store = await storeId();
-  const wantedName = normalizeName(draft.name);
-  const wantedVariant = normalizeName(draft.variant);
+  const fullName = [draft.name, draft.variant].filter(Boolean).join(" ");
+  const wantedName = normalizeName(fullName);
+  const wantedVariant = "";
 
   let matchItem: LoyItem | undefined;
   let matchVariant: LoyVariant | undefined;
@@ -450,7 +452,7 @@ export async function upsertPurchase(
     const sameName = normalizeName(it.item_name) === wantedName;
     for (const v of it.variants ?? []) {
       const label = normalizeName(variantLabel(v));
-      if (sameName && label === wantedVariant) {
+      if (sameName && label === wantedVariant && it.variants?.length === 1 && !it.option1_name) {
         matchItem = it;
         matchVariant = v;
         break;
@@ -460,19 +462,18 @@ export async function upsertPurchase(
   }
 
   if (matchItem?.id && matchVariant?.variant_id) {
-    // Encomenda: o produto existente também precisa ficar na categoria certa.
-    if (forceCategory && categoryId && matchItem.category_id !== categoryId) {
-      try {
-        const full = await loyverse<LoyItem>(`items/${matchItem.id}`);
-        await loyverse("items", {
-          method: "POST",
-          body: { ...full, category_id: categoryId },
-        });
-        matchItem.category_id = categoryId;
-      } catch {
-        /* o estoque é somado mesmo assim */
-      }
-    }
+    const full = await loyverse<LoyItem>(`items/${matchItem.id}`);
+    await loyverse("items", {
+      method: "POST",
+      body: {
+        ...full,
+        ...(categoryId ? { category_id: categoryId } : {}),
+        variants: (full.variants ?? []).map(v => ({
+          ...v, cost: draft.cost, default_pricing_type: "FIXED",
+          stores: (v.stores ?? []).map(s => ({ ...s, pricing_type: "FIXED" })),
+        })),
+      },
+    });
     const current = await inventoryFor(matchVariant.variant_id, store);
     await setInventory(matchVariant.variant_id, store, current + draft.qty);
     return {
@@ -494,20 +495,19 @@ export async function upsertPurchase(
   }
 
   const body: LoyItem = {
-    item_name: draft.name,
+    item_name: fullName,
     track_stock: true,
     sold_by_weight: false,
     is_composite: false,
     use_production: false,
     ...(categoryId ? { category_id: categoryId } : {}),
-    ...(draft.variant ? { option1_name: "Variação" } : {}),
     variants: [
       {
-        ...(draft.variant ? { option1_value: draft.variant } : {}),
+        default_pricing_type: "FIXED",
         cost: draft.cost,
         default_price: 0,
         stores: [
-          { store_id: store, pricing_type: "FIXED", price: 0, available_for_sale: true },
+          { store_id: store, pricing_type: "FIXED", price: 0, available_for_sale: false },
         ],
       },
     ],
@@ -565,7 +565,7 @@ export async function saveSalePrice(
         available_for_sale: true,
       });
     }
-    return { ...v, default_price: price, stores };
+    return { ...v, default_pricing_type: "FIXED", default_price: price, stores };
   });
   await loyverse("items", { method: "POST", body: { ...item, variants } });
 }
