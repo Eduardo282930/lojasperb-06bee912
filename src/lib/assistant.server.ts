@@ -224,8 +224,8 @@ export async function geminiJson(
               temperature: 0,
               responseMimeType: "application/json",
               responseSchema: schema,
-              // Raciocínio curto: a leitura sai em segundos em vez de minutos.
-              thinkingConfig: { thinkingBudget: 0 },
+              // O Flash Lite atual já é otimizado para baixa latência. Não envie
+              // thinkingConfig: essa geração rejeita esse campo com HTTP 400.
             },
           }),
         },

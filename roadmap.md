@@ -5,11 +5,11 @@
 - [x] Extração independente e progressiva por imagem; cadastro por produto.
 - [x] Produtos simples FIXED com unidade técnica autorizada; encomendas excluídas.
 - [x] Identificação de compras por rastreio + produto e bloqueios de escrita.
-- [ ] Executar SQL no banco externo: ação do proprietário.
+- [x] SQL e tabelas do Assistente disponíveis no banco externo.
 - [ ] Validar chat autenticado ponta a ponta após execução da migração.
 
 ## Otimização do Assistente
 - [x] Fixar Flash-Lite sem alternância e eliminar raciocínio extra.
 - [x] Paralelizar leitura com limite, deduplicar imagens e aproveitar resultados progressivamente.
 - [x] Integrar categoria na extração, sincronizar uma vez por lote e medir chamada Gemini.
-- [ ] Validação real bloqueada: Google respondeu 404, gemini-2.5-flash-lite indisponível para novos usuários desta chave. Sintaxe verificada; nenhum estoque alterado.
+- [x] Modelo fixo atualizado para gemini-3.5-flash-lite e chamada real validada com a chave atual.
