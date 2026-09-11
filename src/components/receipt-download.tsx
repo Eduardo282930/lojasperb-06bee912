@@ -81,7 +81,7 @@ async function drawReceipt(r: ReceiptData): Promise<Blob | null> {
     36 +
     totals.length * 42 +
     64 + // total final
-    140 + // rodapé
+    (r.isRepair ? 180 : 140) + // rodapé
     PAD;
 
   const canvas = document.createElement("canvas");
