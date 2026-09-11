@@ -918,6 +918,7 @@ function StockPanel() {
   });
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "in" | "low" | "out">("all");
+  const [assistant, setAssistant] = useState(false);
 
   const products = catalog.data?.products ?? [];
 
