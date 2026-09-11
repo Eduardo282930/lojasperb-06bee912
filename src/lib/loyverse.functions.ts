@@ -72,6 +72,20 @@ export function isOrderCategoryName(name: string | null | undefined): boolean {
   );
 }
 
+/**
+ * Categoria "Conserto": serviço feito na loja. Nunca aparece na vitrine;
+ * o cliente só vê no recibo e nos pedidos finalizados.
+ */
+export function isRepairCategoryName(name: string | null | undefined): boolean {
+  const clean = String(name ?? "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return clean === "conserto" || clean === "concerto" || clean === "consertos" || clean === "concertos";
+}
+
 
 type LoyverseVariant = {
   variant_id: string;
