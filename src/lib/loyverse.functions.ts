@@ -57,6 +57,21 @@ export function isStoreLogoName(name: string): boolean {
   );
 }
 
+/**
+ * Categoria "Encomenda": produtos comprados sob encomenda, só para controle
+ * interno no Loyverse. Nunca entram na vitrine pública da SPERB.
+ */
+export function isOrderCategoryName(name: string | null | undefined): boolean {
+  return (
+    String(name ?? "")
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/\p{Diacritic}/gu, "")
+      .replace(/\s+/g, " ")
+      .trim() === "encomenda"
+  );
+}
+
 
 type LoyverseVariant = {
   variant_id: string;
@@ -353,6 +368,8 @@ async function buildCatalog(token: string): Promise<Catalog> {
 
     const categoryName =
       (it.category_id && categoryNames.get(it.category_id)) || "Outros";
+    // Produtos por encomenda ficam só no Loyverse: fora da vitrine pública.
+    if (isOrderCategoryName(categoryName)) continue;
     const tracked = it.track_stock !== false;
     const hasOptions = itemVariants.some((v) =>
       Boolean(v.option1_value || v.option2_value || v.option3_value),
