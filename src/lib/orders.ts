@@ -54,6 +54,11 @@ export function isStoreOrder(order: { origin?: string }): boolean {
   return order.origin === "store";
 }
 
+/** true quando o pedido é um serviço de conserto (categoria Conserto). */
+export function isRepairOrder(order: { items?: OrderItem[] }): boolean {
+  return (order.items ?? []).some((i) => i.repair === true);
+}
+
 /** Pagamento na entrega tem rótulo próprio, nunca aparece só como "Pago". */
 export function paymentDisplayLabel(order: {
   paymentStatus: string;
