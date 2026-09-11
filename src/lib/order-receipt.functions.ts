@@ -9,7 +9,7 @@ import { createServerFn } from "@tanstack/react-start";
  * aparelho no momento do download e desaparece junto com a tela.
  */
 
-export type ReceiptItem = { name: string; qty: number; price: number };
+export type ReceiptItem = { name: string; qty: number; price: number; repair?: boolean };
 
 export type ReceiptData = {
   ok: boolean;
@@ -33,6 +33,10 @@ export type ReceiptData = {
   total: number;
   logoDataUrl: string | null;
   refunded: boolean;
+  /** Serviço de conserto: recibo com garantia de 3 meses, não é venda. */
+  isRepair: boolean;
+  /** Mesmo código do pedido no Loyverse, para consulta. */
+  orderCode: string;
 };
 
 function digits(v: string): string {
