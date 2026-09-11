@@ -298,8 +298,8 @@ export async function readPurchaseImage(
     if (qty > 1 && total > 0 && Math.abs(cost - total) < 0.01) cost = total / qty;
     if (cost === 0 && total > 0) cost = total / qty;
     return {
-      name: String(p["name"] ?? "").trim(),
-      variant: String(p["variant"] ?? "").trim(),
+      name: cleanProductName(String(p["name"] ?? "")),
+      variant: cleanProductName(String(p["variant"] ?? "")),
       qty,
       seller: String(p["seller"] ?? "").trim(),
       listedPrice: Math.max(0, toNumber(p["listedPrice"])),
