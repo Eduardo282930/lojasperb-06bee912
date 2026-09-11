@@ -7,3 +7,9 @@
 - [x] Identificação de compras por rastreio + produto e bloqueios de escrita.
 - [ ] Executar SQL no banco externo: ação do proprietário.
 - [ ] Validar chat autenticado ponta a ponta após execução da migração.
+
+## Otimização do Assistente
+- [ ] Fixar Flash-Lite sem alternância e eliminar raciocínio extra.
+- [ ] Paralelizar leitura com limite, deduplicar imagens e aproveitar resultados progressivamente.
+- [ ] Reduzir chamadas de categoria e medir etapas sem registrar fotos.
+- [ ] Validar chamadas e testes sem alterar estoque real.
