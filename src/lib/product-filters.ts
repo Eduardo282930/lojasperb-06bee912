@@ -5,6 +5,7 @@
 
 import {
   isOrderCategoryName,
+  isRepairCategoryName,
   isStoreLogoName,
   type CatalogProduct,
 } from "./loyverse.functions";
