@@ -59,7 +59,7 @@ Extraia TODOS os produtos visíveis na imagem. Para cada produto:
   * Reconstrua palavras cortadas por "..." usando o contexto.
   * Mantenha o que identifica o produto e a variação importante (modelo, cor, tamanho, medida), pois a loja usa apenas produtos simples.
   * Use Capitalização Normal (não caixa alta) e medidas no formato 138x188x15.
-  * Máximo de 60 caracteres.
+  * Máximo de 70 caracteres.
   * Exemplo: "Protetor De Colchão Impermeável Cap... AZUL,CASAL - ZIPER 138/188/15" vira "Protetor de Colchão Impermeável Azul Casal 138x188x15".
 - variant: deixe vazio quando a variação já estiver dentro do name. Se houver duas variações diferentes na mesma compra, devolva DOIS produtos separados, cada um com o próprio name completo.
 - qty: quantidade comprada (número inteiro, mínimo 1).
@@ -137,7 +137,7 @@ export function cleanProductName(raw: string): string {
     })
     .join(" ");
 
-  if (s.length > 60) s = s.slice(0, 60).replace(/\s+\S*$/, "").trim();
+  if (s.length > 70) s = s.slice(0, 70).replace(/\s+\S*$/, "").trim();
   return s;
 }
 
