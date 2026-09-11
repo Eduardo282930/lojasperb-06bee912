@@ -19,6 +19,7 @@ import {
   fetchOrderTimeline,
   statusLabel,
   displayStatusLabel,
+  isRepairOrder,
   paymentDisplayLabel,
   minutesLeftToPay,
   cancelExpiredUnpaidOrders,
@@ -246,10 +247,16 @@ function OrderCard({
               {paymentDisplayLabel(order)}
             </p>
 
-            {order.origin === "store" && (
+            {isRepairOrder(order) ? (
               <p className="mt-1 inline-block rounded-lg bg-muted px-2 py-1 text-xs font-semibold text-foreground">
-                Pedido feito pelo vendedor da loja
+                Conserto feito na loja · 3 meses de garantia
               </p>
+            ) : (
+              order.origin === "store" && (
+                <p className="mt-1 inline-block rounded-lg bg-muted px-2 py-1 text-xs font-semibold text-foreground">
+                  Pedido feito pelo vendedor da loja
+                </p>
+              )
             )}
           </div>
 
