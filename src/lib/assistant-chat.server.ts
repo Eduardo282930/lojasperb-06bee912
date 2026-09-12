@@ -84,8 +84,8 @@ export async function extract(owner:string,id:string,image:ai.AssistantImage,mod
         conversation_id:id,
         draft:{...d,sourceHash:fingerprint},
         mode,
-        status:(d.imageUrl||d.crop)?'pending':'review',
-        error:(d.imageUrl||d.crop)?null:'A IA identificou o produto, mas não encontrou uma imagem utilizável na internet nem confirmou um recorte visual seguro.',
+        status:d.crop?'pending':'review',
+        error:d.crop?null:'A IA identificou o produto, mas não confirmou um recorte visual seguro.',
       })));
       check(r.error);
       await message(id, 'assistant', `${drafts.length} produto(s) identificado(s). Revise a imagem, quantidade, custo e informe o preço de venda para salvar cada um.`);
@@ -105,9 +105,8 @@ export async function register(owner:string,id:string,productId:string,image?:{m
     const draft=product.draft as ai.PurchaseDraft;
     const price=Number(draft.manualPrice??0);
     if(!Number.isFinite(price)||price<=0)throw new Error('Informe o preço de venda antes de salvar o produto.');
-    if(!draft.crop && !draft.imageUrl)throw new Error('Não encontrei uma imagem do produto na internet e o recorte da compra também não está disponível.');
-    if(!image?.data && draft.imageUrl)image=await ai.downloadProductImage(draft.imageUrl);
-    if(!image?.data)throw new Error('A imagem do produto não está disponível. Envie novamente a foto da compra para tentar outra busca.');
+    if(!draft.crop)throw new Error('A inteligência artificial não confirmou um recorte seguro do produto. Envie novamente a foto da compra.');
+    if(!image?.data)throw new Error('A imagem recortada do produto não está disponível. Envie novamente a foto da compra.');
     if(!draft.name.trim())throw new Error('Nome do produto inválido.');
     if(!Number.isInteger(draft.qty)||draft.qty<1)throw new Error('Quantidade física inválida.');
     if(!Number.isFinite(draft.cost)||draft.cost<0)throw new Error('Custo unitário inválido.');
@@ -154,7 +153,7 @@ export async function register(owner:string,id:string,productId:string,image?:{m
   });
 }
 
-export async function saveOne(owner:string,id:string,productId:string,changes:{price?:number;name?:string;qty?:number;cost?:number;image?:{mime:string;data:string};imageUrl?:string}){
+export async function saveOne(owner:string,id:string,productId:string,changes:{price?:number;name?:string;qty?:number;cost?:number;image?:{mime:string;data:string}}){
   await state(owner,id);
   return lock('loyverse:assistant-writes',async()=>{
     const d=db(),s=await state(owner,id),p=s.products.find(x=>x.id===productId);
@@ -164,15 +163,13 @@ export async function saveOne(owner:string,id:string,productId:string,changes:{p
     if(changes.qty!==undefined)draft.qty=Math.max(1,Math.trunc(changes.qty));
     if(changes.cost!==undefined)draft.cost=Math.max(0,changes.cost);
     if(changes.price!==undefined)draft.manualPrice=changes.price;
-    if(changes.imageUrl!==undefined)draft.imageUrl=changes.imageUrl;
     const price=Number(draft.manualPrice??0);
     if(!draft.name.trim())throw new Error('Informe um nome válido.');
     if(!Number.isInteger(draft.qty)||draft.qty<1)throw new Error('Informe uma quantidade válida.');
     if(!Number.isFinite(draft.cost)||draft.cost<0)throw new Error('Informe um custo unitário válido.');
     if(!Number.isFinite(price)||price<=0)throw new Error('Informe um preço de venda válido.');
-    if(!draft.crop && !draft.imageUrl)throw new Error('Não encontrei uma imagem do produto na internet e o recorte da compra também não está disponível.');
-    if(!changes.image?.data && draft.imageUrl)changes.image=await ai.downloadProductImage(draft.imageUrl);
-    if(!changes.image?.data)throw new Error('A imagem do produto não está disponível. Envie novamente a foto da compra para tentar outra busca.');
+    if(!draft.crop)throw new Error('A inteligência artificial não confirmou um recorte seguro do produto. Envie novamente a foto da compra.');
+    if(!changes.image?.data)throw new Error('A imagem recortada do produto não está disponível. Envie novamente a foto da compra.');
     const updated=await d.from('assistant_products').update({draft,error:null,status:'pending'}).eq('id',productId);check(updated.error);
     // register adquire o mesmo lock reentrante e faria uma segunda transação.
     // Aqui chamamos diretamente a lógica pública sem outro lock por meio de um marcador.
@@ -188,7 +185,7 @@ async function registerUnlocked(owner:string,id:string,productId:string,image:{m
   const draft=product.draft as ai.PurchaseDraft;
   const price=Number(draft.manualPrice??0);
   if(price<=0)throw new Error('Informe o preço de venda antes de salvar.');
-  if(!draft.crop && !draft.imageUrl)throw new Error('Imagem do produto ausente.');
+  if(!draft.crop)throw new Error('Imagem recortada do produto ausente.');
   const identity=draft.trackingCode?`${draft.trackingCode}:${ai.normalizeName(draft.name+' '+draft.variant)}`:product.id;
   const key=await hash(`purchase:${identity}`);
   const old=await d.from('assistant_operations').select('*').eq('operation_key',key).maybeSingle();check(old.error);
@@ -222,7 +219,7 @@ export async function editProduct(owner:string,id:string,productId:string,change
       if(draft.qty!==p.result.qty){const stock=await ai.inventoryFor(p.result.variantId,store),after=stock+draft.qty-p.result.qty;if(after<0)throw new Error('A correção deixaria o estoque negativo.');await ai.setInventory(p.result.variantId,store,after);}
       const verify=await ai.loyverse<Record<string,unknown>>(`items/${p.result.itemId}`),vr=Array.isArray(verify.variants)?verify.variants[0] as Record<string,unknown>:{};
       const result={...p.result,name:String(verify.item_name??p.result.name),qty:draft.qty,cost:Number(vr.cost??draft.cost)};await d.from('assistant_products').update({draft,result,status:'done',error:null}).eq('id',productId);
-    }else{await d.from('assistant_products').update({draft,error:(draft.imageUrl||draft.crop)?null:'A IA não encontrou uma imagem utilizável.',status:(draft.imageUrl||draft.crop)?'pending':'review'}).eq('id',productId);}
+    }else{await d.from('assistant_products').update({draft,error:draft.crop?null:'A IA não confirmou um recorte visual seguro.',status:draft.crop?'pending':'review'}).eq('id',productId);}
     return state(owner,id);
   });
 }

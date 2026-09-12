@@ -14,7 +14,6 @@ const input=z.object({
   qty:z.number().int().min(1).max(100000).optional(),
   cost:z.number().min(0).max(1000000).optional(),
   image:image.optional(),
-  imageUrl:z.string().url().max(4000).optional(),
 });
 
 export const assistantChat=createServerFn({method:'POST'}).middleware([requireSupabaseAuth]).inputValidator((data:unknown)=>input.parse(data)).handler(async({data,context})=>{
@@ -28,7 +27,7 @@ export const assistantChat=createServerFn({method:'POST'}).middleware([requireSu
     if(data.action==='instructions')return await chat.saveInstructions(context.userId,data.id,data.text??'');
     if(data.action==='sync')return await chat.syncBatch(context.userId,data.id);
     if(data.action==='register'&&data.productId)return await chat.register(context.userId,data.id,data.productId,data.image);
-    if(data.action==='saveOne'&&data.productId)return await chat.saveOne(context.userId,data.id,data.productId,{price:data.price,name:data.name,qty:data.qty,cost:data.cost,image:data.image,imageUrl:data.imageUrl});
+    if(data.action==='saveOne'&&data.productId)return await chat.saveOne(context.userId,data.id,data.productId,{price:data.price,name:data.name,qty:data.qty,cost:data.cost,image:data.image});
     if(data.action==='edit'&&data.productId)return await chat.editProduct(context.userId,data.id,data.productId,{name:data.name,qty:data.qty,cost:data.cost});
     if(data.action==='price'&&data.productId&&data.price)return await chat.text(context.userId,data.id,`Preço informado: R$ ${data.price}`,{productId:data.productId,price:data.price});
     if(data.action==='text'&&data.text?.trim())return await chat.text(context.userId,data.id,data.text);
