@@ -13,3 +13,8 @@
 - [x] Paralelizar leitura com limite, deduplicar imagens e aproveitar resultados progressivamente.
 - [x] Integrar categoria na extração, sincronizar uma vez por lote e medir chamada Gemini.
 - [x] Modelo fixo atualizado para gemini-3.5-flash-lite e chamada real validada com a chave atual.
+
+## Correções do Assistente
+- [x] Limitar nomes completos a 64 caracteres e preservar variação.
+- [x] Instruções editáveis, reinício por cancelamento e exclusão de histórico sem apagar idempotência.
+- [ ] Validar operações autenticadas no banco externo (acesso de teste indisponível).
