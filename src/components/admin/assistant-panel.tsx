@@ -28,10 +28,30 @@ function parseCrop(value:unknown):Crop|undefined{if(!value||typeof value!=="obje
 async function cropImage(source:Prepared,crop?:Crop):Promise<Prepared>{
   if(!crop)throw new Error("A inteligência artificial ainda não confirmou a área do produto.");
   const bytes=Uint8Array.from(atob(source.data),c=>c.charCodeAt(0));const bitmap=await createImageBitmap(new Blob([bytes],{type:source.mime}));
-  const x=Math.max(0,Math.floor(crop.x*bitmap.width)),y=Math.max(0,Math.floor(crop.y*bitmap.height));const w=Math.min(bitmap.width-x,Math.floor(crop.width*bitmap.width)),h=Math.min(bitmap.height-y,Math.floor(crop.height*bitmap.height));
-  if(w<16||h<16){bitmap.close();throw new Error("A área encontrada para o produto é pequena demais.");}
-  const side=Math.min(Math.max(w,h),Math.min(bitmap.width,bitmap.height));const cx=Math.min(Math.max(0,Math.round(x+w/2-side/2)),bitmap.width-side);const cy=Math.min(Math.max(0,Math.round(y+h/2-side/2)),bitmap.height-side);
-  const canvas=document.createElement("canvas");const size=Math.min(1200,Math.max(320,side));canvas.width=size;canvas.height=size;const ctx=canvas.getContext("2d");if(!ctx){bitmap.close();throw new Error("Não consegui preparar a foto do produto.");}ctx.drawImage(bitmap,cx,cy,side,side,0,0,size,size);bitmap.close();const url=canvas.toDataURL("image/jpeg",0.92);return {mime:"image/jpeg",data:url.slice(url.indexOf(",")+1)};
+  const rawX=Math.max(0,Math.floor(crop.x*bitmap.width)),rawY=Math.max(0,Math.floor(crop.y*bitmap.height));
+  const rawW=Math.min(bitmap.width-rawX,Math.floor(crop.width*bitmap.width)),rawH=Math.min(bitmap.height-rawY,Math.floor(crop.height*bitmap.height));
+  if(rawW<16||rawH<16){bitmap.close();throw new Error("A área encontrada para o produto é pequena demais.");}
+
+  // O Gemini fornece a caixa do produto. Não transformamos essa caixa em um
+  // quadrado dentro da foto original, pois isso puxava letras/UI das laterais.
+  // Aplicamos somente uma margem pequena e depois centralizamos a área recortada
+  // dentro de um quadro quadrado, preservando exclusivamente os pixels do produto.
+  const margin=Math.max(2,Math.round(Math.min(rawW,rawH)*0.06));
+  const x=Math.max(0,rawX-margin),y=Math.max(0,rawY-margin);
+  const right=Math.min(bitmap.width,rawX+rawW+margin),bottom=Math.min(bitmap.height,rawY+rawH+margin);
+  const w=right-x,h=bottom-y;
+  if(w<16||h<16){bitmap.close();throw new Error("Não consegui preparar uma área válida para o produto.");}
+
+  const size=Math.min(1200,Math.max(320,Math.max(w,h)));
+  const canvas=document.createElement("canvas");canvas.width=size;canvas.height=size;
+  const ctx=canvas.getContext("2d");if(!ctx){bitmap.close();throw new Error("Não consegui preparar a foto do produto.");}
+  ctx.fillStyle="#ffffff";ctx.fillRect(0,0,size,size);
+  const scale=Math.min((size*0.88)/w,(size*0.88)/h);
+  const drawW=Math.max(1,Math.round(w*scale)),drawH=Math.max(1,Math.round(h*scale));
+  const dx=Math.round((size-drawW)/2),dy=Math.round((size-drawH)/2);
+  ctx.drawImage(bitmap,x,y,w,h,dx,dy,drawW,drawH);
+  bitmap.close();
+  const url=canvas.toDataURL("image/jpeg",0.92);return {mime:"image/jpeg",data:url.slice(url.indexOf(",")+1)};
 }
 function dataUrl(image:Prepared){return `data:${image.mime};base64,${image.data}`;}
 function money(value:number){return Number.isFinite(value)?value.toFixed(2).replace(".",","):"0,00";}
