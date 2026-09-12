@@ -12,7 +12,7 @@ function db() {
 const tool = (name: string, description: string, parameters: Record<string, unknown>) => ({
   name,
   description,
-  parameters: { type: "object", properties: parameters, additionalProperties: false },
+  parameters: { type: "object", properties: parameters },
 });
 
 export const ADMIN_TOOLS = [

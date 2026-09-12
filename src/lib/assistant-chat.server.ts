@@ -200,7 +200,8 @@ export async function reset(owner:string,id:string,clear:boolean){
  const expired=await d.from('assistant_conversations').update({expires_at:new Date().toISOString()}).eq('owner_id',owner);check(expired.error);
  if(clear){const deleted=await d.from('assistant_conversations').delete().eq('owner_id',owner);check(deleted.error);}
  const fresh=await state(owner);
- if(previous.instructions)await message(fresh.id,'user','[INSTRUÇÕES] '+previous.instructions);
- await message(fresh.id,'assistant',clear?'Histórico excluído. Produtos salvos foram preservados.':'Cancelado. Vamos começar novamente. Operações já enviadas ao Loyverse podem concluir; produtos salvos foram preservados.');
+ if(!clear){
+  await message(fresh.id,'assistant','Cancelado. Vamos começar novamente. Operações já enviadas ao Loyverse podem concluir; produtos salvos foram preservados.');
+ }
  return state(owner,fresh.id);
 }
