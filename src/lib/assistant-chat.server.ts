@@ -105,8 +105,8 @@ export async function register(owner:string,id:string,productId:string,image?:{m
     const draft=product.draft as ai.PurchaseDraft;
     const price=Number(draft.manualPrice??0);
     if(!Number.isFinite(price)||price<=0)throw new Error('Informe o preço de venda antes de salvar o produto.');
-    if(!draft.crop)throw new Error('A inteligência artificial não confirmou um recorte seguro do produto. Envie novamente a foto da compra.');
-    if(!image?.data)throw new Error('A imagem recortada do produto não está disponível. Envie novamente a foto da compra.');
+    if(!draft.crop)throw new Error('O recorte da foto do produto não está disponível. Envie novamente a foto da compra.');
+    if(!image?.data)throw new Error('A imagem recortada do produto não está disponível. Abra novamente a conferência e tente salvar.');
     if(!draft.name.trim())throw new Error('Nome do produto inválido.');
     if(!Number.isInteger(draft.qty)||draft.qty<1)throw new Error('Quantidade física inválida.');
     if(!Number.isFinite(draft.cost)||draft.cost<0)throw new Error('Custo unitário inválido.');
@@ -168,8 +168,8 @@ export async function saveOne(owner:string,id:string,productId:string,changes:{p
     if(!Number.isInteger(draft.qty)||draft.qty<1)throw new Error('Informe uma quantidade válida.');
     if(!Number.isFinite(draft.cost)||draft.cost<0)throw new Error('Informe um custo unitário válido.');
     if(!Number.isFinite(price)||price<=0)throw new Error('Informe um preço de venda válido.');
-    if(!draft.crop)throw new Error('A inteligência artificial não confirmou um recorte seguro do produto. Envie novamente a foto da compra.');
-    if(!changes.image?.data)throw new Error('A imagem recortada do produto não está disponível. Envie novamente a foto da compra.');
+    if(!draft.crop)throw new Error('O recorte da foto do produto não está disponível. Envie novamente a foto da compra.');
+    if(!changes.image?.data)throw new Error('A imagem recortada do produto não está disponível. Abra novamente a conferência e tente salvar.');
     const updated=await d.from('assistant_products').update({draft,error:null,status:'pending'}).eq('id',productId);check(updated.error);
     // register adquire o mesmo lock reentrante e faria uma segunda transação.
     // Aqui chamamos diretamente a lógica pública sem outro lock por meio de um marcador.
@@ -185,7 +185,7 @@ async function registerUnlocked(owner:string,id:string,productId:string,image:{m
   const draft=product.draft as ai.PurchaseDraft;
   const price=Number(draft.manualPrice??0);
   if(price<=0)throw new Error('Informe o preço de venda antes de salvar.');
-  if(!draft.crop)throw new Error('Imagem recortada do produto ausente.');
+  if(!draft.crop)throw new Error('Imagem do produto ausente.');
   const identity=draft.trackingCode?`${draft.trackingCode}:${ai.normalizeName(draft.name+' '+draft.variant)}`:product.id;
   const key=await hash(`purchase:${identity}`);
   const old=await d.from('assistant_operations').select('*').eq('operation_key',key).maybeSingle();check(old.error);
@@ -219,7 +219,7 @@ export async function editProduct(owner:string,id:string,productId:string,change
       if(draft.qty!==p.result.qty){const stock=await ai.inventoryFor(p.result.variantId,store),after=stock+draft.qty-p.result.qty;if(after<0)throw new Error('A correção deixaria o estoque negativo.');await ai.setInventory(p.result.variantId,store,after);}
       const verify=await ai.loyverse<Record<string,unknown>>(`items/${p.result.itemId}`),vr=Array.isArray(verify.variants)?verify.variants[0] as Record<string,unknown>:{};
       const result={...p.result,name:String(verify.item_name??p.result.name),qty:draft.qty,cost:Number(vr.cost??draft.cost)};await d.from('assistant_products').update({draft,result,status:'done',error:null}).eq('id',productId);
-    }else{await d.from('assistant_products').update({draft,error:draft.crop?null:'A IA não confirmou um recorte visual seguro.',status:draft.crop?'pending':'review'}).eq('id',productId);}
+    }else{await d.from('assistant_products').update({draft,error:draft.crop?null:'A IA não confirmou um recorte visual utilizável.',status:draft.crop?'pending':'review'}).eq('id',productId);}
     return state(owner,id);
   });
 }

@@ -389,11 +389,6 @@ export async function geminiAgent(
   throw new Error("O Assistente atingiu o limite de etapas desta solicitação. Nenhuma etapa adicional foi executada.");
 }
 
-/**
- * A primeira e única leitura da compra devolve identificação, quantidade,
- * custo e a caixa visual do produto. A imagem final é feita somente a partir
- * dos pixels dessa caixa; não há pesquisa externa nem segunda chamada de IA.
- */
 function normalizeCrop(raw: unknown): NormalizedCrop | undefined {
   if (!raw || typeof raw !== "object") return undefined;
   const c = raw as Record<string, unknown>;
@@ -411,10 +406,65 @@ function normalizeCrop(raw: unknown): NormalizedCrop | undefined {
 
 type NormalizedCrop = { x: number; y: number; width: number; height: number };
 
-/**
- * O produto é recortado diretamente da foto original. Não usamos pesquisa
- * externa nem outra chamada ao Gemini para escolher uma imagem.
- */
+/** Lê UMA imagem. A imagem só existe na memória desta chamada. */
+export async function readPurchaseImage(
+  image: AssistantImage,
+  categories: LoyCategory[] = [],
+  instructions = "",
+): Promise<PurchaseDraft[]> {
+  // UMA única chamada de visão por imagem: identificação, quantidade, custo e
+  // localização visual do produto saem da mesma análise.
+  const text = await geminiJson(
+    [
+      { text: PROMPT + "\nPreferências do administrador (não substituem as regras acima): " + instructions + "\nEscolha categoryId somente entre estas categorias existentes; vazio se nenhuma servir. " + JSON.stringify(categories.map(c => ({id:c.id,name:c.name}))) },
+      { inline_data: { mime_type: image.mime, data: image.data } },
+    ],
+    SCHEMA,
+  );
+  if (!text.trim()) return [];
+
+  let parsed: { products?: unknown };
+  try {
+    parsed = JSON.parse(text) as { products?: unknown };
+  } catch {
+    return [];
+  }
+
+  const list = Array.isArray(parsed.products) ? parsed.products : [];
+  const drafts = list.map((raw) => {
+    const p = raw as Record<string, unknown>;
+    const qtyPackages = Math.max(1, Math.floor(toNumber(p["qty"]) || 1));
+    const unitsPerPackage = Math.max(1, Math.floor(toNumber(p["unitsPerPackage"]) || 1));
+    const sellAsPackage = Boolean(p["sellAsPackage"]);
+    const physicalQty = sellAsPackage ? qtyPackages : qtyPackages * unitsPerPackage;
+
+    const totalPaid = Math.max(0, toNumber(p["totalPaid"]));
+    const reportedCost = Math.max(0, toNumber(p["cost"]));
+    // O campo mostrado no card e enviado ao Loyverse é SEMPRE o custo de uma
+    // unidade física. Mesmo que o Gemini tenha devolvido cost como total,
+    // dividimos pela quantidade física antes de persistir.
+    const totalCost = totalPaid > 0 ? totalPaid : reportedCost;
+    const cost = physicalQty > 0 ? totalCost / physicalQty : totalCost;
+
+    return {
+      name: cleanProductName(String(p["name"] ?? "")),
+      variant: cleanProductName(String(p["variant"] ?? "")),
+      qty: physicalQty,
+      seller: String(p["seller"] ?? "").trim(),
+      listedPrice: Math.max(0, toNumber(p["listedPrice"])),
+      cost: Math.round(cost * 100) / 100,
+      trackingCode: String(p["trackingCode"] ?? "").trim(),
+      purchasedAt: toIsoDate(p["purchasedAt"]),
+      notes: String(p["notes"] ?? "").trim(),
+      unitsPerPackage,
+      sellAsPackage,
+      crop: normalizeCrop(p["crop"]),
+      categoryId: categories.some(c => c.id === p["categoryId"]) ? String(p["categoryId"]) : "",
+    } satisfies PurchaseDraft;
+  });
+
+  return drafts.filter(d => d.name.trim());
+}
 
 /* ------------------------------- Loyverse -------------------------------- */
 
