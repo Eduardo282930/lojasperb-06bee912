@@ -72,6 +72,8 @@ export function AssistantPanel({onClose}:{color:string;onClose:()=>void}){
   async function buildPreviews(snapshot:ChatState){
     const next:Record<string,string>={};
     for(const p of snapshot.pendingProducts){
+      const webImage=typeof p.draft.imageUrl==='string'&&p.draft.imageUrl.trim()?p.draft.imageUrl.trim():"";
+      if(webImage){next[p.id]=webImage;continue;}
       const source=prepared.current.get(String(p.draft.sourceHash??""));const crop=parseCrop(p.draft.crop);
       if(!source||!crop)continue;
       try{const image=await cropImage(source,crop);next[p.id]=dataUrl(image);}catch{/* mantém sem preview e deixa o card explicar o motivo */}
@@ -111,9 +113,14 @@ export function AssistantPanel({onClose}:{color:string;onClose:()=>void}){
     if(!Number.isFinite(qty)||qty<1)throw new Error("Informe uma quantidade válida.");
     if(!Number.isFinite(cost)||cost<0)throw new Error("Informe um custo válido.");
     if(!Number.isFinite(price)||price<=0)throw new Error("Informe o preço de venda.");
-    if(!preview)throw new Error("A foto do produto ainda não está disponível. Envie novamente a foto da compra para a IA localizar o produto.");
+    if(!preview)throw new Error("A imagem do produto ainda não está disponível. Envie novamente a foto da compra para tentar outra busca.");
     active.current++;setBusy(true);
-    try{const image=preview.split(",")[1]??"";const v=await call({data:{action:"saveOne",id:p.conversationId??chat.id,productId:p.id,name:edit.name,qty,cost,price,image:{mime:"image/jpeg",data:image}}});latest.current=v;setChat(v);setPreviews(old=>{const copy={...old};delete copy[p.id];return copy;});setAttention(v.pendingProducts.length>0);}
+    try{
+      const imageData=preview.startsWith("data:")?preview.split(",")[1]??"":"";
+      const imageUrl=typeof p.draft.imageUrl==='string'&&p.draft.imageUrl.trim()?p.draft.imageUrl.trim():undefined;
+      const v=await call({data:{action:"saveOne",id:p.conversationId??chat.id,productId:p.id,name:edit.name,qty,cost,price,image:imageData?{mime:"image/jpeg",data:imageData}:undefined,imageUrl}});
+      latest.current=v;setChat(v);setPreviews(old=>{const copy={...old};delete copy[p.id];return copy;});setAttention(v.pendingProducts.length>0);
+    }
     finally{active.current--;setBusy(active.current>0);}
   }
 
