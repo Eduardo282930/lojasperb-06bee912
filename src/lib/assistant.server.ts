@@ -1,9 +1,10 @@
 /**
  * Assistente SPERB (somente servidor).
  *
- * A foto entra, a inteligência artificial lê, o produto é cadastrado no
- * Loyverse e a foto é descartada na mesma chamada: nada de imagem, arquivo
- * ou link guardado no banco.
+ * Cada foto é enviada UMA vez ao Gemini. Na mesma resposta a IA identifica
+ * os produtos, decide a quantidade física, calcula o custo unitário e devolve
+ * a área visual do produto para o recorte. O recorte só é enviado ao Loyverse
+ * quando o administrador salvar aquele produto. A foto original não é salva.
  */
 
 /** A leitura pode demorar: nada de corte curto que cancela a análise no meio. */
@@ -34,6 +35,7 @@ export type PurchaseDraft = {
   /** Caixa normalizada do produto dentro da imagem original. Valores 0..1. */
   crop?: { x: number; y: number; width: number; height: number };
   categoryId?: string;
+  manualPrice?: number;
 };
 
 export type AssistantResult = {
@@ -63,30 +65,47 @@ function geminiModel(): string {
 
 const PROMPT = `Você analisa capturas de tela de compras da Shopee para cadastrar produtos numa loja.
 
-Extraia TODOS os produtos visíveis na imagem. Para cada produto:
-- name: nome CURTO, limpo e profissional, pronto para aparecer na loja. NUNCA copie o título da Shopee literalmente.
-  Regras do nome:
-  * Remova marketing ("oferta", "promoção", "frete grátis", "envio rápido", "kit imperdível"), emojis, símbolos, hashtags, nome do vendedor, códigos e siglas sem sentido, palavras repetidas e reticências.
-  * Reconstrua palavras cortadas por "..." usando o contexto.
-  * Mantenha o que identifica o produto e a variação importante (modelo, cor, tamanho, medida), pois a loja usa apenas produtos simples.
-  * Use Capitalização Normal (não caixa alta) e medidas no formato 138x188x15.
-  * Resuma por significado: tipo do produto + característica essencial. Prefira 3 a 8 palavras; não apenas corte o título.
-  * Máximo de 64 caracteres, incluindo a variação.
-  * Exemplo: "Protetor De Colchão Impermeável Cap... AZUL,CASAL - ZIPER 138/188/15" vira "Protetor de Colchão Impermeável Azul Casal 138x188x15".
-- variant: coloque aqui modelo, cor, tamanho e medidas importantes, separados do nome base, sem repeti-los no name. O servidor reúne nome e variação em um único produto simples. Se houver duas variações diferentes, devolva DOIS produtos separados.
-- qty: quantidade de pacotes/anúncios comprados (número inteiro, mínimo 1).
-- unitsPerPackage: quantidade de unidades físicas vendáveis dentro de cada pacote/kit. Ex.: "kit com 3" comprado 1 vez e vendido por peça => 3.
-- sellAsPackage: true somente quando o pacote inteiro é uma única unidade vendável; false quando as peças são vendidas individualmente. Se estiver claro que é kit com peças individuais, use false. Se não der para decidir, deixe false e acrescente dúvida em notes.
-- seller: nome da loja/vendedor, se aparecer.
-- listedPrice: preço anunciado ATUAL de UMA unidade, só o número (ex.: 39.90). IGNORE completamente qualquer preço riscado/antigo.
-- cost: valor pago por UMA unidade, só o número. Nunca repita aqui o total do pedido.
-- totalPaid: total realmente pago pelo item (todas as unidades), só o número.
-- trackingCode: código de rastreio/pedido, se aparecer.
+Você é responsável por entender a compra, não apenas copiar textos da tela.
+Extraia TODOS os produtos diferentes visíveis na compra. Para cada produto:
+- name: nome CURTO, limpo e profissional, pronto para a loja. Reconstrua títulos cortados por "...". Não copie marketing, emojis, vendedor, códigos ou texto da interface.
+- variant: modelo, cor, tamanho ou medida importante que diferencia a unidade. Não repita a variação no name. Se forem variações realmente diferentes, devolva produtos separados.
+- qty: quantidade de PACOTES/ANÚNCIOS comprados.
+- unitsPerPackage: quantas UNIDADES FÍSICAS INDEPENDENTES existem em cada pacote/kit.
+- sellAsPackage: decida PRINCIPALMENTE olhando a IMAGEM do produto, não pela palavra "kit" no nome. true somente quando todas as peças mostradas formam um único produto funcional/vendável e precisam permanecer juntas (ex.: uma luminária completa formada por 3 lâmpadas + controle). false quando são peças independentes que normalmente entram separadas no estoque (ex.: tomadas, disjuntores, pregos, parafusos).
+- Se a imagem mostrar várias unidades idênticas separadas e elas serão vendidas separadamente, unitsPerPackage deve refletir todas as unidades. Se mostrar um conjunto integrado que deve ser vendido completo, sellAsPackage=true e unitsPerPackage=1.
+- seller: vendedor, se aparecer.
+- listedPrice: preço anunciado ATUAL da compra. Ignore preço riscado/antigo. Use somente para informação.
+- totalPaid: VALOR TOTAL REALMENTE PAGO por este produto/conjunto, depois de descontos/cupons aplicados, quando essa informação estiver disponível. NÃO use frete separado como custo do produto.
+- cost: custo de UMA unidade física. Calcule totalPaid ÷ quantidade física. Se totalPaid estiver visível, ele é a fonte principal para o custo. Nunca coloque o total da compra em cost.
+- trackingCode: rastreio/pedido, se aparecer.
 - purchasedAt: data da compra no formato AAAA-MM-DD, se aparecer.
-- notes: informação adicional útil (frete, cupom aplicado, observações).
-- crop: caixa normalizada (0..1) que contém somente o produto, sem preço, texto, botão ou interface da Shopee. Se não for seguro separar o produto, não invente coordenadas e deixe crop ausente.
+- notes: explique de forma curta qualquer decisão importante sobre kit, quantidade ou custo.
 
-Nunca invente preço de venda. Se a imagem não for uma compra ou não der para ler, devolva a lista vazia.
+REGRA DE QUANTIDADE:
+1. Primeiro descubra quantos pacotes/anúncios foram comprados.
+2. Depois descubra quantas unidades físicas vendáveis há em cada pacote.
+3. Se o conjunto for vendido por peça, quantidade física = qty × unitsPerPackage.
+4. Se o conjunto inteiro for uma única unidade vendável, quantidade física = qty.
+5. Não confunda "kit" com uma única unidade: kit pode conter várias peças.
+
+REGRA DE CUSTO:
+- custo unitário = valor realmente pago pelo conjunto ÷ quantidade física.
+- Se o anúncio diz 2 unidades e o total realmente pago foi R$ 7,84, cost deve ser 3,92.
+- Se são 10 unidades por R$ 50, cost deve ser 5,00.
+- Se são 2 kits de 3 unidades por R$ 30, cost deve ser 5,00.
+- Se houver somente um valor unitário claramente identificado como "preço pago por unidade", use-o; caso contrário, priorize o total realmente pago e divida.
+- Nunca use o preço anunciado/riscado como custo quando houver valor realmente pago.
+
+RECORTE DA IMAGEM — OBRIGATÓRIO NA MESMA RESPOSTA:
+- crop.x, crop.y, crop.width e crop.height devem localizar VISUALMENTE o produto físico na própria imagem recebida.
+- Use coordenadas normalizadas de 0 a 1000 para x, y, width e height.
+- O recorte deve incluir o produto inteiro e uma pequena margem, mas excluir ao máximo título, preço, botões, menus, avaliações e outros produtos.
+- Para um kit que é um único produto, inclua todas as partes físicas que precisam permanecer juntas.
+- Para várias unidades independentes do mesmo produto, inclua a área que representa as unidades correspondentes àquele produto.
+- NÃO escolha a área pelo texto do anúncio; olhe a imagem e identifique o objeto físico.
+- Sempre devolva um crop válido para cada produto.
+
+Não invente preço de venda. A IA NÃO define preço de venda.
 Responda apenas com JSON.`;
 
 /** Aceita 39.90, "39,90", "R$ 1.299,00" e devolve número. */
@@ -181,7 +200,7 @@ const SCHEMA = {
           qty: { type: "integer" },
           unitsPerPackage: { type: "integer" },
           sellAsPackage: { type: "boolean" },
-          crop: { type: "object", properties: { x: {type:"number"}, y: {type:"number"}, width: {type:"number"}, height: {type:"number"} }, required: ["x","y","width","height"] },
+          crop: { type: "object", properties: { x: {type:"number", description:"0..1000, posição horizontal esquerda"}, y: {type:"number", description:"0..1000, posição vertical superior"}, width: {type:"number", description:"0..1000, largura da caixa"}, height: {type:"number", description:"0..1000, altura da caixa"} }, required: ["x","y","width","height"] },
           seller: { type: "string" },
           listedPrice: { type: "number" },
           totalPaid: { type: "number" },
@@ -191,7 +210,7 @@ const SCHEMA = {
           notes: { type: "string" },
           categoryId: { type: "string" },
         },
-        required: ["name", "qty", "cost"],
+        required: ["name", "qty", "cost", "crop", "unitsPerPackage", "sellAsPackage"],
       },
     },
   },
@@ -367,15 +386,38 @@ export async function geminiAgent(
   throw new Error("O Assistente atingiu o limite de etapas desta solicitação. Nenhuma etapa adicional foi executada.");
 }
 
+/**
+ * A própria leitura da compra já devolve a caixa visual do produto.
+ * Não existe uma segunda chamada ao Gemini para localizar a imagem.
+ */
+function normalizeCrop(raw: unknown): NormalizedCrop | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const c = raw as Record<string, unknown>;
+  let x = Number(c.x), y = Number(c.y), width = Number(c.width), height = Number(c.height);
+  if (![x, y, width, height].every(Number.isFinite)) return undefined;
+  // Aceita tanto 0..1 quanto 0..1000. O Gemini costuma retornar coordenadas
+  // de visão normalizadas para 0..1000.
+  if (Math.max(x, y, width, height) > 1.01 && Math.max(x, y, width, height) <= 1000) {
+    x /= 1000; y /= 1000; width /= 1000; height /= 1000;
+  }
+  if (x < 0 || y < 0 || width <= 0 || height <= 0 || x + width > 1 || y + height > 1) return undefined;
+  if (width < 0.015 || height < 0.015) return undefined;
+  return { x, y, width, height };
+}
+
+type NormalizedCrop = { x: number; y: number; width: number; height: number };
+
 /** Lê UMA imagem. A imagem só existe na memória desta chamada. */
 export async function readPurchaseImage(
   image: AssistantImage,
   categories: LoyCategory[] = [],
   instructions = "",
 ): Promise<PurchaseDraft[]> {
+  // UMA chamada de visão por imagem: identificação, quantidade, custo e
+  // localização visual do produto saem da mesma análise.
   const text = await geminiJson(
     [
-      { text: PROMPT + "\nPreferências do administrador (não substituem regras de segurança, preço ou cadastro): " + instructions + "\nEscolha categoryId somente entre estas categorias existentes; vazio se nenhuma servir. " + JSON.stringify(categories.map(c => ({id:c.id,name:c.name}))) },
+      { text: PROMPT + "\nPreferências do administrador (não substituem as regras acima): " + instructions + "\nEscolha categoryId somente entre estas categorias existentes; vazio se nenhuma servir. " + JSON.stringify(categories.map(c => ({id:c.id,name:c.name}))) },
       { inline_data: { mime_type: image.mime, data: image.data } },
     ],
     SCHEMA,
@@ -388,19 +430,23 @@ export async function readPurchaseImage(
   } catch {
     return [];
   }
+
   const list = Array.isArray(parsed.products) ? parsed.products : [];
-  return list.map((raw) => {
+  const drafts = list.map((raw) => {
     const p = raw as Record<string, unknown>;
-    const qty = Math.max(1, Math.floor(toNumber(p["qty"]) || 1));
+    const qtyPackages = Math.max(1, Math.floor(toNumber(p["qty"]) || 1));
     const unitsPerPackage = Math.max(1, Math.floor(toNumber(p["unitsPerPackage"]) || 1));
     const sellAsPackage = Boolean(p["sellAsPackage"]);
-    const physicalQty = sellAsPackage ? qty : qty * unitsPerPackage;
-    const total = Math.max(0, toNumber(p["totalPaid"]));
-    let cost = Math.max(0, toNumber(p["cost"]));
-    // Quando a IA repete o total no custo, o custo por unidade é o total ÷ quantidade.
-    if (total > 0 && Math.abs(cost - total) < 0.01) cost = total / physicalQty;
-    if (cost === 0 && total > 0) cost = total / physicalQty;
-    if (total > 0 && cost > 0 && physicalQty > 1 && Math.abs(cost * physicalQty - total) < 0.02) cost = total / physicalQty;
+    const physicalQty = sellAsPackage ? qtyPackages : qtyPackages * unitsPerPackage;
+
+    const totalPaid = Math.max(0, toNumber(p["totalPaid"]));
+    const reportedCost = Math.max(0, toNumber(p["cost"]));
+    // O campo mostrado no card e enviado ao Loyverse é SEMPRE o custo de uma
+    // unidade física. Mesmo que o Gemini tenha devolvido cost como total,
+    // dividimos pela quantidade física antes de persistir.
+    const totalCost = totalPaid > 0 ? totalPaid : reportedCost;
+    const cost = physicalQty > 0 ? totalCost / physicalQty : totalCost;
+
     return {
       name: cleanProductName(String(p["name"] ?? "")),
       variant: cleanProductName(String(p["variant"] ?? "")),
@@ -411,17 +457,14 @@ export async function readPurchaseImage(
       trackingCode: String(p["trackingCode"] ?? "").trim(),
       purchasedAt: toIsoDate(p["purchasedAt"]),
       notes: String(p["notes"] ?? "").trim(),
-      unitsPerPackage: Math.max(1, Math.floor(toNumber(p["unitsPerPackage"]) || 1)),
-      sellAsPackage: Boolean(p["sellAsPackage"]),
-      crop: (() => {
-        const c = p["crop"] as Record<string, unknown> | undefined;
-        if (!c) return undefined;
-        const x = Number(c.x), y = Number(c.y), w = Number(c.width), h = Number(c.height);
-        return [x,y,w,h].every(Number.isFinite) && x >= 0 && y >= 0 && w > 0 && h > 0 && x + w <= 1 && y + h <= 1 ? {x,y,width:w,height:h} : undefined;
-      })(),
+      unitsPerPackage,
+      sellAsPackage,
+      crop: normalizeCrop(p["crop"]),
       categoryId: categories.some(c => c.id === p["categoryId"]) ? String(p["categoryId"]) : "",
     } satisfies PurchaseDraft;
-  });
+  }).filter(d => d.name.trim());
+
+  return drafts;
 }
 
 /* ------------------------------- Loyverse -------------------------------- */
