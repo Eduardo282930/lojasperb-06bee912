@@ -18,3 +18,8 @@
 - [x] Limitar nomes completos a 64 caracteres e preservar variação.
 - [x] Instruções editáveis, reinício por cancelamento e exclusão de histórico sem apagar idempotência.
 - [ ] Validar operações autenticadas no banco externo (acesso de teste indisponível).
+
+## Nomes e preços do Assistente
+- [x] Reforçar resumo do nome e preservar variação nas correções.
+- [x] Mostrar campo de preço desde a identificação; liberar salvamento após cadastro sem aguardar todo o lote.
+- [x] Exibir falhas reais e exigir preço na mensagem atual.
