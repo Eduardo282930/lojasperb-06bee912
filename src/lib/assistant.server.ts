@@ -99,11 +99,14 @@ REGRA DE CUSTO:
 RECORTE DA IMAGEM — OBRIGATÓRIO NA MESMA RESPOSTA:
 - crop.x, crop.y, crop.width e crop.height devem localizar VISUALMENTE o produto físico na própria imagem recebida.
 - Use coordenadas normalizadas de 0 a 1000 para x, y, width e height.
-- O recorte deve incluir o produto inteiro e uma pequena margem, mas excluir ao máximo título, preço, botões, menus, avaliações e outros produtos.
-- Para um kit que é um único produto, inclua todas as partes físicas que precisam permanecer juntas.
-- Para várias unidades independentes do mesmo produto, inclua a área que representa as unidades correspondentes àquele produto.
-- NÃO escolha a área pelo texto do anúncio; olhe a imagem e identifique o objeto físico.
-- Sempre devolva um crop válido para cada produto.
+- A caixa deve ser JUSTA ao redor do objeto físico, seguindo as bordas visíveis do produto, com somente uma pequena margem de segurança (aprox. 3% a 8%). NÃO faça uma caixa grande para "garantir" o produto.
+- EXCLUA explicitamente o máximo possível de título, preço, botões, menus, avaliações, banners, ícones, barras e letras da interface que estejam fora do produto.
+- Se houver texto IMPRESSO NO PRÓPRIO PRODUTO ou na embalagem que faz parte da aparência física, esse texto deve permanecer no recorte.
+- Para um kit que é um único produto, inclua todas as partes físicas que precisam permanecer juntas, mas sem puxar elementos da interface ao redor.
+- Para várias unidades independentes do mesmo produto, delimite a área que contém somente essas unidades.
+- NÃO escolha a área pelo texto do anúncio; olhe a imagem e identifique visualmente as bordas do objeto.
+- O objetivo é uma foto final centralizada, limpa e enquadrada, com o produto ocupando a maior parte do quadro e sem letras da tela nas laterais.
+- Sempre devolva um crop válido e apertado para cada produto.
 
 Não invente preço de venda. A IA NÃO define preço de venda.
 Responda apenas com JSON.`;
