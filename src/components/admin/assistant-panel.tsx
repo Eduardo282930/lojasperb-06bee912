@@ -36,19 +36,23 @@ async function cropImage(source:Prepared,crop?:Crop):Promise<Prepared>{
   // quadrado dentro da foto original, pois isso puxava letras/UI das laterais.
   // Aplicamos somente uma margem pequena e depois centralizamos a área recortada
   // dentro de um quadro quadrado, preservando exclusivamente os pixels do produto.
-  const margin=Math.max(2,Math.round(Math.min(rawW,rawH)*0.06));
+  const margin=Math.max(0,Math.round(Math.min(rawW,rawH)*0.005));
   const x=Math.max(0,rawX-margin),y=Math.max(0,rawY-margin);
   const right=Math.min(bitmap.width,rawX+rawW+margin),bottom=Math.min(bitmap.height,rawY+rawH+margin);
   const w=right-x,h=bottom-y;
   if(w<16||h<16){bitmap.close();throw new Error("Não consegui preparar uma área válida para o produto.");}
 
-  const size=Math.min(1200,Math.max(320,Math.max(w,h)));
+  // Mantém uma resolução suficiente para o catálogo sem criar arquivos enormes.
+  const size=Math.min(1200,Math.max(480,Math.max(w,h)));
   const canvas=document.createElement("canvas");canvas.width=size;canvas.height=size;
   const ctx=canvas.getContext("2d");if(!ctx){bitmap.close();throw new Error("Não consegui preparar a foto do produto.");}
   ctx.fillStyle="#ffffff";ctx.fillRect(0,0,size,size);
-  const scale=Math.min((size*0.88)/w,(size*0.88)/h);
+  const scale=Math.min((size*0.92)/w,(size*0.92)/h);
   const drawW=Math.max(1,Math.round(w*scale)),drawH=Math.max(1,Math.round(h*scale));
   const dx=Math.round((size-drawW)/2),dy=Math.round((size-drawH)/2);
+  ctx.imageSmoothingEnabled=true;
+  ctx.imageSmoothingQuality='high';
+  ctx.filter='contrast(1.06) brightness(1.02) saturate(1.03)';
   ctx.drawImage(bitmap,x,y,w,h,dx,dy,drawW,drawH);
   bitmap.close();
   const url=canvas.toDataURL("image/jpeg",0.92);return {mime:"image/jpeg",data:url.slice(url.indexOf(",")+1)};
@@ -72,8 +76,6 @@ export function AssistantPanel({onClose}:{color:string;onClose:()=>void}){
   async function buildPreviews(snapshot:ChatState){
     const next:Record<string,string>={};
     for(const p of snapshot.pendingProducts){
-      const webImage=typeof p.draft.imageUrl==='string'&&p.draft.imageUrl.trim()?p.draft.imageUrl.trim():"";
-      if(webImage){next[p.id]=webImage;continue;}
       const source=prepared.current.get(String(p.draft.sourceHash??""));const crop=parseCrop(p.draft.crop);
       if(!source||!crop)continue;
       try{const image=await cropImage(source,crop);next[p.id]=dataUrl(image);}catch{/* mantém sem preview e deixa o card explicar o motivo */}
@@ -113,12 +115,11 @@ export function AssistantPanel({onClose}:{color:string;onClose:()=>void}){
     if(!Number.isFinite(qty)||qty<1)throw new Error("Informe uma quantidade válida.");
     if(!Number.isFinite(cost)||cost<0)throw new Error("Informe um custo válido.");
     if(!Number.isFinite(price)||price<=0)throw new Error("Informe o preço de venda.");
-    if(!preview)throw new Error("A imagem do produto ainda não está disponível. Envie novamente a foto da compra para tentar outra busca.");
+    if(!preview)throw new Error("O recorte do produto ainda não está disponível. Envie novamente a foto da compra para tentar novamente.");
     active.current++;setBusy(true);
     try{
       const imageData=preview.startsWith("data:")?preview.split(",")[1]??"":"";
-      const imageUrl=typeof p.draft.imageUrl==='string'&&p.draft.imageUrl.trim()?p.draft.imageUrl.trim():undefined;
-      const v=await call({data:{action:"saveOne",id:p.conversationId??chat.id,productId:p.id,name:edit.name,qty,cost,price,image:imageData?{mime:"image/jpeg",data:imageData}:undefined,imageUrl}});
+      const v=await call({data:{action:"saveOne",id:p.conversationId??chat.id,productId:p.id,name:edit.name,qty,cost,price,image:imageData?{mime:"image/jpeg",data:imageData}:undefined}});
       latest.current=v;setChat(v);setPreviews(old=>{const copy={...old};delete copy[p.id];return copy;});setAttention(v.pendingProducts.length>0);
     }
     finally{active.current--;setBusy(active.current>0);}
