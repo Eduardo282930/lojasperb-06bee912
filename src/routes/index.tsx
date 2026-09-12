@@ -33,6 +33,8 @@ import { shareProduct } from "@/lib/share";
 import { filterCommercialProducts } from "@/lib/product-filters";
 import { useLiveCatalog } from "@/lib/live";
 import { cardImageSources, optimizedImage, CARD_WIDTHS } from "@/lib/image-url";
+import { useAdmin } from "@/lib/admin";
+import { AssistantPanel } from "@/components/admin/assistant-panel";
 
 const PAGE_SIZE = 30;
 /** Fotos que começam a baixar junto com a página, com prioridade máxima. */
@@ -145,6 +147,8 @@ function Home() {
   const [category, setCategory] = useState<string>("todos");
   const [showAllCategories, setShowAllCategories] = useState(false);
   const [recommendedIndex, setRecommendedIndex] = useState(0);
+  const { isAdmin } = useAdmin();
+  const [assistantOpen, setAssistantOpen] = useState(false);
 
   /*
    * Cópia local do aparelho: só entra DEPOIS da hidratação, para que a tela
@@ -575,6 +579,21 @@ function Home() {
           </>
         )}
       </main>
+
+      {isAdmin && assistantOpen && (
+        <AssistantPanel color="hsl(var(--primary))" onClose={() => setAssistantOpen(false)} />
+      )}
+
+      {isAdmin && (
+        <button
+          type="button"
+          aria-label="Abrir Assistente SPERB"
+          onClick={() => setAssistantOpen(true)}
+          className="fixed bottom-5 left-5 z-40 grid h-14 w-14 place-items-center rounded-full bg-primary text-primary-foreground shadow-lg ring-4 ring-background/80 transition-transform active:scale-95"
+        >
+          <Sparkles className="h-6 w-6" />
+        </button>
+      )}
 
       <Link
         to="/eu"
