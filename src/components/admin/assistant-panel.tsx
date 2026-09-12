@@ -27,35 +27,46 @@ async function hashText(value:string){const bytes=await crypto.subtle.digest("SH
 function parseCrop(value:unknown):Crop|undefined{if(!value||typeof value!=="object")return undefined;const c=value as Record<string,unknown>;const x=Number(c.x),y=Number(c.y),width=Number(c.width),height=Number(c.height);if(![x,y,width,height].every(Number.isFinite)||x<0||y<0||width<=0||height<=0||x+width>1||y+height>1)return undefined;return {x,y,width,height};}
 async function cropImage(source:Prepared,crop?:Crop):Promise<Prepared>{
   if(!crop)throw new Error("A inteligência artificial ainda não confirmou a área do produto.");
-  const bytes=Uint8Array.from(atob(source.data),c=>c.charCodeAt(0));const bitmap=await createImageBitmap(new Blob([bytes],{type:source.mime}));
-  const rawX=Math.max(0,Math.floor(crop.x*bitmap.width)),rawY=Math.max(0,Math.floor(crop.y*bitmap.height));
-  const rawW=Math.min(bitmap.width-rawX,Math.floor(crop.width*bitmap.width)),rawH=Math.min(bitmap.height-rawY,Math.floor(crop.height*bitmap.height));
-  if(rawW<16||rawH<16){bitmap.close();throw new Error("A área encontrada para o produto é pequena demais.");}
+  const bytes=Uint8Array.from(atob(source.data),c=>c.charCodeAt(0));
+  const bitmap=await createImageBitmap(new Blob([bytes],{type:source.mime}));
+  const rawX=Math.max(0,Math.floor(crop.x*bitmap.width));
+  const rawY=Math.max(0,Math.floor(crop.y*bitmap.height));
+  const rawW=Math.min(bitmap.width-rawX,Math.ceil(crop.width*bitmap.width));
+  const rawH=Math.min(bitmap.height-rawY,Math.ceil(crop.height*bitmap.height));
+  if(rawW<24||rawH<24){bitmap.close();throw new Error("A área encontrada para o produto é pequena demais.");}
 
-  // O Gemini fornece a caixa do produto. Não transformamos essa caixa em um
-  // quadrado dentro da foto original, pois isso puxava letras/UI das laterais.
-  // Aplicamos somente uma margem pequena e depois centralizamos a área recortada
-  // dentro de um quadro quadrado, preservando exclusivamente os pixels do produto.
-  const margin=Math.max(0,Math.round(Math.min(rawW,rawH)*0.005));
-  const x=Math.max(0,rawX-margin),y=Math.max(0,rawY-margin);
-  const right=Math.min(bitmap.width,rawX+rawW+margin),bottom=Math.min(bitmap.height,rawY+rawH+margin);
-  const w=right-x,h=bottom-y;
-  if(w<16||h<16){bitmap.close();throw new Error("Não consegui preparar uma área válida para o produto.");}
-
-  // Mantém uma resolução suficiente para o catálogo sem criar arquivos enormes.
-  const size=Math.min(1200,Math.max(480,Math.max(w,h)));
+  // O recorte usa EXATAMENTE a caixa devolvida pelo Gemini. Não adicionamos
+  // margem, pois qualquer margem poderia trazer título, preço ou elementos da
+  // tela para dentro da foto final. O quadrado é apenas o quadro de saída.
+  const size=Math.min(1400,Math.max(480,Math.max(rawW,rawH)));
   const canvas=document.createElement("canvas");canvas.width=size;canvas.height=size;
-  const ctx=canvas.getContext("2d");if(!ctx){bitmap.close();throw new Error("Não consegui preparar a foto do produto.");}
-  ctx.fillStyle="#ffffff";ctx.fillRect(0,0,size,size);
-  const scale=Math.min((size*0.92)/w,(size*0.92)/h);
-  const drawW=Math.max(1,Math.round(w*scale)),drawH=Math.max(1,Math.round(h*scale));
-  const dx=Math.round((size-drawW)/2),dy=Math.round((size-drawH)/2);
+  const ctx=canvas.getContext("2d");
+  if(!ctx){bitmap.close();throw new Error("Não consegui preparar a foto do produto.");}
   ctx.imageSmoothingEnabled=true;
-  ctx.imageSmoothingQuality='high';
-  ctx.filter='contrast(1.06) brightness(1.02) saturate(1.03)';
-  ctx.drawImage(bitmap,x,y,w,h,dx,dy,drawW,drawH);
+  ctx.imageSmoothingQuality="high";
+  ctx.fillStyle="#ffffff";ctx.fillRect(0,0,size,size);
+
+  // Mantém o enquadramento quadrado e aumenta a imagem sem alterar o produto.
+  const scale=Math.min((size*0.92)/rawW,(size*0.92)/rawH);
+  const drawW=Math.max(1,Math.round(rawW*scale));
+  const drawH=Math.max(1,Math.round(rawH*scale));
+  const dx=Math.round((size-drawW)/2);
+  const dy=Math.round((size-drawH)/2);
+  ctx.drawImage(bitmap,rawX,rawY,rawW,rawH,dx,dy,drawW,drawH);
   bitmap.close();
-  const url=canvas.toDataURL("image/jpeg",0.92);return {mime:"image/jpeg",data:url.slice(url.indexOf(",")+1)};
+
+  // Melhoria leve para enxergar melhor o produto, sem geração de conteúdo.
+  const imageData=ctx.getImageData(0,0,size,size);
+  const px=imageData.data;
+  for(let i=0;i<px.length;i+=4){
+    const r=px[i],g=px[i+1],b=px[i+2];
+    px[i]=Math.max(0,Math.min(255,Math.round((r-128)*1.08+128)));
+    px[i+1]=Math.max(0,Math.min(255,Math.round((g-128)*1.08+128)));
+    px[i+2]=Math.max(0,Math.min(255,Math.round((b-128)*1.08+128)));
+  }
+  ctx.putImageData(imageData,0,0);
+  const url=canvas.toDataURL("image/jpeg",0.94);
+  return {mime:"image/jpeg",data:url.slice(url.indexOf(",")+1)};
 }
 function dataUrl(image:Prepared){return `data:${image.mime};base64,${image.data}`;}
 function money(value:number){return Number.isFinite(value)?value.toFixed(2).replace(".",","):"0,00";}
@@ -115,7 +126,7 @@ export function AssistantPanel({onClose}:{color:string;onClose:()=>void}){
     if(!Number.isFinite(qty)||qty<1)throw new Error("Informe uma quantidade válida.");
     if(!Number.isFinite(cost)||cost<0)throw new Error("Informe um custo válido.");
     if(!Number.isFinite(price)||price<=0)throw new Error("Informe o preço de venda.");
-    if(!preview)throw new Error("O recorte do produto ainda não está disponível. Envie novamente a foto da compra para tentar novamente.");
+    if(!preview)throw new Error("A imagem recortada do produto ainda não está disponível. Envie novamente a foto da compra.");
     active.current++;setBusy(true);
     try{
       const imageData=preview.startsWith("data:")?preview.split(",")[1]??"":"";
