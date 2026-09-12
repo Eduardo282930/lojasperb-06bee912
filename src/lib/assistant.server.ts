@@ -38,6 +38,8 @@ export type PurchaseDraft = {
   manualPrice?: number;
   /** URL de uma foto de produto encontrada na pesquisa de imagens. */
   imageUrl?: string;
+  /** Consulta visual específica gerada pela primeira análise do Gemini. */
+  imageSearchQuery?: string;
 };
 
 export type AssistantResult = {
@@ -399,8 +401,9 @@ export async function geminiAgent(
 }
 
 /**
- * A própria leitura da compra já devolve a caixa visual do produto.
- * Não existe uma segunda chamada ao Gemini para localizar a imagem.
+ * A primeira leitura da compra devolve identificação, quantidade, custo e a
+ * caixa visual. Depois da busca na internet, uma segunda análise visual do
+ * Gemini valida as candidatas; nenhuma imagem é aceita só pelo texto.
  */
 function normalizeCrop(raw: unknown): NormalizedCrop | undefined {
   if (!raw || typeof raw !== "object") return undefined;
@@ -534,25 +537,127 @@ async function downloadWebImage(url: string): Promise<{ mime: string; data: stri
   }
 }
 
-async function findBestInternetProductImage(query: string): Promise<string | undefined> {
-  const candidates = await searchInternetProductImages(query);
-  if (!candidates.length) return undefined;
-  const checked = await Promise.all(candidates.slice(0, 4).map(async (candidate) => {
-    const image = await downloadWebImage(candidate.url);
-    return image ? { candidate, image } : undefined;
+type ImageCandidateWithData = {
+  candidate: WebImageCandidate;
+  image: { mime: string; data: string; bytes: number };
+};
+
+type VerifiedProductImage = {
+  productIndex: number;
+  acceptedCandidateIndex: number;
+  confidence: number;
+  reason: string;
+};
+
+const IMAGE_VERIFY_SCHEMA = {
+  type: "object",
+  properties: {
+    products: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          productIndex: { type: "integer" },
+          acceptedCandidateIndex: { type: "integer", description: "Índice 0..2 da imagem candidata ou -1 se nenhuma for comprovadamente o mesmo produto." },
+          confidence: { type: "number", description: "Confiança de 0 a 1 na correspondência visual." },
+          reason: { type: "string" },
+        },
+        required: ["productIndex", "acceptedCandidateIndex", "confidence", "reason"],
+      },
+    },
+  },
+  required: ["products"],
+};
+
+/**
+ * A busca textual só encontra candidatos. A imagem nunca é aceita pelo texto
+ * do resultado. O Gemini recebe a foto original da compra e as fotos
+ * candidatas e precisa comparar visualmente o produto localizado no crop com
+ * cada candidata. Se não houver correspondência forte, nenhuma imagem é usada.
+ */
+async function findVerifiedInternetProductImages(
+  purchaseImage: AssistantImage,
+  drafts: PurchaseDraft[],
+): Promise<Array<string | undefined>> {
+  const candidatesByProduct = await Promise.all(drafts.map(async (draft) => {
+    const query = (draft.imageSearchQuery || `${draft.name} ${draft.variant} ${draft.seller}`).trim();
+    const candidates = await searchInternetProductImages(query || draft.name);
+    const checked = await Promise.all(candidates.slice(0, 3).map(async (candidate) => {
+      const image = await downloadWebImage(candidate.url);
+      if (!image || image.bytes > 2_000_000) return undefined;
+      return { candidate, image } satisfies ImageCandidateWithData;
+    }));
+    return checked.filter(Boolean) as ImageCandidateWithData[];
   }));
-  const valid = checked.filter(Boolean) as Array<{ candidate: WebImageCandidate; image: { mime: string; data: string; bytes: number } }>;
-  const terms = query.toLowerCase().split(/\s+/).filter((term) => term.length >= 3);
-  valid.sort((a, b) => {
-    const score = (item: typeof a) => {
-      const haystack = `${item.candidate.title ?? ""} ${item.candidate.source ?? ""}`.toLowerCase();
-      const matches = terms.reduce((total, term) => total + (haystack.includes(term) ? 1 : 0), 0);
-      const quality = Math.min(4, Math.log10(Math.max(1, item.image.bytes)));
-      return matches * 10 + quality;
-    };
-    return score(b) - score(a);
+
+  const parts: GeminiPart[] = [
+    {
+      text: [
+        "Você é o verificador visual de fotos de produtos do Assistente SPERB.",
+        "A foto a seguir é a FOTO ORIGINAL DA COMPRA. Para cada produto, use a caixa crop informada para olhar especificamente o produto real que aparece na compra, mesmo que esteja pequeno, parcialmente embaçado ou em uma captura de tela.",
+        "Depois compare esse produto visualmente com as imagens candidatas anexadas para o mesmo produto.",
+        "NÃO aceite uma imagem apenas porque o nome ou o texto da página combina.",
+        "NÃO aceite pessoa, rosto, banner, meme, anúncio sem o produto visível, embalagem de outro produto ou item apenas parecido.",
+        "Procure correspondência de formato, desenho, cor, embalagem, quantidade de posições, conectores, detalhes físicos, modelo e demais características visuais disponíveis.",
+        "Só aceite uma candidata quando for claramente o mesmo produto ou uma foto de catálogo inequívoca do mesmo modelo/variação.",
+        "Se houver dúvida real, retorne acceptedCandidateIndex=-1. É MUITO melhor ficar sem imagem e pedir conferência do que cadastrar uma imagem errada.",
+        "A primeira imagem anexada depois deste texto é sempre a foto original da compra. As demais são candidatas numeradas por produto.",
+        JSON.stringify(drafts.map((d, i) => ({
+          productIndex: i,
+          name: d.name,
+          variant: d.variant,
+          crop: d.crop ?? null,
+          candidates: candidatesByProduct[i].map((c, j) => ({
+            candidateIndex: j,
+            title: c.candidate.title ?? "",
+            source: c.candidate.source ?? "",
+          })),
+        }))),
+      ].join("\n"),
+    },
+    { inline_data: { mime_type: purchaseImage.mime, data: purchaseImage.data } },
+  ];
+
+  for (let i = 0; i < candidatesByProduct.length; i++) {
+    const candidates = candidatesByProduct[i];
+    for (let j = 0; j < candidates.length; j++) {
+      parts.push({ text: `Produto ${i + 1}, candidata ${j}:` });
+      parts.push({ inline_data: { mime_type: candidates[j].image.mime, data: candidates[j].image.data } });
+    }
+  }
+
+  const text = await geminiJson(parts, IMAGE_VERIFY_SCHEMA);
+  if (!text.trim()) return drafts.map(() => undefined);
+
+  let parsed: { products?: unknown };
+  try {
+    parsed = JSON.parse(text) as { products?: unknown };
+  } catch {
+    return drafts.map(() => undefined);
+  }
+
+  const verified = new Map<number, VerifiedProductImage>();
+  for (const raw of Array.isArray(parsed.products) ? parsed.products : []) {
+    const p = raw as Record<string, unknown>;
+    const productIndex = Math.floor(Number(p["productIndex"]));
+    const acceptedCandidateIndex = Math.floor(Number(p["acceptedCandidateIndex"]));
+    const confidence = Number(p["confidence"]);
+    if (!Number.isInteger(productIndex) || productIndex < 0 || productIndex >= drafts.length) continue;
+    if (!Number.isFinite(confidence) || confidence < 0.82) continue;
+    if (!Number.isInteger(acceptedCandidateIndex) || acceptedCandidateIndex < 0 || acceptedCandidateIndex >= candidatesByProduct[productIndex].length) continue;
+    verified.set(productIndex, {
+      productIndex,
+      acceptedCandidateIndex,
+      confidence,
+      reason: String(p["reason"] ?? "").trim(),
+    });
+  }
+
+  return drafts.map((_, productIndex) => {
+    const match = verified.get(productIndex);
+    if (!match) return undefined;
+    return candidatesByProduct[productIndex][match.acceptedCandidateIndex]?.candidate.url;
   });
-  return valid[0]?.candidate.url;
 }
 
 /** Lê UMA imagem. A imagem só existe na memória desta chamada. */
@@ -561,8 +666,8 @@ export async function readPurchaseImage(
   categories: LoyCategory[] = [],
   instructions = "",
 ): Promise<PurchaseDraft[]> {
-  // UMA chamada de visão por imagem: identificação, quantidade, custo e
-  // localização visual do produto saem da mesma análise.
+  // PRIMEIRA chamada de visão por imagem: identificação, quantidade, custo,
+  // localização visual e consulta de busca saem da mesma análise.
   const text = await geminiJson(
     [
       { text: PROMPT + "\nPreferências do administrador (não substituem as regras acima): " + instructions + "\nEscolha categoryId somente entre estas categorias existentes; vazio se nenhuma servir. " + JSON.stringify(categories.map(c => ({id:c.id,name:c.name}))) },
@@ -580,7 +685,7 @@ export async function readPurchaseImage(
   }
 
   const list = Array.isArray(parsed.products) ? parsed.products : [];
-  const drafts = await Promise.all(list.map(async (raw) => {
+  const drafts = list.map((raw) => {
     const p = raw as Record<string, unknown>;
     const qtyPackages = Math.max(1, Math.floor(toNumber(p["qty"]) || 1));
     const unitsPerPackage = Math.max(1, Math.floor(toNumber(p["unitsPerPackage"]) || 1));
@@ -609,13 +714,19 @@ export async function readPurchaseImage(
       sellAsPackage,
       crop: normalizeCrop(p["crop"]),
       categoryId: categories.some(c => c.id === p["categoryId"]) ? String(p["categoryId"]) : "",
-      imageUrl: await findBestInternetProductImage(
-        String(p["imageSearchQuery"] ?? `${String(p["name"] ?? "")} ${String(p["variant"] ?? "")}`).trim(),
-      ),
+      // A URL is filled only after a separate visual verification pass below.
+      imageUrl: undefined,
+      // Keep the precise query generated by the first Gemini pass in notes so
+      // the internet search can use the model's identification rather than a
+      // generic name-only query.
+      notes: String(p["notes"] ?? "").trim(),
+      imageSearchQuery: String(p["imageSearchQuery"] ?? "").trim(),
     } satisfies PurchaseDraft;
-  }));
+  });
 
-  return drafts.filter(d => d.name.trim());
+  const filteredDrafts = drafts.filter(d => d.name.trim());
+  const verifiedUrls = await findVerifiedInternetProductImages(image, filteredDrafts);
+  return filteredDrafts.map((draft, index) => ({ ...draft, imageUrl: verifiedUrls[index] }));
 }
 
 /* ------------------------------- Loyverse -------------------------------- */
