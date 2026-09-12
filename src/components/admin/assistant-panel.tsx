@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useServerFn } from "@tanstack/react-start";
-import { ArrowUp, ImagePlus, Loader2, X, Sparkles, Settings2, Trash2, Square, AlertTriangle, Tag } from "lucide-react";
+import { ArrowUp, ImagePlus, Loader2, X, Sparkles, Trash2, AlertTriangle, Tag } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -85,8 +85,8 @@ export function AssistantPanel({onClose}: {color:string;onClose:()=>void}) {
   const result=await request(args); if("busy" in result) throw new Error(result.message); return result;
  }
  const generation=useRef(0), activeRequests=useRef(0), prepared=useRef(new Map<string,Prepared>()), seenImages=useRef(new Set<string>()), latestChat=useRef<ChatState|null>(null);
- const [settings,setSettings]=useState(false),[instructions,setInstructions]=useState(""),[resetting,setResetting]=useState(false);
- const [responses,setResponses]=useState<Array<{id:string;text:string}>>([]),[chat,setChat]=useState<ChatState|null>(null),[text,setText]=useState(""),[files,setFiles]=useState<File[]>([]),[mode,setMode]=useState<Mode>("store");
+ const [resetting,setResetting]=useState(false);
+ const [chat,setChat]=useState<ChatState|null>(null),[text,setText]=useState(""),[files,setFiles]=useState<File[]>([]),[mode,setMode]=useState<Mode>("store");
  const [busy,setBusy]=useState(false),[stage,setStage]=useState(""),[error,setError]=useState(""),[mounted,setMounted]=useState(false);
  const fileInput=useRef<HTMLInputElement>(null),composer=useRef<HTMLTextAreaElement>(null),bottom=useRef<HTMLDivElement>(null);
  useEffect(()=>{setMounted(true);void call({data:{action:"state"}}).then(v=>{latestChat.current=v;setChat(v);composer.current?.focus();}).catch(e=>setError(e.message));},[]);
@@ -95,14 +95,14 @@ export function AssistantPanel({onClose}: {color:string;onClose:()=>void}) {
   if(!latestChat.current||resetting)return;
   if(clear&&!window.confirm("Excluir todo o histórico? Produtos, preços e estoque salvos serão preservados."))return;
   generation.current++;setResetting(true);
-  try{const v=await call({data:{action:clear?"clear":"cancel",id:latestChat.current.id}});latestChat.current=v;setChat(v);prepared.current.clear();seenImages.current.clear();setFiles([]);setText("");setResponses([]);setError("");setStage("");}
+  try{const v=await call({data:{action:clear?"clear":"cancel",id:latestChat.current.id}});latestChat.current=v;setChat(v);prepared.current.clear();seenImages.current.clear();setFiles([]);setText("");setError("");setStage("");}
   catch(e){setError(e instanceof Error?e.message:"Não foi possível reiniciar.");} finally{setResetting(false);}
  }
  async function send(){
   if(resetting||!chat||(!text.trim()&&!files.length))return;
   if(/^(?:por favor[, ]*)?(?:cancelar|cancela|cancele|parar|pare)(?: tudo| isso| o processamento)?[.!]?$/i.test(text.trim())){await resetChat();return;}
-  const version=generation.current, instruction=text, batch=files, requestId=crypto.randomUUID(); let current=latestChat.current??chat;
-  setResponses(old=>[...old,{id:requestId,text:`${instruction||`${batch.length} imagem(ns)`} — Respondendo…`}]);setText("");setFiles([]);composer.current?.focus();activeRequests.current++;setBusy(true);setError("");
+  const version=generation.current, instruction=text, batch=files; let current=latestChat.current??chat;
+  setText("");setFiles([]);composer.current?.focus();activeRequests.current++;setBusy(true);setError("");
   try{
    let next=0;const claimed=new Set<string>();
    const registerReady=async(snapshot:ChatState)=>{
@@ -130,8 +130,7 @@ export function AssistantPanel({onClose}: {color:string;onClose:()=>void}) {
    if(instruction.trim()){setStage("Entendendo sua mensagem…");current=await call({data:{action:"text",id:current.id,text:instruction}});latestChat.current=current;setChat(current);}
    await registerReady(current);
    if(claimed.size){try{current=await call({data:{action:"sync",id:current.id}});latestChat.current=current;setChat(current);}catch{setError("Cadastros salvos; atualização da vitrine pendente.");}}
-   setResponses(old=>old.map(r=>r.id===requestId?{...r,text:batch.length?"Imagens concluídas. Veja abaixo os produtos aguardando preço ou conferência.":"Concluído."}:r));
-  }catch(e){if(version!==generation.current)return;setResponses(old=>old.map(r=>r.id===requestId?{...r,text:(e instanceof Error?e.message:"Não foi possível responder. Envie novamente.")}:r));}
+  }catch(e){if(version!==generation.current)return;setError(e instanceof Error?e.message:"Não foi possível responder. Envie novamente.");}
   finally{if(version===generation.current)setStage("");activeRequests.current--;setBusy(activeRequests.current>0);composer.current?.focus();}
  }
  async function price(product:ChatProduct,value:number){if(!chat)return;activeRequests.current++;setBusy(true);try{const v=await call({data:{id:product.conversationId??chat.id,action:"price",productId:product.id,price:value}});latestChat.current=v;setChat(v);}finally{activeRequests.current--;setBusy(activeRequests.current>0);}}
@@ -153,15 +152,13 @@ export function AssistantPanel({onClose}: {color:string;onClose:()=>void}) {
  const review=chat?.pendingProducts.filter(p=>p.status==="review")??[];
  if(!mounted)return null;
  return createPortal(<section role="dialog" aria-modal="true" aria-label="Assistente SPERB" className="fixed inset-0 z-[100] flex h-dvh flex-col bg-background text-foreground">
-  <header className="flex shrink-0 items-center justify-between border-b px-4 py-3"><div className="flex items-center gap-3"><Sparkles className="size-6 text-primary"/><div><h1 className="text-lg font-bold">Assistente SPERB</h1><p className="text-xs text-muted-foreground">Administrador · memória de 30 dias</p></div></div><div className="flex items-center"><Button variant="ghost" size="icon" onClick={()=>{setInstructions(chat?.instructions??"");setSettings(v=>!v);}}><Settings2/></Button><Button variant="ghost" size="icon" disabled={!chat||resetting} onClick={()=>void resetChat(true)}><Trash2/></Button><Button variant="ghost" size="icon" disabled={!chat||resetting} onClick={()=>void resetChat()}><Square/></Button><Button variant="ghost" size="icon" disabled={busy} onClick={onClose}><X/></Button></div></header>
+  <header className="flex shrink-0 items-center justify-between border-b bg-background/95 px-4 py-3 backdrop-blur"><div className="flex min-w-0 items-center gap-3"><div className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10"><Sparkles className="size-5 text-primary"/></div><div className="min-w-0"><h1 className="truncate text-base font-bold sm:text-lg">Assistente SPERB</h1><p className="text-xs text-muted-foreground">Administração da loja · memória de 30 dias</p></div></div><div className="flex shrink-0 items-center gap-1"><Button variant="ghost" size="icon" title="Excluir todo o chat" aria-label="Excluir todo o chat" disabled={!chat||resetting} onClick={()=>void resetChat(true)}><Trash2 className="size-5"/></Button><Button variant="ghost" size="icon" title="Fechar Assistente" aria-label="Fechar Assistente" disabled={busy} onClick={onClose}><X className="size-5"/></Button></div></header>
   <div className="min-h-0 flex-1 overflow-y-auto"><div className="mx-auto max-w-3xl space-y-5 px-4 py-6">
-   {settings&&<section className="space-y-3 border-b pb-4"><h2 className="font-semibold">Instruções da IA</h2><textarea maxLength={12000} rows={5} value={instructions} onChange={e=>setInstructions(e.target.value)} className="w-full rounded-md border bg-background p-3"/><Button disabled={!chat||resetting} onClick={async()=>{if(!chat)return;const v=await call({data:{action:"instructions",id:chat.id,text:instructions}});latestChat.current=v;setChat(v);setSettings(false);}}>Salvar instruções</Button></section>}
    {!chat&&!error&&<Loader2 className="animate-spin"/>}
-   {chat?.messages.length===0&&<p className="py-12 text-center text-muted-foreground">Olá! Pode dar uma ordem administrativa ou enviar fotos de compras.</p>}
+   {chat?.messages.length===0&&<div className="py-16 text-center"><div className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-primary/10"><Sparkles className="size-7 text-primary"/></div><h2 className="mt-4 text-lg font-semibold">O que você quer fazer?</h2><p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">Dê uma ordem para a administração da SPERB ou envie fotos das suas compras. Eu executo as ações permitidas e confirmo o resultado.</p></div>}
    {chat?.messages.map(m=><article key={m.id} className={m.role==="user"?"ml-auto max-w-[90%] rounded-2xl bg-muted p-3":"max-w-full py-1"}><p className="mb-1 text-xs font-bold text-muted-foreground">{m.role==="user"?"Você":"Assistente SPERB"}</p><div className="break-words text-base leading-relaxed"><ReactMarkdown>{m.content}</ReactMarkdown></div></article>)}
    {pending.length>0&&<section><h2 className="mb-2 flex items-center gap-2 font-bold"><Tag className="size-4"/>Produtos aguardando preço</h2><div className="grid gap-3 sm:grid-cols-2">{pending.map((p,i)=><PriceCard key={p.id} product={p} index={i} disabled={resetting} save={v=>price(p,v)}/>)}</div></section>}
    {review.length>0&&<section><h2 className="mb-2 flex items-center gap-2 font-bold text-amber-700"><AlertTriangle className="size-4"/>Precisa da sua atenção</h2><div className="grid gap-3 sm:grid-cols-2">{review.map(p=><ReviewCard key={p.id} product={p} disabled={resetting} save={c=>edit(p,c)}/>)}</div></section>}
-   {responses.map(r=><p role="status" key={r.id} className="rounded-lg bg-muted p-3 text-sm">{r.text}</p>)}
    {stage&&<p role="status" className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="size-4 animate-spin"/>{stage}</p>}
    {error&&<p role="alert" className="break-words rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}<div ref={bottom}/>
   </div></div>
