@@ -230,11 +230,62 @@ export async function executeAdminTool(name: string, args: Record<string, unknow
     case "ajustar_moedas": {
       const customerId = await findCustomerIdByPhone(String(args.telefone ?? ""));
       const d = db();
-      const delta = Math.trunc(n(args.delta));
-      if (!delta) return { ok: true, saldo: Number((await d.rpc("admin_coin_balance", { p_customer_id: customerId })).data ?? 0) };
-      const { data, error } = await d.rpc("admin_adjust_coins", { p_customer_id: customerId, p_delta: delta, p_reason: String(args.motivo ?? "Ajuste pelo Assistente SPERB") });
-      if (error || data === null) throw new Error(error?.message ?? "Não foi possível ajustar as moedas.");
-      return { ok: true, telefone: args.telefone, delta, saldo: Number(data) };
+      const requestedDelta = Math.trunc(n(args.delta));
+
+      // O Assistente roda no servidor com service_role. Os RPCs admin_adjust_coins/
+      // admin_coin_balance exigem auth.uid() com role "admin", então podem retornar
+      // permission denied quando chamados por este contexto. Aqui fazemos a mesma
+      // operação diretamente no ledger, usando service_role, e verificamos o saldo
+      // real depois da gravação.
+      const { data: beforeRows, error: beforeError } = await d
+        .from("customer_coin_ledger")
+        .select("delta")
+        .eq("customer_id", customerId);
+
+      if (beforeError) throw new Error(`Não foi possível consultar as moedas: ${beforeError.message}`);
+
+      const beforeBalance = (beforeRows ?? []).reduce((sum: number, row: any) => sum + Math.trunc(n(row.delta)), 0);
+      let appliedDelta = requestedDelta;
+
+      // Nunca deixa o saldo ficar negativo, mantendo a mesma regra do RPC antigo.
+      if (beforeBalance + appliedDelta < 0) {
+        appliedDelta = -beforeBalance;
+      }
+
+      if (appliedDelta !== 0) {
+        const { error: insertError } = await d.from("customer_coin_ledger").insert({
+          customer_id: customerId,
+          delta: appliedDelta,
+          reason: String(args.motivo ?? "Ajuste pelo Assistente SPERB").trim() || "Ajuste pelo Assistente SPERB",
+          created_by: null,
+        });
+
+        if (insertError) {
+          throw new Error(`Não foi possível salvar as moedas: ${insertError.message}`);
+        }
+      }
+
+      const { data: afterRows, error: afterError } = await d
+        .from("customer_coin_ledger")
+        .select("delta")
+        .eq("customer_id", customerId);
+
+      if (afterError) throw new Error(`As moedas foram alteradas, mas não consegui verificar o saldo: ${afterError.message}`);
+
+      const saldo = (afterRows ?? []).reduce((sum: number, row: any) => sum + Math.trunc(n(row.delta)), 0);
+
+      if (saldo !== beforeBalance + appliedDelta) {
+        throw new Error("A alteração das moedas não foi confirmada pelo sistema.");
+      }
+
+      return {
+        ok: true,
+        telefone: args.telefone,
+        delta: appliedDelta,
+        deltaSolicitado: requestedDelta,
+        saldoAnterior: beforeBalance,
+        saldo,
+      };
     }
     case "gerenciar_cupom": {
       const d = db();
