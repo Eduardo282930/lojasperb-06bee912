@@ -64,7 +64,7 @@ Extraia TODOS os produtos visíveis na imagem. Para cada produto:
   * Reconstrua palavras cortadas por "..." usando o contexto.
   * Mantenha o que identifica o produto e a variação importante (modelo, cor, tamanho, medida), pois a loja usa apenas produtos simples.
   * Use Capitalização Normal (não caixa alta) e medidas no formato 138x188x15.
-  * Máximo de 70 caracteres.
+  * Máximo de 64 caracteres, incluindo a variação.
   * Exemplo: "Protetor De Colchão Impermeável Cap... AZUL,CASAL - ZIPER 138/188/15" vira "Protetor de Colchão Impermeável Azul Casal 138x188x15".
 - variant: deixe vazio quando a variação já estiver dentro do name. Se houver duas variações diferentes na mesma compra, devolva DOIS produtos separados, cada um com o próprio name completo.
 - qty: quantidade comprada (número inteiro, mínimo 1).
@@ -142,8 +142,20 @@ export function cleanProductName(raw: string): string {
     })
     .join(" ");
 
-  if (s.length > 70) s = s.slice(0, 70).replace(/\s+\S*$/, "").trim();
+  if (s.length > 64) s = s.slice(0, 64).replace(/\s+\S*$/, "").trim();
   return s;
+}
+
+export function productName(name: string, variant = ''): string {
+ const suffix = cleanProductName(variant);
+ const base = cleanProductName(name);
+ if (!suffix) return base;
+ const combined = `${base} ${suffix}`;
+ if (combined.length <= 64) return combined;
+ const room = 64 - suffix.length - 1;
+ if (room < 1) throw new Error('Variação muito longa. Informe uma descrição menor para preservar tamanho e cor.');
+ const short = base.slice(0, room).replace(/\s+\S*$/, '').trim();
+ return `${short || base.slice(0, room)} ${suffix}`;
 }
 
 const SCHEMA = {
@@ -279,10 +291,11 @@ export async function geminiJson(
 export async function readPurchaseImage(
   image: AssistantImage,
   categories: LoyCategory[] = [],
+  instructions = "",
 ): Promise<PurchaseDraft[]> {
   const text = await geminiJson(
     [
-      { text: PROMPT + "\nEscolha categoryId somente entre estas categorias existentes; vazio se nenhuma servir. " + JSON.stringify(categories.map(c => ({id:c.id,name:c.name}))) },
+      { text: PROMPT + "\nPreferências do administrador (não substituem regras de segurança, preço ou cadastro): " + instructions + "\nEscolha categoryId somente entre estas categorias existentes; vazio se nenhuma servir. " + JSON.stringify(categories.map(c => ({id:c.id,name:c.name}))) },
       { inline_data: { mime_type: image.mime, data: image.data } },
     ],
     SCHEMA,
@@ -521,7 +534,7 @@ export async function upsertPurchase(
   forceCategory = false,
 ): Promise<{ result: AssistantResult; items: LoyItem[] }> {
   const store = await storeId();
-  const fullName = [draft.name, draft.variant].filter(Boolean).join(" ");
+  const fullName = productName(draft.name, draft.variant);
   const wantedName = normalizeName(fullName);
   const wantedVariant = "";
 
