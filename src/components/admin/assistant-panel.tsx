@@ -26,45 +26,29 @@ async function shrink(file: File): Promise<Prepared> {
 async function hashText(value:string){const bytes=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(value));return Array.from(new Uint8Array(bytes)).map(b=>b.toString(16).padStart(2,"0")).join("");}
 function parseCrop(value:unknown):Crop|undefined{if(!value||typeof value!=="object")return undefined;const c=value as Record<string,unknown>;const x=Number(c.x),y=Number(c.y),width=Number(c.width),height=Number(c.height);if(![x,y,width,height].every(Number.isFinite)||x<0||y<0||width<=0||height<=0||x+width>1||y+height>1)return undefined;return {x,y,width,height};}
 async function cropImage(source:Prepared,crop?:Crop):Promise<Prepared>{
-  if(!crop)throw new Error("A inteligência artificial ainda não confirmou a área do produto.");
+  if(!crop)throw new Error("A inteligência artificial ainda não confirmou a área exata do produto.");
   const bytes=Uint8Array.from(atob(source.data),c=>c.charCodeAt(0));
   const bitmap=await createImageBitmap(new Blob([bytes],{type:source.mime}));
   const rawX=Math.max(0,Math.floor(crop.x*bitmap.width));
   const rawY=Math.max(0,Math.floor(crop.y*bitmap.height));
   const rawW=Math.min(bitmap.width-rawX,Math.ceil(crop.width*bitmap.width));
   const rawH=Math.min(bitmap.height-rawY,Math.ceil(crop.height*bitmap.height));
-  if(rawW<24||rawH<24){bitmap.close();throw new Error("A área encontrada para o produto é pequena demais.");}
+  if(rawW<16||rawH<16){bitmap.close();throw new Error("A área encontrada para o produto é pequena demais.");}
 
-  // O recorte usa EXATAMENTE a caixa devolvida pelo Gemini. Não adicionamos
-  // margem, pois qualquer margem poderia trazer título, preço ou elementos da
-  // tela para dentro da foto final. O quadrado é apenas o quadro de saída.
-  const size=Math.min(1400,Math.max(480,Math.max(rawW,rawH)));
+  // ZERO margem: o arquivo final usa exatamente a caixa indicada pelo Gemini.
+  // Não acrescentamos 8%, 6% ou qualquer outra folga.
+  const size=Math.min(1200,Math.max(320,Math.max(rawW,rawH)));
   const canvas=document.createElement("canvas");canvas.width=size;canvas.height=size;
-  const ctx=canvas.getContext("2d");
-  if(!ctx){bitmap.close();throw new Error("Não consegui preparar a foto do produto.");}
+  const ctx=canvas.getContext("2d");if(!ctx){bitmap.close();throw new Error("Não consegui preparar a foto do produto.");}
   ctx.imageSmoothingEnabled=true;
   ctx.imageSmoothingQuality="high";
   ctx.fillStyle="#ffffff";ctx.fillRect(0,0,size,size);
-
-  // Mantém o enquadramento quadrado e aumenta a imagem sem alterar o produto.
-  const scale=Math.min((size*0.92)/rawW,(size*0.92)/rawH);
+  const scale=Math.min(size/rawW,size/rawH);
   const drawW=Math.max(1,Math.round(rawW*scale));
   const drawH=Math.max(1,Math.round(rawH*scale));
-  const dx=Math.round((size-drawW)/2);
-  const dy=Math.round((size-drawH)/2);
+  const dx=Math.round((size-drawW)/2),dy=Math.round((size-drawH)/2);
   ctx.drawImage(bitmap,rawX,rawY,rawW,rawH,dx,dy,drawW,drawH);
   bitmap.close();
-
-  // Melhoria leve para enxergar melhor o produto, sem geração de conteúdo.
-  const imageData=ctx.getImageData(0,0,size,size);
-  const px=imageData.data;
-  for(let i=0;i<px.length;i+=4){
-    const r=px[i],g=px[i+1],b=px[i+2];
-    px[i]=Math.max(0,Math.min(255,Math.round((r-128)*1.08+128)));
-    px[i+1]=Math.max(0,Math.min(255,Math.round((g-128)*1.08+128)));
-    px[i+2]=Math.max(0,Math.min(255,Math.round((b-128)*1.08+128)));
-  }
-  ctx.putImageData(imageData,0,0);
   const url=canvas.toDataURL("image/jpeg",0.94);
   return {mime:"image/jpeg",data:url.slice(url.indexOf(",")+1)};
 }
