@@ -64,9 +64,10 @@ Extraia TODOS os produtos visíveis na imagem. Para cada produto:
   * Reconstrua palavras cortadas por "..." usando o contexto.
   * Mantenha o que identifica o produto e a variação importante (modelo, cor, tamanho, medida), pois a loja usa apenas produtos simples.
   * Use Capitalização Normal (não caixa alta) e medidas no formato 138x188x15.
+  * Resuma por significado: tipo do produto + característica essencial. Prefira 3 a 8 palavras; não apenas corte o título.
   * Máximo de 64 caracteres, incluindo a variação.
   * Exemplo: "Protetor De Colchão Impermeável Cap... AZUL,CASAL - ZIPER 138/188/15" vira "Protetor de Colchão Impermeável Azul Casal 138x188x15".
-- variant: deixe vazio quando a variação já estiver dentro do name. Se houver duas variações diferentes na mesma compra, devolva DOIS produtos separados, cada um com o próprio name completo.
+- variant: coloque aqui modelo, cor, tamanho e medidas importantes, separados do nome base, sem repeti-los no name. O servidor reúne nome e variação em um único produto simples. Se houver duas variações diferentes, devolva DOIS produtos separados.
 - qty: quantidade comprada (número inteiro, mínimo 1).
 - seller: nome da loja/vendedor, se aparecer.
 - listedPrice: preço anunciado ATUAL de UMA unidade, só o número (ex.: 39.90). IGNORE completamente qualquer preço riscado/antigo.
@@ -104,7 +105,7 @@ function toIsoDate(value: unknown): string {
  * Shopee, o produto entra na loja com nome curto, limpo e legível.
  */
 const NOISE =
-  /\b(oferta|ofertas|promo(?:ç|c)(?:ã|a)o|promocional|imperd(?:í|i)vel|frete\s+gr(?:á|a)tis|envio\s+r(?:á|a)pido|pronta\s+entrega|super|mega|top|novo|original|barato|qualidade|loja\s+oficial|atacado|kit)\b/gi;
+  /\b(oferta|ofertas|promo(?:ç|c)(?:ã|a)o|promocional|imperd(?:í|i)vel|frete\s+gr(?:á|a)tis|envio\s+r(?:á|a)pido|pronta\s+entrega|super|mega|top|novo|original|barato|qualidade|loja\s+oficial|atacado)\b/gi;
 
 export function cleanProductName(raw: string): string {
   let s = String(raw ?? "")
