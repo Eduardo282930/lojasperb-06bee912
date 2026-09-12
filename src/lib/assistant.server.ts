@@ -70,9 +70,11 @@ Extraia TODOS os produtos diferentes visíveis na compra. Para cada produto:
 - name: nome CURTO, limpo e profissional, pronto para a loja. Reconstrua títulos cortados por "...". Não copie marketing, emojis, vendedor, códigos ou texto da interface.
 - variant: modelo, cor, tamanho ou medida importante que diferencia a unidade. Não repita a variação no name. Se forem variações realmente diferentes, devolva produtos separados.
 - qty: quantidade de PACOTES/ANÚNCIOS comprados.
-- unitsPerPackage: quantas UNIDADES FÍSICAS INDEPENDENTES existem em cada pacote/kit.
-- sellAsPackage: decida PRINCIPALMENTE olhando a IMAGEM do produto, não pela palavra "kit" no nome. true somente quando todas as peças mostradas formam um único produto funcional/vendável e precisam permanecer juntas (ex.: uma luminária completa formada por 3 lâmpadas + controle). false quando são peças independentes que normalmente entram separadas no estoque (ex.: tomadas, disjuntores, pregos, parafusos).
-- Se a imagem mostrar várias unidades idênticas separadas e elas serão vendidas separadamente, unitsPerPackage deve refletir todas as unidades. Se mostrar um conjunto integrado que deve ser vendido completo, sellAsPackage=true e unitsPerPackage=1.
+- unitsPerPackage: quantas UNIDADES FÍSICAS INDEPENDENTES existem dentro de cada pacote/kit.
+- sellAsPackage: determine olhando A IMAGEM E O ANÚNCIO juntos. Para uma caixa, kit, pacote, cartela, fardo ou conjunto fechado que é o produto anunciado, use true e trate o pacote fechado como UMA unidade de estoque.
+- Se o anúncio disser algo como "500 unidades", "caixa com 500", "kit 500", "pacote com 500" e a foto mostrar uma única caixa/pacote contendo essas 500 peças, NÃO coloque qty=500 e NÃO divida o custo por 500. O produto vendido é a caixa/pacote: qty=1 por caixa comprada, unitsPerPackage=1, sellAsPackage=true e cost=valor total pago pela caixa/pacote.
+- Só use várias unidades de estoque quando as peças do anúncio forem efetivamente produtos independentes que serão vendidos separadamente. Ex.: 10 tomadas vendidas uma a uma podem virar qty=10.
+- Se a imagem mostrar várias unidades idênticas separadas e o anúncio vender cada uma separadamente, unitsPerPackage deve refletir todas as unidades. Se mostrar um conjunto integrado que deve ser vendido completo, sellAsPackage=true e unitsPerPackage=1.
 - seller: vendedor, se aparecer.
 - listedPrice: preço anunciado ATUAL da compra. Ignore preço riscado/antigo. Use somente para informação.
 - totalPaid: VALOR TOTAL REALMENTE PAGO por este produto/conjunto, depois de descontos/cupons aplicados, quando essa informação estiver disponível. NÃO use frete separado como custo do produto.
@@ -81,12 +83,14 @@ Extraia TODOS os produtos diferentes visíveis na compra. Para cada produto:
 - purchasedAt: data da compra no formato AAAA-MM-DD, se aparecer.
 - notes: explique de forma curta qualquer decisão importante sobre kit, quantidade ou custo.
 
-REGRA DE QUANTIDADE:
-1. Primeiro descubra quantos pacotes/anúncios foram comprados.
-2. Depois descubra quantas unidades físicas vendáveis há em cada pacote.
-3. Se o conjunto for vendido por peça, quantidade física = qty × unitsPerPackage.
-4. Se o conjunto inteiro for uma única unidade vendável, quantidade física = qty.
-5. Não confunda "kit" com uma única unidade: kit pode conter várias peças.
+REGRA DE QUANTIDADE E ANÚNCIO:
+1. Primeiro leia o anúncio completo e a imagem para descobrir o que foi comprado: unidade, kit, caixa, pacote, cartela, fardo, conjunto etc.
+2. QUANTIDADE DO ANÚNCIO NÃO É AUTOMATICAMENTE QUANTIDADE DE ESTOQUE. Se o anúncio diz "caixa com 500", "kit com 500", "pacote com 100" ou equivalente e o que foi comprado é uma caixa/kit/pacote fechado vendido como um único produto, a quantidade física do estoque é 1 por anúncio/pacote comprado, mesmo que existam 500 peças dentro.
+3. Quando o próprio anúncio e a apresentação mostram claramente um kit/caixa/pacote fechado como o produto vendido, prefira sellAsPackage=true e unitsPerPackage=1. Isso vale especialmente para anúncios de grande quantidade (ex.: 100, 200, 500, 1000 unidades dentro de uma caixa).
+4. Só transforme a quantidade interna em várias unidades de estoque quando houver evidência clara de que as peças são produtos independentes vendidos separadamente pelo administrador (ex.: anúncio de 10 tomadas, 10 disjuntores ou 10 peças individuais que serão cadastradas por unidade).
+5. Se houver dúvida entre "500 peças dentro de uma caixa" e "500 unidades para estoque individual", considere o objeto físico do anúncio: se é uma caixa/kit fechado, trate como 1 conjunto e explique a decisão em notes.
+6. Se houver vários anúncios/pacotes iguais comprados, qty é o número de pacotes. Se cada pacote é vendido como um único produto, quantidade física = qty.
+7. Não confunda simplesmente a palavra "kit" com quantidade 1: primeiro determine se o conjunto é o produto final vendido junto.
 
 REGRA DE CUSTO:
 - custo unitário = valor realmente pago pelo conjunto ÷ quantidade física.
@@ -99,14 +103,16 @@ REGRA DE CUSTO:
 RECORTE DA IMAGEM — OBRIGATÓRIO NA MESMA RESPOSTA:
 - crop.x, crop.y, crop.width e crop.height devem localizar VISUALMENTE o produto físico na própria imagem recebida.
 - Use coordenadas normalizadas de 0 a 1000 para x, y, width e height.
-- A caixa deve ser JUSTA ao redor do objeto físico, seguindo as bordas visíveis do produto, com somente uma pequena margem de segurança (aprox. 3% a 8%). NÃO faça uma caixa grande para "garantir" o produto.
-- EXCLUA explicitamente o máximo possível de título, preço, botões, menus, avaliações, banners, ícones, barras e letras da interface que estejam fora do produto.
-- Se houver texto IMPRESSO NO PRÓPRIO PRODUTO ou na embalagem que faz parte da aparência física, esse texto deve permanecer no recorte.
-- Para um kit que é um único produto, inclua todas as partes físicas que precisam permanecer juntas, mas sem puxar elementos da interface ao redor.
-- Para várias unidades independentes do mesmo produto, delimite a área que contém somente essas unidades.
-- NÃO escolha a área pelo texto do anúncio; olhe a imagem e identifique visualmente as bordas do objeto.
-- O objetivo é uma foto final centralizada, limpa e enquadrada, com o produto ocupando a maior parte do quadro e sem letras da tela nas laterais.
-- Sempre devolva um crop válido e apertado para cada produto.
+- O crop deve ser 100% enquadrado no produto: SEM margem de 8%, SEM margem de segurança e SEM espaço vazio proposital.
+- A caixa deve encostar o máximo possível nas bordas visíveis do produto físico. Não inclua área da tela, título, preço, botões, menus, avaliações, banners, ícones, fundo desnecessário ou letras que não façam parte fisicamente do produto/embalagem.
+- Se a captura mostrar uma FOTO DO PRODUTO dentro de um card/anúncio, NÃO recorte o card inteiro nem o espaço branco da foto. Encontre o objeto físico dentro dessa foto e delimite somente o objeto (ou a embalagem física) que está sendo vendido.
+- Não use a moldura da imagem do anúncio como borda do crop. A borda do crop é a borda do produto.
+- Se o produto estiver dentro de uma caixa, pacote, cartela ou embalagem que é o próprio item vendido, inclua a embalagem inteira.
+- Para várias unidades independentes que formam o anúncio, inclua somente a área que contém essas unidades, sem sobras laterais.
+- Para um kit/conjunto vendido como uma única unidade, inclua todas as partes físicas do conjunto e somente elas.
+- NÃO use uma caixa aproximada. Olhe a imagem e determine as bordas reais do objeto.
+- Se o produto for branco ou estiver sobre fundo branco, seja ainda mais cuidadoso para não confundir o fundo com o produto.
+- Sempre devolva um crop válido e extremamente apertado para cada produto.
 
 Não invente preço de venda. A IA NÃO define preço de venda.
 Responda apenas com JSON.`;
@@ -389,6 +395,11 @@ export async function geminiAgent(
   throw new Error("O Assistente atingiu o limite de etapas desta solicitação. Nenhuma etapa adicional foi executada.");
 }
 
+/**
+ * A primeira leitura da compra devolve identificação, quantidade, custo e a
+ * caixa visual. Depois da busca na internet, uma segunda análise visual do
+ * Gemini valida as candidatas; nenhuma imagem é aceita só pelo texto.
+ */
 function normalizeCrop(raw: unknown): NormalizedCrop | undefined {
   if (!raw || typeof raw !== "object") return undefined;
   const c = raw as Record<string, unknown>;
@@ -406,65 +417,21 @@ function normalizeCrop(raw: unknown): NormalizedCrop | undefined {
 
 type NormalizedCrop = { x: number; y: number; width: number; height: number };
 
-/** Lê UMA imagem. A imagem só existe na memória desta chamada. */
-export async function readPurchaseImage(
-  image: AssistantImage,
-  categories: LoyCategory[] = [],
-  instructions = "",
-): Promise<PurchaseDraft[]> {
-  // UMA única chamada de visão por imagem: identificação, quantidade, custo e
-  // localização visual do produto saem da mesma análise.
-  const text = await geminiJson(
-    [
-      { text: PROMPT + "\nPreferências do administrador (não substituem as regras acima): " + instructions + "\nEscolha categoryId somente entre estas categorias existentes; vazio se nenhuma servir. " + JSON.stringify(categories.map(c => ({id:c.id,name:c.name}))) },
-      { inline_data: { mime_type: image.mime, data: image.data } },
-    ],
-    SCHEMA,
-  );
-  if (!text.trim()) return [];
-
-  let parsed: { products?: unknown };
-  try {
-    parsed = JSON.parse(text) as { products?: unknown };
-  } catch {
-    return [];
+/** Normaliza a caixa visual retornada pelo Gemini. */
+function normalizeCrop(raw: unknown): NormalizedCrop | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const c = raw as Record<string, unknown>;
+  let x = Number(c.x), y = Number(c.y), width = Number(c.width), height = Number(c.height);
+  if (![x, y, width, height].every(Number.isFinite)) return undefined;
+  if (Math.max(x, y, width, height) > 1.01 && Math.max(x, y, width, height) <= 1000) {
+    x /= 1000; y /= 1000; width /= 1000; height /= 1000;
   }
-
-  const list = Array.isArray(parsed.products) ? parsed.products : [];
-  const drafts = list.map((raw) => {
-    const p = raw as Record<string, unknown>;
-    const qtyPackages = Math.max(1, Math.floor(toNumber(p["qty"]) || 1));
-    const unitsPerPackage = Math.max(1, Math.floor(toNumber(p["unitsPerPackage"]) || 1));
-    const sellAsPackage = Boolean(p["sellAsPackage"]);
-    const physicalQty = sellAsPackage ? qtyPackages : qtyPackages * unitsPerPackage;
-
-    const totalPaid = Math.max(0, toNumber(p["totalPaid"]));
-    const reportedCost = Math.max(0, toNumber(p["cost"]));
-    // O campo mostrado no card e enviado ao Loyverse é SEMPRE o custo de uma
-    // unidade física. Mesmo que o Gemini tenha devolvido cost como total,
-    // dividimos pela quantidade física antes de persistir.
-    const totalCost = totalPaid > 0 ? totalPaid : reportedCost;
-    const cost = physicalQty > 0 ? totalCost / physicalQty : totalCost;
-
-    return {
-      name: cleanProductName(String(p["name"] ?? "")),
-      variant: cleanProductName(String(p["variant"] ?? "")),
-      qty: physicalQty,
-      seller: String(p["seller"] ?? "").trim(),
-      listedPrice: Math.max(0, toNumber(p["listedPrice"])),
-      cost: Math.round(cost * 100) / 100,
-      trackingCode: String(p["trackingCode"] ?? "").trim(),
-      purchasedAt: toIsoDate(p["purchasedAt"]),
-      notes: String(p["notes"] ?? "").trim(),
-      unitsPerPackage,
-      sellAsPackage,
-      crop: normalizeCrop(p["crop"]),
-      categoryId: categories.some(c => c.id === p["categoryId"]) ? String(p["categoryId"]) : "",
-    } satisfies PurchaseDraft;
-  });
-
-  return drafts.filter(d => d.name.trim());
+  if (x < 0 || y < 0 || width <= 0 || height <= 0 || x + width > 1 || y + height > 1) return undefined;
+  if (width < 0.008 || height < 0.008) return undefined;
+  return { x, y, width, height };
 }
+
+type NormalizedCrop = { x: number; y: number; width: number; height: number };
 
 /* ------------------------------- Loyverse -------------------------------- */
 

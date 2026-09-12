@@ -85,7 +85,7 @@ export async function extract(owner:string,id:string,image:ai.AssistantImage,mod
         draft:{...d,sourceHash:fingerprint},
         mode,
         status:d.crop?'pending':'review',
-        error:d.crop?null:'A IA identificou o produto, mas não confirmou um recorte visual seguro.',
+        error:d.crop?null:'A IA não confirmou um recorte visual seguro.',
       })));
       check(r.error);
       await message(id, 'assistant', `${drafts.length} produto(s) identificado(s). Revise a imagem, quantidade, custo e informe o preço de venda para salvar cada um.`);
@@ -105,8 +105,8 @@ export async function register(owner:string,id:string,productId:string,image?:{m
     const draft=product.draft as ai.PurchaseDraft;
     const price=Number(draft.manualPrice??0);
     if(!Number.isFinite(price)||price<=0)throw new Error('Informe o preço de venda antes de salvar o produto.');
-    if(!draft.crop)throw new Error('O recorte da foto do produto não está disponível. Envie novamente a foto da compra.');
-    if(!image?.data)throw new Error('A imagem recortada do produto não está disponível. Abra novamente a conferência e tente salvar.');
+    if(!draft.crop)throw new Error('A IA não confirmou um recorte visual seguro para este produto.');
+    if(!image?.data)throw new Error('A imagem recortada do produto não está disponível. Envie novamente a foto da compra.');
     if(!draft.name.trim())throw new Error('Nome do produto inválido.');
     if(!Number.isInteger(draft.qty)||draft.qty<1)throw new Error('Quantidade física inválida.');
     if(!Number.isFinite(draft.cost)||draft.cost<0)throw new Error('Custo unitário inválido.');
@@ -168,8 +168,8 @@ export async function saveOne(owner:string,id:string,productId:string,changes:{p
     if(!Number.isInteger(draft.qty)||draft.qty<1)throw new Error('Informe uma quantidade válida.');
     if(!Number.isFinite(draft.cost)||draft.cost<0)throw new Error('Informe um custo unitário válido.');
     if(!Number.isFinite(price)||price<=0)throw new Error('Informe um preço de venda válido.');
-    if(!draft.crop)throw new Error('O recorte da foto do produto não está disponível. Envie novamente a foto da compra.');
-    if(!changes.image?.data)throw new Error('A imagem recortada do produto não está disponível. Abra novamente a conferência e tente salvar.');
+    if(!draft.crop)throw new Error('A IA não confirmou um recorte visual seguro para este produto.');
+    if(!changes.image?.data)throw new Error('A imagem recortada do produto não está disponível. Envie novamente a foto da compra.');
     const updated=await d.from('assistant_products').update({draft,error:null,status:'pending'}).eq('id',productId);check(updated.error);
     // register adquire o mesmo lock reentrante e faria uma segunda transação.
     // Aqui chamamos diretamente a lógica pública sem outro lock por meio de um marcador.
@@ -185,7 +185,7 @@ async function registerUnlocked(owner:string,id:string,productId:string,image:{m
   const draft=product.draft as ai.PurchaseDraft;
   const price=Number(draft.manualPrice??0);
   if(price<=0)throw new Error('Informe o preço de venda antes de salvar.');
-  if(!draft.crop)throw new Error('Imagem do produto ausente.');
+  if(!draft.crop)throw new Error('Imagem recortada do produto ausente.');
   const identity=draft.trackingCode?`${draft.trackingCode}:${ai.normalizeName(draft.name+' '+draft.variant)}`:product.id;
   const key=await hash(`purchase:${identity}`);
   const old=await d.from('assistant_operations').select('*').eq('operation_key',key).maybeSingle();check(old.error);
