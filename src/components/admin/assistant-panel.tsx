@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useServerFn } from '@tanstack/react-start';
-import { ArrowUp, ImagePlus, Loader2, X, Sparkles } from 'lucide-react';
+import { ArrowUp, ImagePlus, Loader2, X, Sparkles, Settings2, Trash2, Square } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
@@ -57,6 +57,16 @@ export function AssistantPanel({onClose}: {color:string;onClose:()=>void}) {
    if('busy' in result)throw new Error(result.message);
   return result;
  }
+ const generation=useRef(0);
+ const [settings,setSettings]=useState(false),[instructions,setInstructions]=useState(''),[resetting,setResetting]=useState(false);
+ async function resetChat(clear=false){
+  if(!latestChat.current||resetting)return;
+  if(clear&&!window.confirm('Excluir todo o histórico? Produtos, preços e estoque salvos serão preservados.'))return;
+  generation.current++;setResetting(true);
+  try{const value=await call({data:{action:clear?'clear':'cancel',id:latestChat.current.id}});latestChat.current=value;setChat(value);seenImages.current.clear();setFiles([]);setText('');setResponses([]);setError('');setStage('');}
+  catch(e){setError(e instanceof Error?e.message:'Não foi possível reiniciar.');}
+  finally{setResetting(false);}
+ }
  const activeRequests=useRef(0);
  const seenImages=useRef(new Set<string>());
  const [responses,setResponses]=useState<Array<{id:string;text:string}>>([]);
@@ -68,7 +78,10 @@ export function AssistantPanel({onClose}: {color:string;onClose:()=>void}) {
  useEffect(()=>{setMounted(true);void call({data:{action:'state'}}).then(value=>{latestChat.current=value;setChat(value);composer.current?.focus();}).catch(e=>setError(e.message));},[]);
  useEffect(()=>{bottom.current?.scrollIntoView({behavior:'smooth'});},[chat?.messages.length,stage]);
  async function send(){
- if(!chat||(!text.trim()&&!files.length))return;
+ if(resetting||!chat||(!text.trim()&&!files.length))return;
+ if(/^(?:por favor[, ]*)?(?:cancelar|cancela|cancele|parar|pare)(?: tudo| isso| o processamento)?[.!]?$/i.test(text.trim())){await resetChat();return;}
+ const version=generation.current;
+ const ensureActive=()=>{if(version!==generation.current)throw new Error('Operação cancelada.');};
  const instruction=text,batch=files,requestId=crypto.randomUUID();
  let current=latestChat.current??chat;
  setResponses(old=>[...old,{id:requestId,text:`${instruction||`${batch.length} imagem(ns)`} — Respondendo…`}]);
@@ -79,8 +92,8 @@ export function AssistantPanel({onClose}: {color:string;onClose:()=>void}) {
  let next=0;
  let registrations:Promise<void>=Promise.resolve();
  const claimed=new Set<string>();
- const registerReady=(snapshot:ChatState)=>{for(const p of snapshot.products.filter(p=>p.status==='pending'&&!claimed.has(p.id))){claimed.add(p.id);registrations=registrations.then(async()=>{try{current=await call({data:{action:'register',id:snapshot.id,productId:p.id}});setChat(current);}catch(e){setError(e instanceof Error?e.message:'Falha no cadastro');}});}};
-  const worker=async()=>{while(next<batch.length){const index=next++;
+ const registerReady=(snapshot:ChatState)=>{ensureActive();for(const p of snapshot.products.filter(p=>p.status==='pending'&&!claimed.has(p.id))){claimed.add(p.id);registrations=registrations.then(async()=>{try{ensureActive();current=await call({data:{action:'register',id:snapshot.id,productId:p.id}});setChat(current);}catch(e){setError(e instanceof Error?e.message:'Falha no cadastro');}});}};
+  const worker=async()=>{while(next<batch.length){ensureActive();const index=next++;
   const file=batch[index];if(!file)return;setStage(`Imagem ${index+1} de ${batch.length}: lendo…`);
  try{
  const digest=await crypto.subtle.digest('SHA-256',await file.arrayBuffer());
@@ -92,18 +105,18 @@ export function AssistantPanel({onClose}: {color:string;onClose:()=>void}) {
  const response=await fetch('/api/assistant/analyze',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify({id:current.id,mode,image:{name:file.name,...image}})});
  if(!response.ok||!response.body)throw new Error(`Falha na leitura (${response.status}).`);
  const reader=response.body.getReader(),decoder=new TextDecoder();let buffer='',waiting=false;
- while(true){const chunk=await reader.read();if(chunk.done)break;buffer+=decoder.decode(chunk.value,{stream:true});let end;while((end=buffer.indexOf('\n'))>=0){const event=JSON.parse(buffer.slice(0,end));buffer=buffer.slice(end+1);if(event.result){current=event.result;setChat(current);if(!instruction.trim())registerReady(current);}if(event.busy)waiting=true;else if(event.error)throw new Error(event.error);}}
+ while(true){const chunk=await reader.read();if(chunk.done)break;buffer+=decoder.decode(chunk.value,{stream:true});let end;while((end=buffer.indexOf('\n'))>=0){const event=JSON.parse(buffer.slice(0,end));buffer=buffer.slice(end+1);if(event.result){ensureActive();current=event.result;setChat(current);if(!instruction.trim())registerReady(current);}if(event.busy)waiting=true;else if(event.error)throw new Error(event.error);}}
  if(waiting)throw new Error('Outra imagem está sendo processada. Esta imagem não foi analisada; envie-a novamente.');
  }catch(e){setError(`${file.name}: precisa de conferência — ${e instanceof Error?e.message:'Falha na imagem'}`);}
  }};
   await Promise.all(Array.from({length:Math.min(2,batch.length)},()=>worker()));
-  current=await call({data:{action:'state',id:current.id}});setChat(current);
+  ensureActive();current=await call({data:{action:'state',id:current.id}});ensureActive();setChat(current);
   if(instruction.trim()){setStage('Entendendo sua mensagem…');current=await call({data:{action:'text',id:current.id,text:instruction}});setChat(current);}
  registerReady(current);await registrations;
  if(claimed.size){try{current=await call({data:{action:'sync',id:current.id}});setChat(current);}catch{setError('Cadastros salvos; atualização da vitrine pendente.');}}
  setResponses(old=>batch.length?[...old.filter(r=>r.id!==requestId),{id:requestId,text:'Imagens concluídas. Informe os preços de venda nos produtos abaixo.'}]:old.filter(r=>r.id!==requestId));
- }catch(e){const detail=e instanceof Error?e.message:'Não foi possível responder. Envie novamente.';setResponses(old=>old.map(r=>r.id===requestId?{...r,text:`${instruction||'Imagens'} — ${detail}`} :r));}
- finally{latestChat.current=current;activeRequests.current--;setBusy(activeRequests.current>0);setStage('');composer.current?.focus();}
+ }catch(e){if(version!==generation.current)return;const detail=e instanceof Error?e.message:'Não foi possível responder. Envie novamente.';setResponses(old=>old.map(r=>r.id===requestId?{...r,text:`${instruction||'Imagens'} — ${detail}`} :r));}
+ finally{if(version===generation.current){latestChat.current=current;setStage('');}activeRequests.current--;setBusy(activeRequests.current>0);composer.current?.focus();}
  }
  async function price(product:ChatProduct,value:number){
   if(!chat)return;
@@ -113,8 +126,9 @@ export function AssistantPanel({onClose}: {color:string;onClose:()=>void}) {
  }
  if(!mounted)return null;
  return createPortal(<section role="dialog" aria-modal="true" aria-label="Assistente SPERB" className="fixed inset-0 z-[100] flex h-dvh flex-col bg-background text-foreground">
- <header className="flex shrink-0 items-center justify-between border-b px-4 py-3"><div className="flex items-center gap-3"><Sparkles className="size-6 text-primary"/><div><h1 className="text-lg font-bold">Assistente SPERB</h1><p className="text-xs text-muted-foreground">Conversa · memória de 30 dias</p></div></div><Button variant="ghost" size="icon" aria-label="Fechar assistente" disabled={busy} onClick={onClose}><X/></Button></header>
+ <header className="flex shrink-0 items-center justify-between border-b px-4 py-3"><div className="flex items-center gap-3"><Sparkles className="size-6 text-primary"/><div><h1 className="text-lg font-bold">Assistente SPERB</h1><p className="text-xs text-muted-foreground">Conversa · memória de 30 dias</p></div></div><div className="flex items-center"><Button variant="ghost" size="icon" aria-label="Instruções da IA" title="Instruções da IA" onClick={()=>{setInstructions(chat?.instructions??'');setSettings(v=>!v);}}><Settings2/></Button><Button variant="ghost" size="icon" aria-label="Excluir histórico" title="Excluir histórico" disabled={!chat||resetting} onClick={()=>void resetChat(true)}><Trash2/></Button><Button variant="ghost" size="icon" aria-label="Cancelar processamento" title="Cancelar processamento" disabled={!chat||resetting} onClick={()=>void resetChat()}><Square/></Button><Button variant="ghost" size="icon" aria-label="Fechar assistente" disabled={busy} onClick={onClose}><X/></Button></div></header>
  <div className="min-h-0 flex-1 overflow-y-auto"><div className="mx-auto max-w-3xl space-y-5 px-4 py-6">
+ {settings&&<section className="space-y-3 border-b pb-4"><h2 className="font-semibold">Instruções da IA</h2><label className="block text-sm">Descrição, conhecimentos e preferências<textarea aria-label="Instruções da IA" maxLength={12000} rows={5} value={instructions} onChange={e=>setInstructions(e.target.value)} className="mt-2 w-full rounded-md border bg-background p-3"/></label><Button disabled={!chat||resetting} onClick={async()=>{if(!chat)return;try{const value=await call({data:{action:'instructions',id:chat.id,text:instructions}});latestChat.current=value;setChat(value);setSettings(false);}catch(e){setError(e instanceof Error?e.message:'Erro ao salvar instruções.');}}}>Salvar instruções</Button></section>}
  {!chat&&!error&&<Loader2 className="animate-spin"/>}
  {chat?.messages.length===0&&<p className="py-12 text-center text-muted-foreground">Olá! O que vamos cadastrar hoje?</p>}
  {chat?.messages.map(m=><article key={m.id} className={m.role==='user'?'ml-auto max-w-[90%] rounded-2xl bg-muted p-3':'max-w-full py-1'}><p className="mb-1 text-xs font-bold text-muted-foreground">{m.role==='user'?'Você':'Assistente SPERB'}</p><div className="break-words text-base leading-relaxed [&_p]:mb-2 [&_ul]:list-inside [&_ul]:list-disc"><ReactMarkdown>{m.content}</ReactMarkdown></div></article>)}
