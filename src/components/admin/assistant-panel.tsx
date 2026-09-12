@@ -26,31 +26,31 @@ async function shrink(file: File): Promise<Prepared> {
 async function hashText(value:string){const bytes=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(value));return Array.from(new Uint8Array(bytes)).map(b=>b.toString(16).padStart(2,"0")).join("");}
 function parseCrop(value:unknown):Crop|undefined{if(!value||typeof value!=="object")return undefined;const c=value as Record<string,unknown>;const x=Number(c.x),y=Number(c.y),width=Number(c.width),height=Number(c.height);if(![x,y,width,height].every(Number.isFinite)||x<0||y<0||width<=0||height<=0||x+width>1||y+height>1)return undefined;return {x,y,width,height};}
 async function cropImage(source:Prepared,crop?:Crop):Promise<Prepared>{
-  if(!crop)throw new Error("A inteligência artificial ainda não confirmou a área exata do produto.");
-  const bytes=Uint8Array.from(atob(source.data),c=>c.charCodeAt(0));
-  const bitmap=await createImageBitmap(new Blob([bytes],{type:source.mime}));
-  const rawX=Math.max(0,Math.floor(crop.x*bitmap.width));
-  const rawY=Math.max(0,Math.floor(crop.y*bitmap.height));
-  const rawW=Math.min(bitmap.width-rawX,Math.ceil(crop.width*bitmap.width));
-  const rawH=Math.min(bitmap.height-rawY,Math.ceil(crop.height*bitmap.height));
+  if(!crop)throw new Error("A inteligência artificial ainda não confirmou a área do produto.");
+  const bytes=Uint8Array.from(atob(source.data),c=>c.charCodeAt(0));const bitmap=await createImageBitmap(new Blob([bytes],{type:source.mime}));
+  const rawX=Math.max(0,Math.floor(crop.x*bitmap.width)),rawY=Math.max(0,Math.floor(crop.y*bitmap.height));
+  const rawW=Math.min(bitmap.width-rawX,Math.floor(crop.width*bitmap.width)),rawH=Math.min(bitmap.height-rawY,Math.floor(crop.height*bitmap.height));
   if(rawW<16||rawH<16){bitmap.close();throw new Error("A área encontrada para o produto é pequena demais.");}
 
-  // ZERO margem: o arquivo final usa exatamente a caixa indicada pelo Gemini.
-  // Não acrescentamos 8%, 6% ou qualquer outra folga.
-  const size=Math.min(1200,Math.max(320,Math.max(rawW,rawH)));
+  // O Gemini fornece a caixa EXATA do produto. Não adicionamos margem.
+  // Isso evita que preço, data, texto ou outras partes da tela entrem na foto.
+  const x=rawX,y=rawY;
+  const right=Math.min(bitmap.width,rawX+rawW),bottom=Math.min(bitmap.height,rawY+rawH);
+  const w=right-x,h=bottom-y;
+  if(w<16||h<16){bitmap.close();throw new Error("Não consegui preparar uma área válida para o produto.");}
+
+  const size=Math.min(1200,Math.max(320,Math.max(w,h)));
   const canvas=document.createElement("canvas");canvas.width=size;canvas.height=size;
   const ctx=canvas.getContext("2d");if(!ctx){bitmap.close();throw new Error("Não consegui preparar a foto do produto.");}
-  ctx.imageSmoothingEnabled=true;
-  ctx.imageSmoothingQuality="high";
   ctx.fillStyle="#ffffff";ctx.fillRect(0,0,size,size);
-  const scale=Math.min(size/rawW,size/rawH);
-  const drawW=Math.max(1,Math.round(rawW*scale));
-  const drawH=Math.max(1,Math.round(rawH*scale));
+  ctx.filter="contrast(1.06) saturate(1.03) brightness(1.02)";
+  const scale=Math.min(size/w,size/h);
+  const drawW=Math.max(1,Math.round(w*scale)),drawH=Math.max(1,Math.round(h*scale));
   const dx=Math.round((size-drawW)/2),dy=Math.round((size-drawH)/2);
-  ctx.drawImage(bitmap,rawX,rawY,rawW,rawH,dx,dy,drawW,drawH);
+  ctx.drawImage(bitmap,x,y,w,h,dx,dy,drawW,drawH);
+  ctx.filter="none";
   bitmap.close();
-  const url=canvas.toDataURL("image/jpeg",0.94);
-  return {mime:"image/jpeg",data:url.slice(url.indexOf(",")+1)};
+  const url=canvas.toDataURL("image/jpeg",0.92);return {mime:"image/jpeg",data:url.slice(url.indexOf(",")+1)};
 }
 function dataUrl(image:Prepared){return `data:${image.mime};base64,${image.data}`;}
 function money(value:number){return Number.isFinite(value)?value.toFixed(2).replace(".",","):"0,00";}
@@ -110,7 +110,7 @@ export function AssistantPanel({onClose}:{color:string;onClose:()=>void}){
     if(!Number.isFinite(qty)||qty<1)throw new Error("Informe uma quantidade válida.");
     if(!Number.isFinite(cost)||cost<0)throw new Error("Informe um custo válido.");
     if(!Number.isFinite(price)||price<=0)throw new Error("Informe o preço de venda.");
-    if(!preview)throw new Error("A imagem recortada do produto ainda não está disponível. Envie novamente a foto da compra.");
+    if(!preview)throw new Error("A imagem do produto ainda não está disponível. Envie novamente a foto da compra para tentar outro recorte.");
     active.current++;setBusy(true);
     try{
       const imageData=preview.startsWith("data:")?preview.split(",")[1]??"":"";
