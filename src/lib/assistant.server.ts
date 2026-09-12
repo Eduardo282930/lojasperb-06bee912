@@ -27,6 +27,12 @@ export type PurchaseDraft = {
   trackingCode: string;
   purchasedAt: string;
   notes: string;
+  /** Quantas unidades físicas vendáveis existem no pacote/kit comprado. */
+  unitsPerPackage?: number;
+  /** true quando o pacote deve ser vendido como uma única unidade. */
+  sellAsPackage?: boolean;
+  /** Caixa normalizada do produto dentro da imagem original. Valores 0..1. */
+  crop?: { x: number; y: number; width: number; height: number };
   categoryId?: string;
 };
 
@@ -68,7 +74,9 @@ Extraia TODOS os produtos visíveis na imagem. Para cada produto:
   * Máximo de 64 caracteres, incluindo a variação.
   * Exemplo: "Protetor De Colchão Impermeável Cap... AZUL,CASAL - ZIPER 138/188/15" vira "Protetor de Colchão Impermeável Azul Casal 138x188x15".
 - variant: coloque aqui modelo, cor, tamanho e medidas importantes, separados do nome base, sem repeti-los no name. O servidor reúne nome e variação em um único produto simples. Se houver duas variações diferentes, devolva DOIS produtos separados.
-- qty: quantidade comprada (número inteiro, mínimo 1).
+- qty: quantidade de pacotes/anúncios comprados (número inteiro, mínimo 1).
+- unitsPerPackage: quantidade de unidades físicas vendáveis dentro de cada pacote/kit. Ex.: "kit com 3" comprado 1 vez e vendido por peça => 3.
+- sellAsPackage: true somente quando o pacote inteiro é uma única unidade vendável; false quando as peças são vendidas individualmente. Se estiver claro que é kit com peças individuais, use false. Se não der para decidir, deixe false e acrescente dúvida em notes.
 - seller: nome da loja/vendedor, se aparecer.
 - listedPrice: preço anunciado ATUAL de UMA unidade, só o número (ex.: 39.90). IGNORE completamente qualquer preço riscado/antigo.
 - cost: valor pago por UMA unidade, só o número. Nunca repita aqui o total do pedido.
@@ -76,6 +84,7 @@ Extraia TODOS os produtos visíveis na imagem. Para cada produto:
 - trackingCode: código de rastreio/pedido, se aparecer.
 - purchasedAt: data da compra no formato AAAA-MM-DD, se aparecer.
 - notes: informação adicional útil (frete, cupom aplicado, observações).
+- crop: caixa normalizada (0..1) que contém somente o produto, sem preço, texto, botão ou interface da Shopee. Se não for seguro separar o produto, não invente coordenadas e deixe crop ausente.
 
 Nunca invente preço de venda. Se a imagem não for uma compra ou não der para ler, devolva a lista vazia.
 Responda apenas com JSON.`;
@@ -170,6 +179,9 @@ const SCHEMA = {
           name: { type: "string" },
           variant: { type: "string" },
           qty: { type: "integer" },
+          unitsPerPackage: { type: "integer" },
+          sellAsPackage: { type: "boolean" },
+          crop: { type: "object", properties: { x: {type:"number"}, y: {type:"number"}, width: {type:"number"}, height: {type:"number"} }, required: ["x","y","width","height"] },
           seller: { type: "string" },
           listedPrice: { type: "number" },
           totalPaid: { type: "number" },
@@ -288,6 +300,73 @@ export async function geminiJson(
   throw lastError;
 }
 
+
+export type GeminiToolDeclaration = { name: string; description: string; parameters: Record<string, unknown> };
+
+/**
+ * Loop mínimo de function calling sobre a mesma conexão/modelo já usado pelo
+ * Assistente. Não troca token, modelo ou endpoint; apenas permite que o Gemini
+ * escolha funções administrativas reais e receba o resultado antes de responder.
+ */
+export async function geminiAgent(
+  prompt: string,
+  tools: GeminiToolDeclaration[],
+  execute: (name: string, args: Record<string, unknown>) => Promise<unknown>,
+): Promise<{ reply: string; calls: string[] }> {
+  const key = process.env["GEMINI_API_KEY"];
+  if (!key) throw new Error("A chave da inteligência artificial não está configurada.");
+  const model = geminiModel();
+  const contents: Array<Record<string, unknown>> = [{ role: "user", parts: [{ text: prompt }] }];
+  const declarations = tools.map(t => ({ name: t.name, description: t.description, parameters: t.parameters }));
+  const calls: string[] = [];
+  for (let round = 0; round < 6; round++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), GEMINI_TIMEOUT_MS);
+    let res: Response;
+    try {
+      res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-goog-api-key": key },
+        signal: controller.signal,
+        body: JSON.stringify({
+          contents,
+          tools: [{ functionDeclarations: declarations }],
+          generationConfig: { temperature: 0 },
+        }),
+      });
+    } finally { clearTimeout(timer); }
+    if (!res.ok) {
+      const body = await res.text();
+      if (res.status === 404) throw new Error(`O Google não disponibiliza ${model} para esta chave.`);
+      if (res.status === 429 || res.status === 503 || res.status >= 500) throw new Error("A inteligência artificial está ocupada. Tente de novo em instantes.");
+      throw new Error(`A inteligência artificial recusou a solicitação (${res.status}): ${body.slice(0,160)}`);
+    }
+    const json = await res.json() as { candidates?: Array<{ content?: { role?: string; parts?: Array<Record<string, unknown>> } }> };
+    const content = json.candidates?.[0]?.content;
+    const parts = content?.parts ?? [];
+    const functionCalls = parts.map(p => p.functionCall as {name?: string; args?: Record<string, unknown>} | undefined).filter(Boolean);
+    contents.push({ role: "model", parts });
+    if (!functionCalls.length) {
+      const reply = parts.map(p => typeof p.text === "string" ? p.text : "").join("").trim();
+      return { reply: reply || "Concluído.", calls };
+    }
+    const responses: Record<string, unknown>[] = [];
+    for (const call of functionCalls) {
+      const name = String(call?.name ?? "");
+      const args = call?.args ?? {};
+      calls.push(name);
+      try {
+        const result = await execute(name, args);
+        responses.push({ functionResponse: { name, response: { ok: true, result } } });
+      } catch (error) {
+        responses.push({ functionResponse: { name, response: { ok: false, error: error instanceof Error ? error.message : "Falha na função." } } });
+      }
+    }
+    contents.push({ role: "user", parts: responses });
+  }
+  throw new Error("O Assistente atingiu o limite de etapas desta solicitação. Nenhuma etapa adicional foi executada.");
+}
+
 /** Lê UMA imagem. A imagem só existe na memória desta chamada. */
 export async function readPurchaseImage(
   image: AssistantImage,
@@ -313,21 +392,33 @@ export async function readPurchaseImage(
   return list.map((raw) => {
     const p = raw as Record<string, unknown>;
     const qty = Math.max(1, Math.floor(toNumber(p["qty"]) || 1));
+    const unitsPerPackage = Math.max(1, Math.floor(toNumber(p["unitsPerPackage"]) || 1));
+    const sellAsPackage = Boolean(p["sellAsPackage"]);
+    const physicalQty = sellAsPackage ? qty : qty * unitsPerPackage;
     const total = Math.max(0, toNumber(p["totalPaid"]));
     let cost = Math.max(0, toNumber(p["cost"]));
     // Quando a IA repete o total no custo, o custo por unidade é o total ÷ quantidade.
-    if (qty > 1 && total > 0 && Math.abs(cost - total) < 0.01) cost = total / qty;
-    if (cost === 0 && total > 0) cost = total / qty;
+    if (total > 0 && Math.abs(cost - total) < 0.01) cost = total / physicalQty;
+    if (cost === 0 && total > 0) cost = total / physicalQty;
+    if (total > 0 && cost > 0 && physicalQty > 1 && Math.abs(cost * physicalQty - total) < 0.02) cost = total / physicalQty;
     return {
       name: cleanProductName(String(p["name"] ?? "")),
       variant: cleanProductName(String(p["variant"] ?? "")),
-      qty,
+      qty: physicalQty,
       seller: String(p["seller"] ?? "").trim(),
       listedPrice: Math.max(0, toNumber(p["listedPrice"])),
       cost: Math.round(cost * 100) / 100,
       trackingCode: String(p["trackingCode"] ?? "").trim(),
       purchasedAt: toIsoDate(p["purchasedAt"]),
       notes: String(p["notes"] ?? "").trim(),
+      unitsPerPackage: Math.max(1, Math.floor(toNumber(p["unitsPerPackage"]) || 1)),
+      sellAsPackage: Boolean(p["sellAsPackage"]),
+      crop: (() => {
+        const c = p["crop"] as Record<string, unknown> | undefined;
+        if (!c) return undefined;
+        const x = Number(c.x), y = Number(c.y), w = Number(c.width), h = Number(c.height);
+        return [x,y,w,h].every(Number.isFinite) && x >= 0 && y >= 0 && w > 0 && h > 0 && x + w <= 1 && y + h <= 1 ? {x,y,width:w,height:h} : undefined;
+      })(),
       categoryId: categories.some(c => c.id === p["categoryId"]) ? String(p["categoryId"]) : "",
     } satisfies PurchaseDraft;
   });
@@ -635,6 +726,24 @@ export async function upsertPurchase(
 
 export async function loadItems(): Promise<LoyItem[]> {
   return loyverseList<LoyItem>("items");
+}
+
+
+/** Envia a imagem original recortada para a foto do item no Loyverse. */
+export async function uploadItemImage(itemId: string, mime: string, base64: string): Promise<string> {
+  const token = process.env["LOYVERSE_TOKEN"];
+  if (!token) throw new Error("LOYVERSE_TOKEN ausente");
+  const bytes = Uint8Array.from(Buffer.from(base64, "base64"));
+  const res = await fetch(`https://api.loyverse.com/v1.0/items/${itemId}/image`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": mime },
+    body: bytes,
+  });
+  if (!res.ok) throw new Error(`Não consegui enviar a foto ao Loyverse (${res.status}).`);
+  const item = await loyverse<LoyItem>(`items/${itemId}`);
+  const image = String((item as unknown as Record<string, unknown>).image_url ?? "");
+  if (!image) throw new Error("A foto foi enviada, mas o Loyverse não confirmou a imagem do item.");
+  return image;
 }
 
 /** Grava o preço de venda digitado pelo administrador direto no Loyverse. */
