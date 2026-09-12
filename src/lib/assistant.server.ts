@@ -36,6 +36,8 @@ export type PurchaseDraft = {
   crop?: { x: number; y: number; width: number; height: number };
   categoryId?: string;
   manualPrice?: number;
+  /** URL de uma foto de produto encontrada na pesquisa de imagens. */
+  imageUrl?: string;
 };
 
 export type AssistantResult = {
@@ -95,6 +97,12 @@ REGRA DE CUSTO:
 - Se são 2 kits de 3 unidades por R$ 30, cost deve ser 5,00.
 - Se houver somente um valor unitário claramente identificado como "preço pago por unidade", use-o; caso contrário, priorize o total realmente pago e divida.
 - Nunca use o preço anunciado/riscado como custo quando houver valor realmente pago.
+
+IMAGEM DO PRODUTO NA INTERNET — OBRIGATÓRIO:
+- imageSearchQuery deve ser uma consulta curta e MUITO específica para procurar na internet uma foto real deste produto.
+- Inclua fabricante/marca, modelo, amperagem, tamanho, cor ou outra variação somente quando identificáveis na imagem/compra.
+- Priorize uma busca que encontre a FOTO DO PRODUTO, não a página da compra e não uma foto genérica de produto parecido.
+- Se houver um modelo exato, inclua-o. Se não houver, use o nome + marca + variação disponível.
 
 RECORTE DA IMAGEM — OBRIGATÓRIO NA MESMA RESPOSTA:
 - crop.x, crop.y, crop.width e crop.height devem localizar VISUALMENTE o produto físico na própria imagem recebida.
@@ -212,8 +220,9 @@ const SCHEMA = {
           purchasedAt: { type: "string" },
           notes: { type: "string" },
           categoryId: { type: "string" },
+          imageSearchQuery: { type: "string", description: "Consulta precisa para encontrar na internet uma foto limpa e real deste produto, incluindo marca/modelo/variação quando identificáveis." },
         },
-        required: ["name", "qty", "cost", "crop", "unitsPerPackage", "sellAsPackage"],
+        required: ["name", "qty", "cost", "crop", "unitsPerPackage", "sellAsPackage", "imageSearchQuery"],
       },
     },
   },
@@ -410,6 +419,142 @@ function normalizeCrop(raw: unknown): NormalizedCrop | undefined {
 
 type NormalizedCrop = { x: number; y: number; width: number; height: number };
 
+function decodeHtmlEntities(value: string): string {
+  return value
+    .replace(/&quot;/g, '"')
+    .replace(/&#34;/g, '"')
+    .replace(/&amp;/g, '&')
+    .replace(/&#39;|&apos;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>');
+}
+
+type WebImageCandidate = { url: string; title?: string; source?: string };
+
+function parseBingImageCandidates(html: string): WebImageCandidate[] {
+  const out: WebImageCandidate[] = [];
+  const patterns = [
+    /class=["']iusc["'][^>]*\bm=["']([^"']+)["']/gi,
+    /\bm=["']([^"']+)["'][^>]*class=["']iusc["']/gi,
+  ];
+  for (const re of patterns) {
+    for (const match of html.matchAll(re)) {
+      try {
+        const meta = JSON.parse(decodeHtmlEntities(match[1] ?? '')) as Record<string, unknown>;
+        const url = String(meta.murl ?? '').trim();
+        if (!/^https?:\/\//i.test(url)) continue;
+        if (!out.some((x) => x.url === url)) out.push({
+          url,
+          title: String(meta.t ?? '').trim(),
+          source: String(meta.purl ?? '').trim(),
+        });
+      } catch {
+        // Resultado de imagem inválido: tenta o próximo.
+      }
+      if (out.length >= 8) return out;
+    }
+  }
+  return out;
+}
+
+function parseGenericImageUrls(html: string): WebImageCandidate[] {
+  const out: WebImageCandidate[] = [];
+  const re = /https?:\/\/[^"'<>\s]+/gi;
+  for (const raw of html.matchAll(re)) {
+    let url = decodeHtmlEntities(raw[0]).replace(/\\u0026/g, '&');
+    try { url = decodeURIComponent(url); } catch { /* mantém */ }
+    if (!/^https?:\/\//i.test(url)) continue;
+    if (!/\.(?:jpe?g|png|webp)(?:[?#]|$)/i.test(url)) continue;
+    if (!out.some((x) => x.url === url)) out.push({ url });
+    if (out.length >= 8) break;
+  }
+  return out;
+}
+
+async function searchInternetProductImages(query: string): Promise<WebImageCandidate[]> {
+  const q = query.trim();
+  if (!q) return [];
+  const headers = {
+    'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131 Safari/537.36',
+    accept: 'text/html,application/xhtml+xml',
+    'accept-language': 'pt-BR,pt;q=0.9,en;q=0.8',
+  };
+  const url = `https://www.bing.com/images/search?form=HDRSC2&first=1&q=${encodeURIComponent(q)}`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 12_000);
+  try {
+    const res = await fetch(url, { headers, signal: controller.signal });
+    if (res.ok) {
+      const html = await res.text();
+      const candidates = parseBingImageCandidates(html);
+      if (candidates.length) return candidates;
+    }
+  } catch {
+    // Fallback abaixo.
+  } finally {
+    clearTimeout(timer);
+  }
+
+  const googleUrl = `https://www.google.com/search?tbm=isch&hl=pt-BR&q=${encodeURIComponent(q)}`;
+  const googleController = new AbortController();
+  const googleTimer = setTimeout(() => googleController.abort(), 12_000);
+  try {
+    const res = await fetch(googleUrl, { headers, signal: googleController.signal });
+    if (!res.ok) return [];
+    return parseGenericImageUrls(await res.text());
+  } catch {
+    return [];
+  } finally {
+    clearTimeout(googleTimer);
+  }
+}
+
+async function downloadWebImage(url: string): Promise<{ mime: string; data: string; bytes: number } | undefined> {
+  if (!/^https?:\/\//i.test(url)) return undefined;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 12_000);
+  try {
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: { 'user-agent': 'Mozilla/5.0', accept: 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8' },
+      redirect: 'follow',
+    });
+    if (!res.ok) return undefined;
+    const contentType = String(res.headers.get('content-type') ?? '').split(';')[0].toLowerCase();
+    if (!contentType.startsWith('image/') || contentType === 'image/svg+xml' || contentType === 'image/gif') return undefined;
+    const length = Number(res.headers.get('content-length') ?? 0);
+    if (length > 8_000_000) return undefined;
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    if (bytes.length < 12 || bytes.length > 8_000_000) return undefined;
+    return { mime: contentType === 'image/jpg' ? 'image/jpeg' : contentType, data: Buffer.from(bytes).toString('base64'), bytes: bytes.length };
+  } catch {
+    return undefined;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function findBestInternetProductImage(query: string): Promise<string | undefined> {
+  const candidates = await searchInternetProductImages(query);
+  if (!candidates.length) return undefined;
+  const checked = await Promise.all(candidates.slice(0, 4).map(async (candidate) => {
+    const image = await downloadWebImage(candidate.url);
+    return image ? { candidate, image } : undefined;
+  }));
+  const valid = checked.filter(Boolean) as Array<{ candidate: WebImageCandidate; image: { mime: string; data: string; bytes: number } }>;
+  const terms = query.toLowerCase().split(/\s+/).filter((term) => term.length >= 3);
+  valid.sort((a, b) => {
+    const score = (item: typeof a) => {
+      const haystack = `${item.candidate.title ?? ""} ${item.candidate.source ?? ""}`.toLowerCase();
+      const matches = terms.reduce((total, term) => total + (haystack.includes(term) ? 1 : 0), 0);
+      const quality = Math.min(4, Math.log10(Math.max(1, item.image.bytes)));
+      return matches * 10 + quality;
+    };
+    return score(b) - score(a);
+  });
+  return valid[0]?.candidate.url;
+}
+
 /** Lê UMA imagem. A imagem só existe na memória desta chamada. */
 export async function readPurchaseImage(
   image: AssistantImage,
@@ -435,7 +580,7 @@ export async function readPurchaseImage(
   }
 
   const list = Array.isArray(parsed.products) ? parsed.products : [];
-  const drafts = list.map((raw) => {
+  const drafts = await Promise.all(list.map(async (raw) => {
     const p = raw as Record<string, unknown>;
     const qtyPackages = Math.max(1, Math.floor(toNumber(p["qty"]) || 1));
     const unitsPerPackage = Math.max(1, Math.floor(toNumber(p["unitsPerPackage"]) || 1));
@@ -464,10 +609,13 @@ export async function readPurchaseImage(
       sellAsPackage,
       crop: normalizeCrop(p["crop"]),
       categoryId: categories.some(c => c.id === p["categoryId"]) ? String(p["categoryId"]) : "",
+      imageUrl: await findBestInternetProductImage(
+        String(p["imageSearchQuery"] ?? `${String(p["name"] ?? "")} ${String(p["variant"] ?? "")}`).trim(),
+      ),
     } satisfies PurchaseDraft;
-  }).filter(d => d.name.trim());
+  }));
 
-  return drafts;
+  return drafts.filter(d => d.name.trim());
 }
 
 /* ------------------------------- Loyverse -------------------------------- */
@@ -774,6 +922,12 @@ export async function loadItems(): Promise<LoyItem[]> {
   return loyverseList<LoyItem>("items");
 }
 
+
+export async function downloadProductImage(url: string): Promise<{ mime: string; data: string }> {
+  const image = await downloadWebImage(url);
+  if (!image) throw new Error('Não consegui baixar a imagem encontrada na internet.');
+  return { mime: image.mime, data: image.data };
+}
 
 /** Envia a imagem original recortada para a foto do item no Loyverse. */
 export async function uploadItemImage(itemId: string, mime: string, base64: string): Promise<string> {
