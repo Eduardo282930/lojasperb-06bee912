@@ -344,7 +344,7 @@ export async function geminiAgent(
     const json = await res.json() as { candidates?: Array<{ content?: { role?: string; parts?: Array<Record<string, unknown>> } }> };
     const content = json.candidates?.[0]?.content;
     const parts = content?.parts ?? [];
-    const functionCalls = parts.map(p => p.functionCall as {name?: string; args?: Record<string, unknown>} | undefined).filter(Boolean);
+    const functionCalls = parts.map(p => p.functionCall as {name?: string; args?: Record<string, unknown>; id?: string} | undefined).filter(Boolean);
     contents.push({ role: "model", parts });
     if (!functionCalls.length) {
       const reply = parts.map(p => typeof p.text === "string" ? p.text : "").join("").trim();
@@ -357,9 +357,9 @@ export async function geminiAgent(
       calls.push(name);
       try {
         const result = await execute(name, args);
-        responses.push({ functionResponse: { name, response: { ok: true, result } } });
+        responses.push({ functionResponse: { name, id: call?.id, response: { ok: true, result } } });
       } catch (error) {
-        responses.push({ functionResponse: { name, response: { ok: false, error: error instanceof Error ? error.message : "Falha na função." } } });
+        responses.push({ functionResponse: { name, id: call?.id, response: { ok: false, error: error instanceof Error ? error.message : "Falha na função." } } });
       }
     }
     contents.push({ role: "user", parts: responses });

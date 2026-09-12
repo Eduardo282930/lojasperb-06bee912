@@ -73,6 +73,13 @@ export const ADMIN_TOOLS = [
     limiteUsos: { type: "integer" },
     telefoneCliente: { type: "string" },
   }),
+  tool("enviar_notificacao", "Envia uma notificação privada para um único cliente. Localize o cliente por nome, telefone ou e-mail e envie somente para os aparelhos dele.", {
+    cliente: { type: "string" },
+    titulo: { type: "string" },
+    mensagem: { type: "string" },
+    categoria: { type: "string" },
+    destino: { type: "string" },
+  }),
   tool("sincronizar_catalogo", "Sincroniza o catálogo do Loyverse com a base externa da SPERB.", {}),
 ];
 
@@ -228,64 +235,18 @@ export async function executeAdminTool(name: string, args: Record<string, unknow
       return { ok: true, cliente: { id: saved.id, nome: saved.name ?? "", telefone: saved.phone_number ?? "", email: saved.email ?? "" } };
     }
     case "ajustar_moedas": {
-      const customerId = await findCustomerIdByPhone(String(args.telefone ?? ""));
-      const d = db();
-      const requestedDelta = Math.trunc(n(args.delta));
-
-      // O Assistente roda no servidor com service_role. Os RPCs admin_adjust_coins/
-      // admin_coin_balance exigem auth.uid() com role "admin", então podem retornar
-      // permission denied quando chamados por este contexto. Aqui fazemos a mesma
-      // operação diretamente no ledger, usando service_role, e verificamos o saldo
-      // real depois da gravação.
-      const { data: beforeRows, error: beforeError } = await d
-        .from("customer_coin_ledger")
-        .select("delta")
-        .eq("customer_id", customerId);
-
-      if (beforeError) throw new Error(`Não foi possível consultar as moedas: ${beforeError.message}`);
-
-      const beforeBalance = (beforeRows ?? []).reduce((sum: number, row: any) => sum + Math.trunc(n(row.delta)), 0);
-      let appliedDelta = requestedDelta;
-
-      // Nunca deixa o saldo ficar negativo, mantendo a mesma regra do RPC antigo.
-      if (beforeBalance + appliedDelta < 0) {
-        appliedDelta = -beforeBalance;
-      }
-
-      if (appliedDelta !== 0) {
-        const { error: insertError } = await d.from("customer_coin_ledger").insert({
-          customer_id: customerId,
-          delta: appliedDelta,
-          reason: String(args.motivo ?? "Ajuste pelo Assistente SPERB").trim() || "Ajuste pelo Assistente SPERB",
-          created_by: null,
-        });
-
-        if (insertError) {
-          throw new Error(`Não foi possível salvar as moedas: ${insertError.message}`);
-        }
-      }
-
-      const { data: afterRows, error: afterError } = await d
-        .from("customer_coin_ledger")
-        .select("delta")
-        .eq("customer_id", customerId);
-
-      if (afterError) throw new Error(`As moedas foram alteradas, mas não consegui verificar o saldo: ${afterError.message}`);
-
-      const saldo = (afterRows ?? []).reduce((sum: number, row: any) => sum + Math.trunc(n(row.delta)), 0);
-
-      if (saldo !== beforeBalance + appliedDelta) {
-        throw new Error("A alteração das moedas não foi confirmada pelo sistema.");
-      }
-
-      return {
-        ok: true,
-        telefone: args.telefone,
-        delta: appliedDelta,
-        deltaSolicitado: requestedDelta,
-        saldoAnterior: beforeBalance,
-        saldo,
-      };
+      const phone = digits(String(args.telefone ?? ""));
+      if(!phone) throw new Error("Telefone do cliente obrigatório.");
+      const d=db();
+      const { data: customer, error: ce } = await d.from("customers").select("id,name,phone,email").eq("phone",phone).maybeSingle();
+      if(ce||!customer) throw new Error("Cliente não encontrado pelo telefone informado.");
+      const delta=Math.trunc(n(args.delta));
+      if(!delta){ const {data,error}=await d.from("customer_coin_ledger").select("delta").eq("customer_id",customer.id); if(error)throw error; const saldo=(data??[]).reduce((a:any,r:any)=>a+Number(r.delta??0),0); return {ok:true,telefone:phone,saldo}; }
+      const {data: rows,error: re}=await d.from("customer_coin_ledger").select("delta").eq("customer_id",customer.id);if(re)throw re;
+      const saldo=(rows??[]).reduce((a:any,r:any)=>a+Number(r.delta??0),0);if(saldo+delta<0)throw new Error(`O ajuste deixaria o saldo negativo. Saldo atual: ${saldo}.`);
+      const {error}=await d.from("customer_coin_ledger").insert({customer_id:customer.id,delta,reason:String(args.motivo??"Ajuste pelo Assistente SPERB")});if(error)throw error;
+      const {data: verify,error: ve}=await d.from("customer_coin_ledger").select("delta").eq("customer_id",customer.id);if(ve)throw ve;const saldoFinal=(verify??[]).reduce((a:any,r:any)=>a+Number(r.delta??0),0);if(saldoFinal!==saldo+delta)throw new Error("Ajuste feito, mas o saldo não foi confirmado.");
+      return {ok:true,telefone:phone,delta,saldo:saldoFinal};
     }
     case "gerenciar_cupom": {
       const d = db();
@@ -314,6 +275,17 @@ export async function executeAdminTool(name: string, args: Record<string, unknow
       const { data, error } = await d.from("coupons").update(payload).eq("id", id).select("*").single();
       if (error) throw error;
       return { ok: true, cupom: data };
+    }
+    case "enviar_notificacao": {
+      const query=ai.normalizeName(String(args.cliente??""));const title=String(args.titulo??"").trim();const body=String(args.mensagem??"").trim();if(!query||!title||!body)throw new Error("Cliente, título e mensagem são obrigatórios.");
+      const d=db();const {data:customers,error}=await d.from("customers").select("id,name,phone,email");if(error)throw error;
+      const found=(customers??[]).filter((c:any)=>ai.normalizeName(`${c.name??""} ${c.phone??""} ${c.email??""}`).includes(query));
+      if(found.length===0)throw new Error("Cliente não encontrado.");
+      if(found.length>1)throw new Error(`Encontrei mais de um cliente: ${found.slice(0,5).map((c:any)=>`${c.name??"sem nome"} (${c.phone??"sem telefone"})`).join(", ")}. Informe o telefone ou escolha um deles.`);
+      const customer=found[0] as any;const {sendNotificationToCustomer}=await import("./web-push.server");const target=String(args.destino??"/").startsWith("/")?String(args.destino):"/";const kind=String(args.categoria??"info");
+      const {error:historyError}=await d.from("customer_notifications").insert({customer_id:customer.id,kind,title,body,target_url:target});if(historyError)throw new Error(`Não consegui registrar a notificação privada: ${historyError.message}`);
+      const sent=await sendNotificationToCustomer(String(customer.id),{kind,title,body,targetUrl:target});if(sent===0)throw new Error("A notificação foi registrada, mas o cliente não tem nenhum aparelho com notificações ativadas.");
+      return {ok:true,cliente:{id:customer.id,nome:customer.name,telefone:customer.phone},enviadas:sent};
     }
     case "sincronizar_catalogo":
       await syncCatalogFromLoyverse();
