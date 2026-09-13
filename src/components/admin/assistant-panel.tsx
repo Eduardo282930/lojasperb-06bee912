@@ -25,6 +25,71 @@ async function shrink(file: File): Promise<Prepared> {
 }
 async function hashText(value:string){const bytes=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(value));return Array.from(new Uint8Array(bytes)).map(b=>b.toString(16).padStart(2,"0")).join("");}
 function parseCrop(value:unknown):Crop|undefined{if(!value||typeof value!=="object")return undefined;const c=value as Record<string,unknown>;const x=Number(c.x),y=Number(c.y),width=Number(c.width),height=Number(c.height);if(![x,y,width,height].every(Number.isFinite)||x<0||y<0||width<=0||height<=0||x+width>1||y+height>1)return undefined;return {x,y,width,height};}
+function tightenCrop(bitmap:ImageBitmap,x:number,y:number,w:number,h:number){
+  // Remove somente folgas visíveis dentro da caixa do Gemini. Não aumenta a caixa
+  // e não adiciona margem. Também corta uma faixa inferior isolada (ex.:
+  // “Data prevista”) quando ela está claramente separada do produto.
+  const probe=document.createElement("canvas");
+  const pw=Math.min(700,Math.max(80,w)),ph=Math.min(700,Math.max(80,h));
+  probe.width=pw;probe.height=ph;
+  const pctx=probe.getContext("2d",{willReadFrequently:true});
+  if(!pctx)return {x,y,w,h};
+  pctx.drawImage(bitmap,x,y,w,h,0,0,pw,ph);
+  const data=pctx.getImageData(0,0,pw,ph).data;
+  const rows=new Uint32Array(ph);
+  const cols=new Uint32Array(pw);
+  for(let yy=0;yy<ph;yy++){
+    for(let xx=0;xx<pw;xx++){
+      const i=(yy*pw+xx)*4,r=data[i],g=data[i+1],b=data[i+2],a=data[i+3];
+      if(a<20)continue;
+      // Captura texto/objeto sobre fundo branco, mas ignora pequenas variações
+      // de compressão e áreas praticamente brancas.
+      const ink=(255-r)+(255-g)+(255-b);
+      if(ink>48 || Math.max(r,g,b)-Math.min(r,g,b)>28){rows[yy]++;cols[xx]++;}
+    }
+  }
+  const rowActive=Array.from(rows,(n)=>n>=Math.max(2,Math.floor(pw*0.006)));
+  const colActive=Array.from(cols,(n)=>n>=Math.max(2,Math.floor(ph*0.006)));
+  const runs=(flags:boolean[])=>{
+    const out:Array<[number,number,number]>=[];let start=-1,count=0;
+    for(let i=0;i<flags.length;i++){
+      if(flags[i]){if(start<0)start=i;count++;}
+      else if(start>=0){out.push([start,i-1,count]);start=-1;count=0;}
+    }
+    if(start>=0)out.push([start,flags.length-1,count]);
+    return out;
+  };
+  let rr=runs(rowActive),cr=runs(colActive);
+  if(!rr.length||!cr.length)return {x,y,w,h};
+
+  // Se existir um grande vazio separando a parte principal de uma faixa de
+  // texto inferior, elimina a faixa inferior. O produto continua inteiro.
+  if(rr.length>1){
+    let best=rr[0];
+    for(const r of rr){
+      const span=r[1]-r[0]+1,area=r[2]*span;
+      const bestSpan=best[1]-best[0]+1,bestArea=best[2]*bestSpan;
+      if(area>bestArea)best=r;
+    }
+    const bestIdx=rr.indexOf(best);
+    if(bestIdx<rr.length-1){
+      const next=rr[bestIdx+1];
+      const gap=next[0]-best[1]-1;
+      const gapRatio=gap/ph;
+      const nextArea=next[2]*(next[1]-next[0]+1);
+      const bestArea=best[2]*(best[1]-best[0]+1);
+      if(gapRatio>=0.035 && nextArea<=bestArea*0.55 && next[0]>best[1])rr=rr.slice(0,bestIdx+1);
+    }
+  }
+
+  const top=rr[0][0],bottom=rr[rr.length-1][1];
+  const left=cr[0][0],right=cr[cr.length-1][1];
+  const nx=x+Math.floor((left/pw)*w),ny=y+Math.floor((top/ph)*h);
+  const nr=Math.max(1,Math.ceil(((right-left+1)/pw)*w));
+  const nh=Math.max(1,Math.ceil(((bottom-top+1)/ph)*h));
+  return {x:nx,y:ny,w:Math.min(w-nx+x,nr),h:Math.min(h-ny+y,nh)};
+}
+
 async function cropImage(source:Prepared,crop?:Crop):Promise<Prepared>{
   if(!crop)throw new Error("A inteligência artificial ainda não confirmou a área do produto.");
   const bytes=Uint8Array.from(atob(source.data),c=>c.charCodeAt(0));const bitmap=await createImageBitmap(new Blob([bytes],{type:source.mime}));
@@ -32,11 +97,8 @@ async function cropImage(source:Prepared,crop?:Crop):Promise<Prepared>{
   const rawW=Math.min(bitmap.width-rawX,Math.floor(crop.width*bitmap.width)),rawH=Math.min(bitmap.height-rawY,Math.floor(crop.height*bitmap.height));
   if(rawW<16||rawH<16){bitmap.close();throw new Error("A área encontrada para o produto é pequena demais.");}
 
-  // O Gemini fornece a caixa EXATA do produto. Não adicionamos margem.
-  // Isso evita que preço, data, texto ou outras partes da tela entrem na foto.
-  const x=rawX,y=rawY;
-  const right=Math.min(bitmap.width,rawX+rawW),bottom=Math.min(bitmap.height,rawY+rawH);
-  const w=right-x,h=bottom-y;
+  const tight=tightenCrop(bitmap,rawX,rawY,rawW,rawH);
+  const x=tight.x,y=tight.y,w=tight.w,h=tight.h;
   if(w<16||h<16){bitmap.close();throw new Error("Não consegui preparar uma área válida para o produto.");}
 
   const size=Math.min(1200,Math.max(320,Math.max(w,h)));
